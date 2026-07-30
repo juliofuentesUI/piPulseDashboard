@@ -1,0 +1,129 @@
+/*
+ * Global palette, reset and the shared chunky panel frame.
+ *
+ * The palette is deliberately small — one background family, one ink family,
+ * four accents, and a handful of sprite colours. Everything on screen picks
+ * from this list, which is what keeps the handheld look coherent.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Shell */
+  --c-void: #07060f;
+  --c-bezel: #14122a;
+  --c-screen: #1b1836;
+  --c-panel: #2b2557;
+  --c-panel-hi: #3d3579;
+  --c-line: #574db0;
+  --c-line-soft: #3a3280;
+
+  /* Ink */
+  --c-ink: #f6f3e7;
+  --c-dim: #a79ddb;
+  --c-mute: #6f66a8;
+
+  /* Accents */
+  --c-amber: #ffc74a;
+  --c-cyan: #5fe0d8;
+  --c-pink: #ff6fa5;
+  --c-green: #97e04f;
+  --c-red: #ff5d5d;
+
+  /* Sprite palette */
+  --ic-sun: #ffc74a;
+  --ic-sun-hi: #fff2ae;
+  --ic-sun-shade: #e0952b;
+  --ic-sun-ray: #ff9a2e;
+  --ic-moon: #b7aef0;
+  --ic-moon-hi: #ded8ff;
+  --ic-moon-shade: #7f76bd;
+  --ic-star: #fff2ae;
+  --ic-cloud: #cdc6f2;
+  --ic-cloud-hi: #ffffff;
+  --ic-cloud-shade: #8f86c9;
+  --ic-cloud-dark: #8b82c4;
+  --ic-cloud-dark-shade: #5d5590;
+  --ic-rain: #4fb6e8;
+  --ic-rain-hi: #9fe8ff;
+  --ic-snow: #ffffff;
+  --ic-bolt: #ffc74a;
+  --ic-bolt-hi: #fff2ae;
+  --ic-fog: #8b82c4;
+  --ic-fog-hi: #cdc6f2;
+
+  /*
+   * No webfont is bundled, so this falls back to the sharpest monospace the
+   * machine has. To go full pixel, drop a .woff2 into apps/web/public/fonts/
+   * and add an @font-face named "Pixel Operator" — the stack picks it up.
+   */
+  --font-pixel: 'Pixel Operator', 'Press Start 2P', 'DejaVu Sans Mono',
+    ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--c-void);
+  color: var(--c-ink);
+
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  text-transform: uppercase;
+  font-variant-ligatures: none;
+  font-synthesis: none;
+
+  /* Aliased glyph edges suit the pixel look and cost nothing to render. */
+  -webkit-font-smoothing: none;
+
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * The shared frame: a hard 4px border, an inset top highlight and bottom
+ * shade for depth, a hard drop shadow, and four corner rivets. No radii and
+ * no blur anywhere — every edge lands on a whole pixel.
+ */
+.panel {
+  position: relative;
+  background: var(--c-panel);
+  border: 4px solid var(--c-line);
+  box-shadow:
+    inset 0 4px 0 var(--c-panel-hi),
+    inset 0 -5px 0 var(--c-line-soft),
+    0 5px 0 var(--c-void);
+}
+
+.panel::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--c-line) 0 0) 0 0 / 5px 5px no-repeat,
+    linear-gradient(var(--c-line) 0 0) 100% 0 / 5px 5px no-repeat,
+    linear-gradient(var(--c-line) 0 0) 0 100% / 5px 5px no-repeat,
+    linear-gradient(var(--c-line) 0 0) 100% 100% / 5px 5px no-repeat;
+}

@@ -1,0 +1,27 @@
+{
+  "name": "pipulse-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pixel-art handheld-console weather dashboard for a 720x720 HyperPixel Square Touch on Raspberry Pi 5",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c magenta,cyan \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev --workspace @pipulse/api",
+    "dev:web": "npm run dev --workspace @pipulse/web",
+    "build": "npm run build --workspace @pipulse/api && npm run build --workspace @pipulse/web",
+    "start": "concurrently -n api,web -c magenta,cyan \"npm:start:api\" \"npm:start:web\"",
+    "start:api": "npm run start --workspace @pipulse/api",
+    "start:web": "npm run start --workspace @pipulse/web",
+    "typecheck": "npm run typecheck --workspace @pipulse/api && npm run typecheck --workspace @pipulse/web"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.4"
+  }
+}
