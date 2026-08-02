@@ -25,6 +25,18 @@ root instead and shows up as an untracked stray.
 
 Run `npm run typecheck` before calling a change done — it covers both workspaces.
 
+## Remote access
+
+Tailscale lives on the **Windows host**, never inside WSL — installing it in WSL was tried
+and abandoned, because mirrored networking conflicts with it. Mirrored networking also
+means Windows already reaches the WSL dev server on `localhost`, so `tailscale serve` on
+the host is all that is needed. Leave Tailscale installation and `serve`/`funnel` config
+to the user on Windows; there is nothing to run for it inside WSL.
+
+Do not change the dev server's `host` or `port`, or add WSL port forwarding, to make
+remote access work. Those are not the problem. The one thing the repo needs is
+`server.allowedHosts` in `apps/web/vite.config.ts`, which is already set.
+
 ## Raspberry Pi deploys
 
 Install Node 22+ from NodeSource. The version in apt is 18, which is too old for Vite and

@@ -27,6 +27,38 @@ Then open **http://localhost:5173**.
 The dev server binds to `0.0.0.0`, so you can also open the dashboard from another
 machine on the same network at `http://<pi-ip>:5173`.
 
+## Remote access over Tailscale
+
+To check the dashboard from a phone off the LAN — on cellular, say — put the machine on a
+[tailnet](https://tailscale.com/) and let Tailscale front the dev server.
+
+On a Windows + WSL setup, Tailscale belongs on the **Windows host**, not inside WSL.
+Mirrored networking already shares `localhost` between the two, so Windows reaches the
+WSL dev server with no port forwarding, and WSL needs no Tailscale of its own. From
+PowerShell, with `npm run dev` running in WSL:
+
+```powershell
+tailscale serve --bg 5173     # tailnet-only HTTPS
+tailscale serve status        # prints the https://<node>.<tailnet>.ts.net URL
+tailscale serve reset         # undo
+```
+
+Install Tailscale on the phone, sign into the same account, and open that URL.
+
+Two things make this work:
+
+- **`server.allowedHosts` includes `.ts.net`.** `tailscale serve` forwards the original
+  `Host` header, so requests arrive as the tailnet FQDN rather than `localhost`, and Vite
+  rejects hostnames it does not recognise. The leading dot matches any `*.ts.net` name.
+- **Only port 5173 is exposed.** The client calls `/api/weather` as a relative path and
+  Vite proxies it to Fastify inside the machine, so port 3000 never leaves it.
+
+Prefer `tailscale serve` to `tailscale funnel`. Both give HTTPS, but `serve` is reachable
+only from your own tailnet, whereas `funnel` publishes the dev server to the whole
+internet — and the hostname is discoverable in public Certificate Transparency logs, so
+an unlisted URL is not a security boundary. A dev server serves your project source; keep
+it off the public internet unless you have a reason.
+
 ## Scripts
 
 Run from the repository root:

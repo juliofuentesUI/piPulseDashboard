@@ -1,20 +1,13 @@
 # Handoff: remote viewing and testing
 
-Written 2026-08-02. Two goals, neither started:
+Written 2026-08-02. Two goals:
 
-1. **Tailscale** — reach the dev server from a phone beyond the LAN.
+1. ~~**Tailscale** — reach the dev server from a phone beyond the LAN.~~ **Done** — see
+   "Goal 1" below for what shipped.
 2. **Remote PNG viewing** — Claude takes a screenshot and hands back something
-   openable on a phone.
+   openable on a phone. **Still open.**
 
-Delete this file once both are done.
-
----
-
-## Step 0: uncommitted work
-
-`CLAUDE.md` and `README.md` are modified and not committed. Both are documentation
-corrections about `browser_take_screenshot` writing outside `.playwright-mcp/`. Review
-and commit before starting.
+Delete this file once Goal 2 is done.
 
 Repo convention: branch, commit, `git merge --ff-only` back to `main`, delete the
 branch. No PRs — this is a solo repo.
@@ -56,36 +49,41 @@ with stable refs — `button "Refresh weather" [ref=e16]`, `button "Open setting
 
 ---
 
-## Goal 1: Tailscale
+## Goal 1: Tailscale — done
 
-Install **inside WSL**, not on the Windows host. The dev server lives in WSL and the
-environment is already suited to it:
+**Tailscale runs on the Windows host, not in WSL.** Installing inside WSL was tried and
+abandoned: systemd and `/dev/net/tun` are both present, so it looked viable, but mirrored
+networking conflicts with Tailscale in WSL. Do not retry it.
 
-- systemd is enabled (`/etc/wsl.conf`), so `tailscaled` runs as a service and survives
-  restarts.
-- `/dev/net/tun` exists, so no `--tun=userspace-networking` workaround is needed.
-- Mirrored networking is on — `eth4` carries the LAN address `192.168.0.164/24`
-  directly rather than a NAT'd `172.x`, so no `netsh portproxy` is required.
+The Windows-host arrangement is simpler anyway. Mirrored networking shares `localhost`
+between Windows and WSL, so Windows reaches the WSL dev server with no port forwarding,
+and Tailscale's address surfaces inside WSL as a `100.x` on its own interface.
 
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
+Setup lives in README under "Remote access over Tailscale". The short version, from
+PowerShell with `npm run dev` running in WSL:
+
+```powershell
+tailscale serve --bg 5173
+tailscale serve status
 ```
 
-`tailscale up` prints a login URL. **The user does that in a browser — do not attempt
-to authenticate on their behalf.** Then install Tailscale on the phone and sign into
-the same account.
+`serve`, not `funnel` — `serve` is tailnet-only, while `funnel` publishes the dev server
+to the internet and its hostname is discoverable in public Certificate Transparency logs.
 
-Verify by loading `http://<machine-name>:5173` from the phone on cellular, with wifi
-off, to prove it is not just working over the LAN. `tailscale serve` can front it with
-HTTPS if mixed-content warnings become a problem.
+The only repo change this needed was `server.allowedHosts: ['.ts.net']` in
+`apps/web/vite.config.ts`. `tailscale serve` preserves the original `Host` header, so
+requests arrive as the tailnet FQDN and Vite blocks them otherwise. Verified by spoofing
+the header locally — `.ts.net` and bare IPs pass, everything else still gets
+`Blocked request`.
 
 The Windows machine is always on, so there is no "is the host awake" concern. The Pi is
 deliberately off during development and is not part of this.
 
-Vite already binds `0.0.0.0`, so no config change is needed. If the phone gets a host
-check error, Vite's `server.allowedHosts` in `apps/web/vite.config.ts` may need the
-tailnet hostname.
+**Still unverified:** HMR over HTTPS. The page is served on 443 but Vite derives its
+websocket URL from the dev server port, so live reload may fail with console errors while
+the dashboard itself renders fine. Fix if it bites: `server.hmr.clientPort: 443` plus
+`protocol: 'wss'` — but that breaks plain local dev if applied unconditionally, so it was
+deliberately left out.
 
 ---
 

@@ -20,6 +20,12 @@ export default defineConfig(({ mode }) => {
     },
   };
 
+  // Vite rejects unrecognised Host headers. `tailscale serve` forwards the
+  // original one, so remote requests arrive as the tailnet FQDN rather than
+  // localhost. The leading dot matches every *.ts.net name, which resolves only
+  // inside a tailnet — this is not a public opening.
+  const allowedHosts = ['.ts.net'];
+
   return {
     envDir,
     plugins: [svelte()],
@@ -27,12 +33,14 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0', // reachable from other machines on the LAN
       port: webPort,
       strictPort: true,
+      allowedHosts,
       proxy,
     },
     preview: {
       host: '0.0.0.0',
       port: webPort,
       strictPort: true,
+      allowedHosts,
       proxy,
     },
     build: {
