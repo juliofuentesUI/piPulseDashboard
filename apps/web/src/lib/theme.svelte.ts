@@ -74,6 +74,26 @@ export const THEMES: readonly Theme[] = [
     },
   },
   {
+    /*
+     * Monochrome, so `surface` and `warm` — the two fills — drop back to the
+     * background. Cloud bodies and sun discs become hollow, leaving only their
+     * outlines, which is what turns the sprites into the line art this palette
+     * is drawn from. They still paint, so a cloud goes on occluding the sun
+     * behind it exactly as before.
+     */
+    id: 'brutalist-mono',
+    name: 'BRUTALIST MONO',
+    palette: {
+      bg: '#0a0e06',
+      surface: '#0d1207',
+      ink: '#a8e831',
+      blue: '#86c81c',
+      sky: '#6aa015',
+      warm: '#0d1207',
+      hot: '#d7f76b',
+    },
+  },
+  {
     id: 'amber',
     name: 'AMBER CRT',
     palette: {
@@ -109,7 +129,7 @@ export function storedTheme(): Theme {
 }
 
 /**
- * The theme currently on screen, plus the means to move to the next one.
+ * The theme currently on screen, plus the means to change it.
  *
  * Swapping is a synchronous property write on one element — no rebuild, no
  * reload, and nothing to re-fetch, which is the whole point of keeping themes
@@ -118,15 +138,11 @@ export function storedTheme(): Theme {
 export class ThemeStore {
   current = $state<Theme>(storedTheme());
 
-  /** Advances to the next theme, wrapping around, and remembers the choice. */
-  next(): Theme {
-    const index = THEMES.indexOf(this.current);
-    const theme = THEMES[(index + 1) % THEMES.length] ?? DEFAULT_THEME;
-
+  /** Applies a theme immediately and remembers the choice. */
+  select(theme: Theme): void {
     this.current = theme;
     applyTheme(theme);
     write(STORAGE_KEY, theme.id);
-    return theme;
   }
 }
 

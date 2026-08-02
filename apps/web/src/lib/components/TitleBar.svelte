@@ -1,9 +1,9 @@
 <script lang="ts">
   interface Props {
-    onswap: () => void;
+    onmenu: () => void;
   }
 
-  let { onswap }: Props = $props();
+  let { onmenu }: Props = $props();
 
   const DOTS = [0, 1, 2, 3, 4, 5];
 </script>
@@ -12,11 +12,11 @@
   <h1 class="title">WEATHER</h1>
 
   <!--
-    The 3x2 grid is decoration in the reference design. Here it doubles as the
-    theme switcher: it already reads as a menu affordance, so the dashboard
-    gains a control without gaining a widget.
+    The 3x2 grid is decoration in the reference design. Here it opens settings:
+    it already reads as a menu affordance, so the dashboard gains a control
+    without gaining a widget.
   -->
-  <button class="menu" type="button" onclick={onswap} aria-label="Change theme">
+  <button class="menu" type="button" onclick={onmenu} aria-label="Open settings">
     {#each DOTS as dot (dot)}
       <span class="dot"></span>
     {/each}

@@ -3,14 +3,13 @@
 
   import ErrorScreen from './lib/components/ErrorScreen.svelte';
   import LoadingScreen from './lib/components/LoadingScreen.svelte';
+  import SettingsModal from './lib/components/SettingsModal.svelte';
   import WeatherDashboard from './lib/components/WeatherDashboard.svelte';
-  import { Dashboard, type Notice } from './lib/dashboard.svelte';
-  import { ThemeStore } from './lib/theme.svelte';
+  import { Dashboard } from './lib/dashboard.svelte';
+  import { ThemeStore, type Theme } from './lib/theme.svelte';
 
   /** The HyperPixel Square panel. Everything below is authored at this size. */
   const DESIGN_SIZE = 720;
-  /** How long the new theme's name stays in the status bar after a swap. */
-  const THEME_FLASH_MS = 1_800;
 
   const dashboard = new Dashboard();
   const themes = new ThemeStore();
@@ -21,25 +20,13 @@
    * produces a scrollbar.
    */
   let scale = $state(1);
-
-  let flash = $state<Notice | null>(null);
-  let flashTimer: ReturnType<typeof setTimeout> | undefined;
+  let menuOpen = $state(false);
 
   const view = $derived(dashboard.view);
-  /** A theme swap borrows the status slot; everything else defers to it. */
-  const notice = $derived(flash ?? dashboard.notice);
-
   const refresh = (): void => void dashboard.refresh();
 
-  function swapTheme(): void {
-    const theme = themes.next();
-    flash = { text: theme.name, tone: 'ok' };
-
-    clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => {
-      flash = null;
-    }, THEME_FLASH_MS);
-  }
+  /** The menu stays open on pick, so the new palette can be seen taking effect. */
+  const pickTheme = (theme: Theme): void => themes.select(theme);
 
   onMount(() => {
     const fit = (): void => {
@@ -52,7 +39,6 @@
 
     return () => {
       window.removeEventListener('resize', fit);
-      clearTimeout(flashTimer);
       dashboard.stop();
     };
   });
@@ -74,9 +60,17 @@
           {view}
           date={dashboard.date}
           clock={dashboard.clock}
-          {notice}
+          notice={dashboard.notice}
           onrefresh={refresh}
-          onswap={swapTheme}
+          onmenu={() => (menuOpen = true)}
+        />
+      {/if}
+
+      {#if menuOpen}
+        <SettingsModal
+          current={themes.current}
+          onselect={pickTheme}
+          onclose={() => (menuOpen = false)}
         />
       {/if}
     </div>
@@ -103,6 +97,8 @@
 
   /* The thick outer frame of the reference design. Square corners, no shadow. */
   .screen {
+    /* Anchors the settings overlay, which is clipped to the panel like everything else. */
+    position: relative;
     display: grid;
     /*
      * Explicit, not the implicit `auto` row: an auto row would ask its child

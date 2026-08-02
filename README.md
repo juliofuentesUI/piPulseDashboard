@@ -221,7 +221,8 @@ The reference design has no visible buttons, so both controls are hidden in plai
 
 - **Tap the status bar** (the date/clock row) to force a refresh. It is a 700 × 72
   target, which is hard to miss on a touchscreen.
-- **Tap the 3 × 2 menu grid** beside the title to cycle themes.
+- **Tap the 3 × 2 menu grid** beside the title to open settings. Dismiss with the
+  close button, a tap outside the panel, or `Escape`.
 
 Keyboard focus draws a visible outline on both, since neither looks like a control.
 
@@ -245,11 +246,32 @@ reload, nothing re-fetched.
 Tokens are named for their role in the artwork rather than their hue, so an inverted
 theme stays coherent — in `midnight`, `ink` is near-white.
 
-Four ship today: `gba-blue` (the default), `midnight`, `dmg-green` and `amber`. **To add
-one, append an object to `THEMES` in `apps/web/src/lib/theme.svelte.ts`.** That is the
-whole change; nothing else references a colour literal. The choice is remembered in
-`localStorage` and reapplied before the first paint, so a non-default theme never
+Five ship today: `gba-blue` (the default), `midnight`, `dmg-green`, `brutalist-mono` and
+`amber`. **To add one, append an object to `THEMES` in
+`apps/web/src/lib/theme.svelte.ts`.** That is the whole change; nothing else references
+a colour literal, and the settings list picks it up on its own. The choice is remembered
+in `localStorage` and reapplied before the first paint, so a non-default theme never
 flashes the default one.
+
+`brutalist-mono` shows what the role-based naming buys: it sets `surface` and `warm` —
+the two fill roles — to the background, so cloud bodies and sun discs go hollow and the
+sprites read as line art without a single sprite being redrawn.
+
+## Settings
+
+`SettingsModal.svelte` is the panel behind the menu grid. It is built as a stack of
+option groups, of which theme selection is the first:
+
+```svelte
+<section class="group">
+  <h3 class="group-heading">THEME</h3>
+  ...
+</section>
+```
+
+Add another group as a sibling `<section class="group">`. Spacing comes from the grid
+`gap` on the container, so nothing else needs touching. Picking a theme applies it
+immediately and leaves the panel open, so the change can be seen happening.
 
 ## Front-end behaviour
 
