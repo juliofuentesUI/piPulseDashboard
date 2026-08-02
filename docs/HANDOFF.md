@@ -108,10 +108,17 @@ Suggested approach — publish as an Artifact:
 
 That yields a private claude.ai URL, openable on a phone signed into the same account.
 
-Worth deciding once it works: whether this is even needed. If Tailscale lets the user
-load the live dashboard on their phone, a static screenshot is only useful as an
-asynchronous record — "here is what I changed while you were away." Do not build
-elaborate tooling around it until that question is settled.
+Both goals are worth having, because they answer different questions.
+
+`App.svelte` scales the fixed 720 × 720 design by
+`Math.min(window.innerWidth, window.innerHeight) / 720`, so a phone shows the whole
+dashboard centered and never clips it — roughly 0.54 on a 390 px-wide viewport. Layout
+and touch behaviour are therefore honest on a phone.
+
+Pixel fidelity is not. At a fractional scale the sprite grid resamples unevenly, so
+sprite crispness and outline alignment can only be judged at exactly 720 × 720 — a
+screenshot, or the HyperPixel itself. Keep the screenshot path for that, and for
+asynchronous "here is what changed while you were away" handoffs.
 
 ---
 
