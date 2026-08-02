@@ -62,8 +62,12 @@ channel at `/opt/google/chrome/chrome`, which a Raspberry Pi OS or WSL image wil
 have. Without the flag every call fails with `Chromium distribution 'chrome' is not
 found`.
 
-Screenshots and accessibility snapshots are written to `.playwright-mcp/` in the
-repository root, which is ignored by git.
+Output lands in `.playwright-mcp/` in the repository root, which is ignored by git:
+accessibility snapshots and a console log after every action, plus any screenshot you
+ask for. The one exception is `browser_take_screenshot` with an explicit `filename` —
+that resolves against the working directory and drops the file in the repository root,
+ignoring `--output-dir`. Omit `filename` and it is auto-named into `.playwright-mcp/`
+instead.
 
 The command is pinned to `@playwright/mcp@latest`, so the available tools can change
 between sessions. Pin a version instead if you would rather they did not.

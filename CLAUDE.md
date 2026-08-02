@@ -19,6 +19,10 @@ not tell you whether it renders correctly. Start the app with `npm run dev` and 
 Playwright MCP server against `http://localhost:5173` with the viewport set to 720 × 720.
 First-run setup is under "Browser automation" in `README.md`.
 
+Do not pass `filename` to `browser_take_screenshot`. Without it the file is auto-named
+into `.playwright-mcp/`, which is gitignored; with it the file lands in the repository
+root instead and shows up as an untracked stray.
+
 Run `npm run typecheck` before calling a change done — it covers both workspaces.
 
 ## Raspberry Pi deploys
