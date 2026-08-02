@@ -1,0 +1,27 @@
+# piPulseDashboard
+
+A weather dashboard for a 720 × 720 HyperPixel Square Touch on a Raspberry Pi 5.
+`README.md` covers the architecture, API contract, layout bands, and theming — read it
+before changing anything structural.
+
+## Scope
+
+This is a first demo, deliberately small: current weather for San Jose on one fixed-size
+screen, done well. Do not overbuild it.
+
+Prefer plain CSS and hand-rolled helpers over new dependencies. The pixel sprites and the
+runtime payload validation are hand-written on purpose, not for lack of a library.
+
+## Verifying UI changes
+
+The layout is authored at a fixed 720 × 720 and never reflows, so reading the CSS does
+not tell you whether it renders correctly. Start the app with `npm run dev` and drive the
+Playwright MCP server against `http://localhost:5173` with the viewport set to 720 × 720.
+First-run setup is under "Browser automation" in `README.md`.
+
+Run `npm run typecheck` before calling a change done — it covers both workspaces.
+
+## Raspberry Pi deploys
+
+Install Node 22+ from NodeSource. The version in apt is 18, which is too old for Vite and
+fails during install.
