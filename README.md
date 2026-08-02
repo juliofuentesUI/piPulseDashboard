@@ -53,6 +53,11 @@ Two things make this work:
 - **Only port 5173 is exposed.** The client calls `/api/weather` as a relative path and
   Vite proxies it to Fastify inside the machine, so port 3000 never leaves it.
 
+Hot reload works over the tailnet as-is — edit a component and the phone updates without
+a refresh. Vite's client derives its websocket URL from the page, so an HTTPS page gives
+`wss://` on 443 with no `server.hmr` config. Don't add `hmr.clientPort` to "fix" this; it
+would break HMR for local `localhost:5173` development.
+
 Prefer `tailscale serve` to `tailscale funnel`. Both give HTTPS, but `serve` is reachable
 only from your own tailnet, whereas `funnel` publishes the dev server to the whole
 internet — and the hostname is discoverable in public Certificate Transparency logs, so

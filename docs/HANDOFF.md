@@ -79,11 +79,15 @@ the header locally — `.ts.net` and bare IPs pass, everything else still gets
 The Windows machine is always on, so there is no "is the host awake" concern. The Pi is
 deliberately off during development and is not part of this.
 
-**Still unverified:** HMR over HTTPS. The page is served on 443 but Vite derives its
-websocket URL from the dev server port, so live reload may fail with console errors while
-the dashboard itself renders fine. Fix if it bites: `server.hmr.clientPort: 443` plus
-`protocol: 'wss'` — but that breaks plain local dev if applied unconditionally, so it was
-deliberately left out.
+**HMR works over the tailnet**, verified by editing a component and watching a phone on
+cellular hot-update without a reload. No `server.hmr` config is needed: Vite's injected
+client derives protocol, host and port from the *page* URL rather than from the dev server
+config, so an HTTPS page yields `wss://<fqdn>` on 443 by itself, and `tailscale serve`
+forwards the upgrade.
+
+**Do not "fix" this with `server.hmr.clientPort`.** Pinning it overrides that page-derived
+logic for every client, so plain `localhost:5173` dev would be told to open `wss://localhost:443`
+and local HMR would break. There is no problem to solve here.
 
 ---
 
