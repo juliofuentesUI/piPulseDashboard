@@ -19,9 +19,10 @@
   );
 </script>
 
-<section class="error panel" role="alert">
+<section class="error" role="alert">
+  <!-- A chunky exclamation mark, built from blocks to stay on the pixel grid. -->
   <div class="mark" aria-hidden="true">
-    <span class="bar"></span>
+    <span class="stem"></span>
     <span class="dot"></span>
   </div>
   <p class="headline">{failure?.message ?? 'NO WEATHER DATA'}</p>
@@ -31,52 +32,49 @@
 
 <style>
   .error {
-    grid-row: 1 / -1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 20px;
+    gap: 22px;
   }
 
-  /* A chunky exclamation mark, built from blocks to stay on the pixel grid. */
   .mark {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 12px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
   }
 
-  .bar {
-    width: 28px;
-    height: 76px;
-    background: var(--c-red);
-    box-shadow: 0 5px 0 var(--c-void);
+  .stem {
+    width: 30px;
+    height: 80px;
+    background: var(--c-hot);
+    border: var(--divider) solid var(--c-ink);
   }
 
   .dot {
-    width: 28px;
-    height: 28px;
-    background: var(--c-red);
-    box-shadow: 0 5px 0 var(--c-void);
+    width: 30px;
+    height: 30px;
+    background: var(--c-hot);
+    border: var(--divider) solid var(--c-ink);
   }
 
   .headline {
     margin: 0;
-    font-size: 32px;
+    font-size: 34px;
     font-weight: 700;
     letter-spacing: 4px;
     color: var(--c-ink);
     text-align: center;
-    text-shadow: 0 4px 0 var(--c-void);
   }
 
   .hint {
-    margin: 0 0 12px;
-    font-size: 17px;
+    margin: 0 0 10px;
+    font-size: 18px;
     letter-spacing: 3px;
-    color: var(--c-mute);
+    color: var(--c-blue);
     text-align: center;
   }
 </style>

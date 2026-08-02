@@ -2,17 +2,18 @@
   import { onMount } from 'svelte';
 
   import ErrorScreen from './lib/components/ErrorScreen.svelte';
-  import FooterBar from './lib/components/FooterBar.svelte';
-  import HeroPanel from './lib/components/HeroPanel.svelte';
   import LoadingScreen from './lib/components/LoadingScreen.svelte';
-  import StatGrid from './lib/components/StatGrid.svelte';
-  import StatusBar from './lib/components/StatusBar.svelte';
-  import { Dashboard } from './lib/dashboard.svelte';
+  import WeatherDashboard from './lib/components/WeatherDashboard.svelte';
+  import { Dashboard, type Notice } from './lib/dashboard.svelte';
+  import { ThemeStore } from './lib/theme.svelte';
 
   /** The HyperPixel Square panel. Everything below is authored at this size. */
   const DESIGN_SIZE = 720;
+  /** How long the new theme's name stays in the status bar after a swap. */
+  const THEME_FLASH_MS = 1_800;
 
   const dashboard = new Dashboard();
+  const themes = new ThemeStore();
 
   /**
    * On the Pi this resolves to exactly 1. On a desktop browser it scales the
@@ -21,8 +22,24 @@
    */
   let scale = $state(1);
 
+  let flash = $state<Notice | null>(null);
+  let flashTimer: ReturnType<typeof setTimeout> | undefined;
+
   const view = $derived(dashboard.view);
-  const refresh = () => void dashboard.refresh();
+  /** A theme swap borrows the status slot; everything else defers to it. */
+  const notice = $derived(flash ?? dashboard.notice);
+
+  const refresh = (): void => void dashboard.refresh();
+
+  function swapTheme(): void {
+    const theme = themes.next();
+    flash = { text: theme.name, tone: 'ok' };
+
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => {
+      flash = null;
+    }, THEME_FLASH_MS);
+  }
 
   onMount(() => {
     const fit = (): void => {
@@ -35,6 +52,7 @@
 
     return () => {
       window.removeEventListener('resize', fit);
+      clearTimeout(flashTimer);
       dashboard.stop();
     };
   });
@@ -52,26 +70,15 @@
           onretry={refresh}
         />
       {:else}
-        <StatusBar
-          location={view.location}
+        <WeatherDashboard
+          {view}
+          date={dashboard.date}
           clock={dashboard.clock}
-          online={dashboard.online}
-        />
-        <HeroPanel
-          icon={view.icon}
-          temperature={view.temperature}
-          condition={view.condition}
-          feelsLike={view.feelsLike}
-        />
-        <StatGrid tiles={view.tiles} />
-        <FooterBar
-          notice={dashboard.notice}
-          busy={dashboard.isRefreshing}
+          {notice}
           onrefresh={refresh}
+          onswap={swapTheme}
         />
       {/if}
-
-      <div class="crt" aria-hidden="true"></div>
     </div>
   </div>
 </div>
@@ -83,7 +90,7 @@
     display: grid;
     place-items: center;
     overflow: hidden;
-    background: var(--c-void);
+    background: var(--c-ink);
   }
 
   .device {
@@ -94,44 +101,21 @@
     transform-origin: center center;
   }
 
+  /* The thick outer frame of the reference design. Square corners, no shadow. */
   .screen {
-    position: relative;
+    display: grid;
+    /*
+     * Explicit, not the implicit `auto` row: an auto row would ask its child
+     * how tall it wants to be, the child's own `height: 100%` could not resolve
+     * against a row that is still being sized, and the row would lock to the
+     * content height. The panel would then be 720 tall with ~774 of content in
+     * it. A definite track makes the 704 flow downwards instead.
+     */
+    grid-template-rows: minmax(0, 1fr);
     width: 100%;
     height: 100%;
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
-    gap: 10px;
-    padding: 12px;
     overflow: hidden;
-
-    background:
-      repeating-linear-gradient(
-        45deg,
-        rgba(255, 255, 255, 0.014) 0 2px,
-        rgba(0, 0, 0, 0) 2px 4px
-      ),
-      var(--c-screen);
-    border: 6px solid var(--c-bezel);
-    box-shadow: inset 0 0 0 3px var(--c-line-soft);
-  }
-
-  /* Static scanlines and vignette — no animation, so it costs nothing on the Pi. */
-  .crt {
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    pointer-events: none;
-    background:
-      repeating-linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0.22) 0 1px,
-        rgba(0, 0, 0, 0) 1px 3px
-      ),
-      radial-gradient(
-        130% 130% at 50% 32%,
-        rgba(255, 255, 255, 0.05) 0%,
-        rgba(0, 0, 0, 0) 46%,
-        rgba(0, 0, 0, 0.55) 100%
-      );
+    background: var(--c-bg);
+    border: var(--frame) solid var(--c-ink);
   }
 </style>

@@ -1,4 +1,10 @@
-import type { DashboardFailure, WeatherCondition, WeatherSnapshot } from './types';
+import type {
+  DashboardFailure,
+  ForecastPeriod,
+  ForecastPoint,
+  WeatherCondition,
+  WeatherSnapshot,
+} from './types';
 
 /** A fetch failure already translated into something the screen can show. */
 export class WeatherRequestError extends Error {
@@ -18,9 +24,12 @@ const CONDITIONS: readonly WeatherCondition[] = [
   'fog',
   'drizzle',
   'rain',
+  'heavy-rain',
   'snow',
   'thunderstorm',
 ];
+
+const PERIODS: readonly ForecastPeriod[] = ['midday', 'evening'];
 
 /**
  * Calls the local Fastify endpoint. The path stays relative so Vite's proxy
@@ -88,6 +97,24 @@ function isWeatherSnapshot(value: unknown): value is WeatherSnapshot {
     typeof v['precipitationProbability'] === 'number' &&
     typeof v['windSpeed'] === 'number' &&
     typeof v['updatedAt'] === 'string' &&
+    CONDITIONS.includes(v['conditionKey'] as WeatherCondition) &&
+    Array.isArray(v['forecast']) &&
+    v['forecast'].every(isForecastPoint)
+  );
+}
+
+function isForecastPoint(value: unknown): value is ForecastPoint {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v['time'] === 'string' &&
+    typeof v['dayOffset'] === 'number' &&
+    typeof v['temperature'] === 'number' &&
+    typeof v['condition'] === 'string' &&
+    typeof v['weatherCode'] === 'number' &&
+    typeof v['isDay'] === 'boolean' &&
+    typeof v['precipitationProbability'] === 'number' &&
+    PERIODS.includes(v['period'] as ForecastPeriod) &&
     CONDITIONS.includes(v['conditionKey'] as WeatherCondition)
   );
 }

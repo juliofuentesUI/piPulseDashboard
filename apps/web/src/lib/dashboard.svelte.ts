@@ -1,11 +1,17 @@
 import { requestWeather, WeatherRequestError } from './api';
 import type { DashboardFailure, DashboardPhase, WeatherSnapshot } from './types';
-import { formatClock, toDashboardView } from './view';
+import { formatClock, formatDate, relativeTime, toDashboardView } from './view';
 
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const CLOCK_INTERVAL_MS = 60 * 1000;
-/** How long "REFRESHED" stays on screen after a successful fetch. */
+/** How long "UPDATED" stays on screen after a successful fetch. */
 const FLASH_MS = 2_500;
+/**
+ * A reading older than this means the refresh timer never fired — a suspended
+ * tab, a slept machine — which produces no error but leaves stale numbers on
+ * screen looking current. Worth saying out loud on an always-on display.
+ */
+const STALE_AFTER_MS = 30 * 60 * 1000;
 
 export type NoticeTone = 'ok' | 'busy' | 'warn' | 'error';
 
@@ -37,23 +43,37 @@ export class Dashboard {
   #flashTimer: ReturnType<typeof setTimeout> | undefined;
   #controller: AbortController | undefined;
 
-  view = $derived(
-    this.#snapshot === null ? null : toDashboardView(this.#snapshot, this.#now),
-  );
+  view = $derived(this.#snapshot === null ? null : toDashboardView(this.#snapshot));
 
   clock = $derived(formatClock(this.#now));
+  date = $derived(formatDate(this.#now));
 
-  /** One line of status text covering loading, success, failure and offline. */
-  notice = $derived<Notice>(
+  #stale = $derived(
+    this.#snapshot !== null &&
+      this.#now.getTime() - new Date(this.#snapshot.updatedAt).getTime() >
+        STALE_AFTER_MS,
+  );
+
+  #age = $derived(
+    this.#snapshot === null ? '' : relativeTime(this.#snapshot.updatedAt, this.#now),
+  );
+
+  /**
+   * Status text for the header, or null when there is nothing worth saying —
+   * the resting state of the screen shows no chatter at all.
+   */
+  notice = $derived<Notice | null>(
     this.isRefreshing
-      ? { text: 'REFRESHING...', tone: 'busy' }
+      ? { text: 'REFRESHING', tone: 'busy' }
       : !this.online
         ? { text: 'NO NETWORK', tone: 'error' }
         : this.failure !== null
           ? { text: this.failure.message, tone: 'warn' }
           : this.justRefreshed
-            ? { text: 'REFRESHED', tone: 'ok' }
-            : { text: this.view?.updatedLabel ?? 'WAITING', tone: 'ok' },
+            ? { text: 'UPDATED', tone: 'ok' }
+            : this.#stale
+              ? { text: this.#age, tone: 'warn' }
+              : null,
   );
 
   start(): void {

@@ -1,57 +1,15 @@
 <script lang="ts">
   import IconFrame from './IconFrame.svelte';
   import Pixels from './Pixels.svelte';
-  import { cloud, type Rect } from './sprite';
+  import { BLUE, cloud, outlined, SKY, type Rect } from './sprite';
 
-  const back: Rect[] = cloud(-4, -4, {
-    body: 'var(--ic-cloud-dark)',
-    shade: 'var(--ic-cloud-dark-shade)',
-    highlight: 'var(--ic-cloud)',
-  });
+  /** A cooler cloud behind and above reads as overcast rather than as one cloud. */
+  const back = cloud(3, -1, { body: SKY, shade: BLUE });
+  const front = cloud(-3, 6);
 
-  const front: Rect[] = cloud(2, 3, {
-    body: 'var(--ic-cloud)',
-    shade: 'var(--ic-cloud-shade)',
-    highlight: 'var(--ic-cloud-hi)',
-  });
+  const art: Rect[] = [...outlined(back), ...outlined(front)];
 </script>
 
 <IconFrame label="Cloudy">
-  <g class="back"><Pixels rects={back} /></g>
-  <g class="front"><Pixels rects={front} /></g>
+  <Pixels rects={art} />
 </IconFrame>
-
-<style>
-  .back {
-    animation: drift-back 11s ease-in-out infinite alternate;
-  }
-
-  .front {
-    animation: drift-front 8s ease-in-out infinite alternate;
-  }
-
-  @keyframes drift-back {
-    from {
-      transform: translateX(1px);
-    }
-    to {
-      transform: translateX(-1px);
-    }
-  }
-
-  @keyframes drift-front {
-    from {
-      transform: translateX(-1px);
-    }
-    to {
-      transform: translateX(1px);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .back,
-    .front {
-      animation: none;
-    }
-  }
-</style>

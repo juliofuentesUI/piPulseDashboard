@@ -21,6 +21,9 @@ export interface OpenMeteoCurrent {
 
 export interface OpenMeteoHourly {
   readonly time: readonly string[];
+  readonly temperature_2m: readonly number[];
+  readonly weather_code: readonly number[];
+  readonly is_day: readonly number[];
   readonly precipitation_probability: readonly (number | null)[];
 }
 
@@ -49,8 +52,29 @@ export type WeatherCondition =
   | 'fog'
   | 'drizzle'
   | 'rain'
+  | 'heavy-rain'
   | 'snow'
   | 'thunderstorm';
+
+/** The two look-ahead columns on the dashboard, beside the current reading. */
+export type ForecastPeriod = 'midday' | 'evening';
+
+/** A single hourly forecast the dashboard renders as one column. */
+export interface ForecastPoint {
+  readonly period: ForecastPeriod;
+  /** ISO 8601 with the location's UTC offset, e.g. "2026-08-01T13:00:00-07:00". */
+  readonly time: string;
+  /** Days ahead of the current local date: 0 = today, 1 = tomorrow. */
+  readonly dayOffset: number;
+  /** Whole degrees Fahrenheit. */
+  readonly temperature: number;
+  readonly condition: string;
+  readonly conditionKey: WeatherCondition;
+  readonly weatherCode: number;
+  readonly isDay: boolean;
+  /** Percent, 0-100, for this hour specifically. */
+  readonly precipitationProbability: number;
+}
 
 export interface WeatherSnapshot {
   /** Human-readable place name, e.g. "San Jose". */
@@ -68,10 +92,19 @@ export interface WeatherSnapshot {
   readonly isDay: boolean;
   readonly high: number;
   readonly low: number;
-  /** Percent, 0-100. */
+  /**
+   * Percent, 0-100. The *highest* hourly probability over the next
+   * `RAIN_WINDOW_HOURS`, not the current minute — one number on a wall display
+   * should answer "will I need an umbrella today".
+   */
   readonly precipitationProbability: number;
   /** Miles per hour. */
   readonly windSpeed: number;
+  /**
+   * Look-ahead points, in display order. Normally `[midday, evening]`; a
+   * period is omitted if the hourly series cannot supply it.
+   */
+  readonly forecast: readonly ForecastPoint[];
   /** ISO 8601 with the location's UTC offset, e.g. "2026-07-30T01:00:00-07:00". */
   readonly updatedAt: string;
 }

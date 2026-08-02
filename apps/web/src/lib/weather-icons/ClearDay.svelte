@@ -1,52 +1,29 @@
 <script lang="ts">
   import IconFrame from './IconFrame.svelte';
   import Pixels from './Pixels.svelte';
-  import { disc, rect, type Rect } from './sprite';
+  import { disc, HOT, outlined, rect, WARM, type Rect } from './sprite';
 
+  const body = disc(16, 16, 8, WARM);
+
+  /** Cardinal rays are straight bars; diagonals are two stepped blocks. */
   const rays: Rect[] = [
-    rect(11, 0, 2, 3, 'var(--ic-sun-ray)'),
-    rect(11, 21, 2, 3, 'var(--ic-sun-ray)'),
-    rect(0, 11, 3, 2, 'var(--ic-sun-ray)'),
-    rect(21, 11, 3, 2, 'var(--ic-sun-ray)'),
-    rect(4, 4, 2, 2, 'var(--ic-sun-ray)'),
-    rect(18, 4, 2, 2, 'var(--ic-sun-ray)'),
-    rect(4, 18, 2, 2, 'var(--ic-sun-ray)'),
-    rect(18, 18, 2, 2, 'var(--ic-sun-ray)'),
+    rect(15, 1, 2, 5, HOT),
+    rect(15, 26, 2, 5, HOT),
+    rect(1, 15, 5, 2, HOT),
+    rect(26, 15, 5, 2, HOT),
+    rect(6, 6, 2, 2, HOT),
+    rect(8, 8, 2, 2, HOT),
+    rect(24, 6, 2, 2, HOT),
+    rect(22, 8, 2, 2, HOT),
+    rect(6, 24, 2, 2, HOT),
+    rect(8, 22, 2, 2, HOT),
+    rect(24, 24, 2, 2, HOT),
+    rect(22, 22, 2, 2, HOT),
   ];
 
-  const body: Rect[] = [
-    ...disc(12, 12, 6, 'var(--ic-sun)'),
-    rect(9, 7, 4, 1, 'var(--ic-sun-hi)'),
-    rect(8, 8, 2, 2, 'var(--ic-sun-hi)'),
-    rect(7, 10, 1, 2, 'var(--ic-sun-hi)'),
-    rect(14, 15, 4, 1, 'var(--ic-sun-shade)'),
-    rect(16, 13, 2, 2, 'var(--ic-sun-shade)'),
-  ];
+  const art: Rect[] = [...outlined(body, HOT), ...rays];
 </script>
 
-<IconFrame label="Clear sky">
-  <g class="rays"><Pixels rects={rays} /></g>
-  <Pixels rects={body} />
+<IconFrame label="Clear">
+  <Pixels rects={art} />
 </IconFrame>
-
-<style>
-  .rays {
-    transform-origin: 50% 50%;
-    animation: flare 4s ease-in-out infinite alternate;
-  }
-
-  @keyframes flare {
-    from {
-      opacity: 0.55;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .rays {
-      animation: none;
-    }
-  }
-</style>

@@ -16,87 +16,35 @@
   aria-busy={busy}
   aria-label={busy ? 'Refreshing weather' : 'Refresh weather now'}
 >
-  <span class="pip" aria-hidden="true"></span>
-  <span class="text">{busy ? 'WAIT' : label}</span>
+  {busy ? 'WAIT' : label}
 </button>
 
 <style>
   .button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-
     /* Comfortably past the 44px touch target minimum. */
-    min-width: 210px;
-    min-height: 72px;
-    padding: 0 24px;
+    min-width: 220px;
+    min-height: 76px;
+    padding: 0 28px;
 
     font: inherit;
-    font-size: 24px;
+    font-size: 26px;
     font-weight: 700;
     letter-spacing: 4px;
-    color: var(--c-void);
+    color: var(--c-ink);
 
-    background: var(--c-amber);
-    border: 4px solid var(--c-void);
-    box-shadow:
-      inset 0 4px 0 rgba(255, 255, 255, 0.55),
-      inset 0 -5px 0 rgba(0, 0, 0, 0.28),
-      0 6px 0 var(--c-void);
-
+    background: var(--c-warm);
+    border: var(--divider) solid var(--c-ink);
     cursor: pointer;
-    touch-action: manipulation;
-    transition: none;
   }
 
-  .button:focus-visible {
-    outline: 4px solid var(--c-cyan);
-    outline-offset: 4px;
-  }
-
-  /* Physical button press: the face drops onto its own shadow. */
+  /* Flat design, so a press swaps the fill rather than moving the button. */
   .button:active:not(:disabled) {
-    transform: translateY(6px);
-    box-shadow:
-      inset 0 4px 0 rgba(255, 255, 255, 0.4),
-      inset 0 -5px 0 rgba(0, 0, 0, 0.28),
-      0 0 0 var(--c-void);
+    background: var(--c-hot);
   }
 
   .button:disabled {
-    background: var(--c-panel-hi);
-    color: var(--c-mute);
+    background: var(--c-bg);
+    color: var(--c-blue);
     cursor: default;
-  }
-
-  .pip {
-    width: 14px;
-    height: 14px;
-    background: var(--c-void);
-    box-shadow: 6px 0 0 -3px var(--c-void);
-  }
-
-  .button:disabled .pip {
-    background: var(--c-mute);
-    box-shadow: 6px 0 0 -3px var(--c-mute);
-    animation: pulse 1s steps(2, end) infinite;
-  }
-
-  @keyframes pulse {
-    0%,
-    50% {
-      opacity: 1;
-    }
-    51%,
-    100% {
-      opacity: 0.3;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .button:disabled .pip {
-      animation: none;
-    }
   }
 </style>

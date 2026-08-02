@@ -1,11 +1,30 @@
 import type { LocationConfig } from './config.js';
 import type {
+  ForecastPeriod,
+  ForecastPoint,
   OpenMeteoResponse,
   WeatherCondition,
   WeatherSnapshot,
 } from './types.js';
 
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
+
+/**
+ * Two days of hourly data, so an evening reading late at night can roll
+ * forward to tomorrow instead of falling off the end of the series.
+ */
+const FORECAST_DAYS = 2;
+
+/** Local hour each dashboard column aims at. */
+const PERIOD_HOURS: Readonly<Record<ForecastPeriod, number>> = {
+  midday: 13,
+  evening: 19,
+};
+
+const PERIODS: readonly ForecastPeriod[] = ['midday', 'evening'];
+
+/** How far ahead the single rain number looks. */
+const RAIN_WINDOW_HOURS = 12;
 
 /** Raised when the upstream provider is unreachable or answers with nonsense. */
 export class WeatherUnavailableError extends Error {
@@ -24,7 +43,10 @@ export function buildRequestUrl(location: LocationConfig): URL {
     'current',
     'temperature_2m,apparent_temperature,is_day,weather_code,wind_speed_10m',
   );
-  url.searchParams.set('hourly', 'precipitation_probability');
+  url.searchParams.set(
+    'hourly',
+    'temperature_2m,weather_code,is_day,precipitation_probability',
+  );
   url.searchParams.set(
     'daily',
     'temperature_2m_max,temperature_2m_min,precipitation_probability_max',
@@ -32,7 +54,7 @@ export function buildRequestUrl(location: LocationConfig): URL {
   url.searchParams.set('temperature_unit', 'fahrenheit');
   url.searchParams.set('wind_speed_unit', 'mph');
   url.searchParams.set('precipitation_unit', 'inch');
-  url.searchParams.set('forecast_days', '1');
+  url.searchParams.set('forecast_days', String(FORECAST_DAYS));
   return url;
 }
 
@@ -81,22 +103,106 @@ export function normalize(
     isDay: raw.current.is_day === 1,
     high: Math.round(raw.daily.temperature_2m_max[0] ?? raw.current.temperature_2m),
     low: Math.round(raw.daily.temperature_2m_min[0] ?? raw.current.temperature_2m),
-    precipitationProbability: currentPrecipitationProbability(raw),
+    precipitationProbability: upcomingPrecipitationProbability(raw),
     windSpeed: Math.round(raw.current.wind_speed_10m),
+    forecast: buildForecast(raw),
     updatedAt: toOffsetIso(Date.now(), raw.utc_offset_seconds),
   };
 }
 
+// --- Look-ahead columns ---------------------------------------------------
+
+function buildForecast(raw: OpenMeteoResponse): ForecastPoint[] {
+  const points: ForecastPoint[] = [];
+  for (const period of PERIODS) {
+    const point = forecastPoint(raw, period);
+    if (point !== null) points.push(point);
+  }
+  return points;
+}
+
+function forecastPoint(
+  raw: OpenMeteoResponse,
+  period: ForecastPeriod,
+): ForecastPoint | null {
+  const index = selectHour(raw, PERIOD_HOURS[period]);
+  if (index === -1) return null;
+
+  const time = raw.hourly.time[index];
+  const temperature = raw.hourly.temperature_2m[index];
+  const code = raw.hourly.weather_code[index];
+  if (time === undefined || temperature === undefined || code === undefined) {
+    return null;
+  }
+
+  const { key, label } = describeWeatherCode(code);
+  return {
+    period,
+    time: `${time}:00${offsetSuffix(raw.utc_offset_seconds)}`,
+    dayOffset: daysBetween(raw.current.time, time),
+    temperature: Math.round(temperature),
+    condition: label,
+    conditionKey: key,
+    weatherCode: code,
+    isDay: raw.hourly.is_day[index] === 1,
+    precipitationProbability: clamp(
+      Math.round(raw.hourly.precipitation_probability[index] ?? 0),
+      0,
+      100,
+    ),
+  };
+}
+
 /**
- * Open-Meteo only reports precipitation probability hourly, so we line the
- * current timestamp up with the hourly series and fall back to today's max.
+ * Finds the hourly entry for `hour` on the soonest day where it has not
+ * already gone by, compared at hour rather than minute granularity.
+ *
+ * So at 13:40 the midday column still shows today's 13:00; from 14:00 it rolls
+ * to tomorrow, and `dayOffset` tells the client to label it as such. Open-Meteo
+ * timestamps are fixed-width local ISO strings, so comparing them as strings is
+ * the same as comparing them as instants.
  */
-function currentPrecipitationProbability(raw: OpenMeteoResponse): number {
+function selectHour(raw: OpenMeteoResponse, hour: number): number {
   const currentHour = `${raw.current.time.slice(0, 13)}:00`;
-  const index = raw.hourly.time.indexOf(currentHour);
-  const hourly = index === -1 ? undefined : raw.hourly.precipitation_probability[index];
-  const value = hourly ?? raw.daily.precipitation_probability_max[0] ?? 0;
-  return clamp(Math.round(value), 0, 100);
+  const target = String(hour).padStart(2, '0');
+
+  for (let i = 0; i < raw.hourly.time.length; i += 1) {
+    const stamp = raw.hourly.time[i];
+    if (stamp === undefined || stamp.slice(11, 13) !== target) continue;
+    if (stamp >= currentHour) return i;
+  }
+  return -1;
+}
+
+/** Whole days between the date halves of two local ISO timestamps. */
+function daysBetween(from: string, to: string): number {
+  const start = Date.parse(`${from.slice(0, 10)}T00:00:00Z`);
+  const end = Date.parse(`${to.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(start) || Number.isNaN(end)) return 0;
+  return Math.round((end - start) / 86_400_000);
+}
+
+/**
+ * The screen has room for one rain number, so it reports the worst hour in the
+ * near future rather than the current one — a dry minute with a downpour due at
+ * four o'clock should not read as 0%.
+ */
+function upcomingPrecipitationProbability(raw: OpenMeteoResponse): number {
+  const currentHour = `${raw.current.time.slice(0, 13)}:00`;
+  const start = raw.hourly.time.findIndex((stamp) => stamp >= currentHour);
+
+  if (start !== -1) {
+    const end = Math.min(start + RAIN_WINDOW_HOURS, raw.hourly.time.length);
+    let highest = -1;
+    for (let i = start; i < end; i += 1) {
+      const value = raw.hourly.precipitation_probability[i];
+      if (typeof value === 'number' && value > highest) highest = value;
+    }
+    if (highest >= 0) return clamp(Math.round(highest), 0, 100);
+  }
+
+  // Nothing usable in the hourly series; today's headline figure will do.
+  return clamp(Math.round(raw.daily.precipitation_probability_max[0] ?? 0), 0, 100);
 }
 
 /** Maps a WMO weather code to the icon bucket and label the UI renders. */
@@ -129,10 +235,11 @@ export function describeWeatherCode(code: number): {
     case 63:
       return { key: 'rain', label: 'RAIN' };
     case 65:
-      return { key: 'rain', label: 'HEAVY RAIN' };
+      return { key: 'heavy-rain', label: 'HEAVY RAIN' };
     case 66:
-    case 67:
       return { key: 'rain', label: 'FREEZING RAIN' };
+    case 67:
+      return { key: 'heavy-rain', label: 'FREEZING RAIN' };
     case 71:
       return { key: 'snow', label: 'LIGHT SNOW' };
     case 73:
@@ -145,7 +252,7 @@ export function describeWeatherCode(code: number): {
     case 81:
       return { key: 'rain', label: 'SHOWERS' };
     case 82:
-      return { key: 'rain', label: 'HEAVY SHOWERS' };
+      return { key: 'heavy-rain', label: 'HEAVY SHOWERS' };
     case 85:
     case 86:
       return { key: 'snow', label: 'SNOW SHOWERS' };
@@ -162,11 +269,16 @@ export function describeWeatherCode(code: number): {
 /** Formats an instant in the location's local time, e.g. 2026-07-30T01:00:00-07:00. */
 export function toOffsetIso(epochMs: number, offsetSeconds: number): string {
   const local = new Date(epochMs + offsetSeconds * 1000).toISOString().slice(0, 19);
+  return `${local}${offsetSuffix(offsetSeconds)}`;
+}
+
+/** The trailing "+HH:MM" / "-HH:MM" of an ISO 8601 timestamp. */
+export function offsetSuffix(offsetSeconds: number): string {
   const sign = offsetSeconds < 0 ? '-' : '+';
   const absolute = Math.abs(offsetSeconds);
   const hours = String(Math.floor(absolute / 3600)).padStart(2, '0');
   const minutes = String(Math.floor((absolute % 3600) / 60)).padStart(2, '0');
-  return `${local}${sign}${hours}:${minutes}`;
+  return `${sign}${hours}:${minutes}`;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -202,6 +314,9 @@ function assertOpenMeteoResponse(value: unknown): asserts value is OpenMeteoResp
   if (
     !isRecord(hourly) ||
     !isArrayOf(hourly['time'], (item): item is string => typeof item === 'string') ||
+    !isArrayOf(hourly['temperature_2m'], isNumber) ||
+    !isArrayOf(hourly['weather_code'], isNumber) ||
+    !isArrayOf(hourly['is_day'], isNumber) ||
     !isArrayOf(
       hourly['precipitation_probability'],
       (item): item is number | null => item === null || typeof item === 'number',
