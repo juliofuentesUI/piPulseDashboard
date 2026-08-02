@@ -38,6 +38,36 @@ Run from the repository root:
 | `npm run start` | Serves the built output (API + `vite preview`) |
 | `npm run typecheck` | `tsc --noEmit` for the API, `svelte-check` for the web app |
 
+## Browser automation
+
+`.mcp.json` checks a [Playwright MCP](https://github.com/microsoft/playwright-mcp) server
+into the repository, so Claude Code — or any MCP-aware editor — can drive a real browser
+against the running dashboard: open `localhost:5173`, resize to 720 × 720, tap the status
+bar, screenshot the result. It is a development aid only. Nothing in the app depends on
+it, and the dashboard builds and runs without it.
+
+Because the config is committed, an editor opening this repository will **ask before
+enabling the server**. That prompt is deliberate: a checked-in `.mcp.json` is an
+instruction to run a command on your machine, and no repository should get to do that
+silently. Declining costs you nothing but the automation.
+
+First run needs a browser, once per machine:
+
+```bash
+npx @playwright/mcp@latest install-browser chrome-for-testing
+```
+
+The server is pinned to `--browser chromium` because its default is the system Chrome
+channel at `/opt/google/chrome/chrome`, which a Raspberry Pi OS or WSL image will not
+have. Without the flag every call fails with `Chromium distribution 'chrome' is not
+found`.
+
+Screenshots and accessibility snapshots are written to `.playwright-mcp/` in the
+repository root, which is ignored by git.
+
+The command is pinned to `@playwright/mcp@latest`, so the available tools can change
+between sessions. Pin a version instead if you would rather they did not.
+
 ## Kiosk mode on the Pi
 
 Once `npm run dev` (or `npm run start`) is running, launch Chromium full-screen:
@@ -92,6 +122,7 @@ piPulseDashboard/
 │       ├── tsconfig.json
 │       └── vite.config.ts
 ├── package.json                  npm workspaces + scripts
+├── .mcp.json                     Playwright MCP server, for browser automation
 ├── .env.example
 └── .gitignore
 ```
@@ -313,3 +344,5 @@ immediately and leaves the panel open, so the change can be seen happening.
 
 - Node.js 20 or newer (developed on 24).
 - No database, no Docker, no API key.
+- Browser automation is optional and downloads ~300 MB on first use. Skip it and
+  everything else still works.

@@ -14,6 +14,8 @@ npm-debug.log*
 .svelte-kit/
 *.tsbuildinfo
 
+.playwright-mcp/
+
 .DS_Store
 Thumbs.db
 
