@@ -70,19 +70,27 @@ researchers tells you everything. This is the strongest candidate for filling th
 left by `relatedQueries`.
 
 **This is now Phase 3.5** and the decisions are made — see the plan doc for the full spec.
-In short: a full-screen card inside Search Pulse, the image posterized to the active theme
-palette, all three headlines quoted with their sources, the article link shown, QR deferred.
+In short: a full-screen card inside Search Pulse, the image duotoned to the active theme
+in ~4 lines of CSS, all three headlines quoted with their sources, the article link shown,
+QR deferred.
 
 **Showing one headline would have been a bug.** Sampled 2026-08-03: four of five trends had
 three headlines about one event, but `artificial intelligence news` returned three
 different stories. Picking the first would have asserted the trend was about the first when
 it was about all three. That is why all three are shown.
 
-**CORS is not a blocker** — verified 2026-08-03, `encrypted-tbn*.gstatic.com` returns
-`access-control-allow-origin: *`, so a canvas can read those pixels with
-`crossorigin="anonymous"` and posterizing needs no proxy. The only open sub-decision is
-whether to proxy anyway, since this would be the first time the client talks to Google
-rather than to our API.
+**The image treatment is CSS, not canvas.** An earlier version of this spec called for
+palette-posterizing on a canvas; tested against a real feed image on 2026-08-03 and it was
+overkill. `filter: grayscale(1) contrast(1.35)` plus `mix-blend-mode: screen` over a
+theme-coloured panel does the job in four lines and recolours with the theme for free.
+Chunky pixels are a separate effect that CSS genuinely cannot do — `image-rendering:
+pixelated` only engages when upscaling, and these images are displayed smaller than they
+arrive — so that needs canvas and is deferred.
+
+Open sub-decision: this loads images directly from Google in the browser, the first time
+the client talks to Google rather than to our API. CORS allows it
+(`access-control-allow-origin: *`); it is a question of whether that property is worth
+keeping.
 
 Headlines may be shown **quoted with attribution only** — never summarised, interpreted, or
 presented as related searches.
@@ -136,7 +144,7 @@ scrolling on a wall display.
 | `active` column dropped from the schema | Would be `1` on every row ever written |
 | Carousel stays two pages | User's rule. New views go *inside* Search Pulse |
 | Trend card shows all three headlines | One headline misrepresents broad queries |
-| Card image posterized to the theme palette | A raw news photo clashes with flat pixel art |
+| Card image duotoned to the theme in CSS | Fixes the clash in 4 lines; canvas was overkill |
 | Article link shown, QR deferred | QR suits a wall display but needs an encoder |
 
 ## Gotchas

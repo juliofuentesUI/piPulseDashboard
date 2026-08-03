@@ -434,24 +434,38 @@ see the trend is broad, and that divergence is itself information.
 How Google associates articles with a query is **not published**. Do not describe a
 mechanism for it.
 
-### The image, posterized to the theme
+### The image, duotoned to the theme — CSS only
 
-Snap the photo to the active theme's seven colours and render it with
-`image-rendering: pixelated`, so a news photograph becomes chunky GBA-era artwork that
-**recolours when the theme changes**. This turns the one element that would clash with a
-flat pixel-art screen into the most on-brand thing on it. Draw small to a canvas, map each
-pixel to the nearest theme colour, scale up. Roughly 40 lines, no dependency, the same
-spirit as the hand-rolled sprites and outlines.
+Greyscale the photo and blend it onto a panel painted in a theme colour:
 
-**Verified 2026-08-03: this works client-side with no proxy.** `encrypted-tbn*.gstatic.com`
-returns `access-control-allow-origin: *`, so with `crossorigin="anonymous"` the canvas is
-not tainted and `getImageData` is allowed. Images are `cache-control: public,
-max-age=31536000`, so repeat loads are free.
+```css
+.shot { background: var(--c-ink); }
+.shot img { filter: grayscale(1) contrast(1.35) brightness(1.05);
+            mix-blend-mode: screen; }
+```
 
-The one open sub-decision: doing this loads images **directly from Google in the browser**,
-which is the first time the client talks to Google at all — every other request goes to our
-API. There is no technical need to proxy them; it is a question of whether that property is
-worth keeping.
+That is the whole treatment. Four lines, no JavaScript, and it **recolours with the
+theme** for free because the blend target is a theme token — switch to Amber CRT and the
+photo goes amber.
+
+**AMENDED — the original spec said canvas palette-posterizing; that was overkill.** Tested
+side by side on 2026-08-03 against a real feed image. The duotone alone takes the photo
+from an obvious foreign object to something in the palette, which was the entire problem.
+
+The chunky-pixel look is a *separate* job and **cannot be done in CSS at all**:
+`image-rendering: pixelated` only applies when the browser upscales, and these images
+arrive at 275 px and are displayed smaller, so it never engages. `transform: scale()` does
+not help either — that is a compositor operation with its own smoothing. Getting blockiness
+means canvas: draw small, read back, redraw with `imageSmoothingEnabled = false`. Deferred;
+it is a nicety, not what made the photo fit.
+
+If canvas is ever revisited, CORS is not a blocker — verified that
+`encrypted-tbn*.gstatic.com` returns `access-control-allow-origin: *`, so with
+`crossorigin="anonymous"` the canvas is untainted. Images are cached a year.
+
+Open sub-decision either way: this loads images **directly from Google in the browser**,
+the first time the client talks to Google rather than to our API. No technical need to
+proxy; a question of whether that property is worth keeping.
 
 ### The article link
 
