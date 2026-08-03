@@ -13,6 +13,7 @@ Lines marked **AMENDED** record where the plan met reality and reality won.
 | 1 | Live Trending Now list | Done — 2026-08-02 |
 | 2 | Selected-trend details panel | Done — 2026-08-02 |
 | 3 | SQLite history and rank graph | Done — 2026-08-02 |
+| — | Ordering fix: `SURGING` / `BIGGEST` — see the AMENDED section at the end | Done — 2026-08-02 |
 | 3.5 | Full-screen trend card | **Next** |
 | 4 | Daily history view | Not started |
 | 5 | Reliability and polish | Not started |

@@ -35,7 +35,7 @@ All commits pushed, working tree clean. Nothing is parked on a branch.
 Per-project memories also load automatically in this directory. They cover Pi deployment,
 git workflow, and two gotchas repeated below.
 
-## The five things that surprised us
+## The six things that surprised us
 
 Each of these cost real debugging time. They are all written up in the plan doc under
 **AMENDED**, but here is the short version.
