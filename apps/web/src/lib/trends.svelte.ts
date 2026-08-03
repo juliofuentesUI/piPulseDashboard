@@ -1,6 +1,17 @@
-import { requestTrends, TrendsRequestError } from './api';
-import { regionName, toTrendDetail, toTrendRows, VISIBLE_TRENDS } from './trend-view';
-import type { DashboardFailure, DashboardPhase, TrendsSnapshot } from './types';
+import { requestTrendHistory, requestTrends, TrendsRequestError } from './api';
+import {
+  regionName,
+  toTrendDetail,
+  toTrendHistoryView,
+  toTrendRows,
+  VISIBLE_TRENDS,
+} from './trend-view';
+import type {
+  DashboardFailure,
+  DashboardPhase,
+  TrendHistory,
+  TrendsSnapshot,
+} from './types';
 import { relativeTime } from './view';
 
 /**
@@ -73,8 +84,40 @@ export class Trends {
     this.#current === null ? null : toTrendDetail(this.#current, this.#now),
   );
 
+  #history = $state<TrendHistory | null>(null);
+  #historyController: AbortController | undefined;
+
+  /**
+   * Only rendered when it belongs to the trend on screen. The lookup is
+   * asynchronous, so without this check a slow response for a previous
+   * selection could land after a fast one and describe the wrong search.
+   */
+  history = $derived(
+    this.#history === null || this.#history.trendKey !== this.selectedId
+      ? null
+      : toTrendHistoryView(this.#history, this.#now),
+  );
+
   select(id: string): void {
     this.#chosen = id;
+    void this.#loadHistory(id);
+  }
+
+  async #loadHistory(key: string): Promise<void> {
+    if (key === '') return;
+
+    const controller = new AbortController();
+    this.#historyController?.abort();
+    this.#historyController = controller;
+
+    try {
+      this.#history = await requestTrendHistory(key, controller.signal);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      // The list is the point of the screen; losing the graph beside it is
+      // not worth an error state over.
+      this.#history = null;
+    }
   }
 
   #ageMs = $derived(
@@ -131,6 +174,14 @@ export class Trends {
       this.#now = new Date();
       this.failure = null;
       this.phase = 'ready';
+
+      /*
+       * Reloaded on every poll, not only on a tap: the backend has just
+       * written a new observation, so the graph beside the selection has a
+       * new point to draw. This also covers the default selection, which
+       * nobody ever tapped.
+       */
+      void this.#loadHistory(this.selectedId);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
 

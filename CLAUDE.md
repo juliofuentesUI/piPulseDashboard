@@ -121,5 +121,10 @@ remote access work. Those are not the problem. The one thing the repo needs is
 
 ## Raspberry Pi deploys
 
-Install Node 22+ from NodeSource. The version in apt is 18, which is too old for Vite and
-fails during install.
+Install **Node 24+** from NodeSource. The version in apt is 18, which is too old for Vite
+and fails during install.
+
+The floor moved from 22 to 24 when Search Pulse started storing history: it uses
+`node:sqlite`, which Node 22 has only behind `--experimental-sqlite` and 24 has outright.
+Built-in SQLite is what keeps this dependency-free and, more to the point, keeps a native
+module off a Raspberry Pi.

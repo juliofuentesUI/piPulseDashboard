@@ -1,6 +1,12 @@
 <script lang="ts">
   import type { PulseStatus } from '../trends.svelte';
-  import type { DashboardPhase, TrendDetailView, TrendRowView } from '../types';
+  import type {
+    DashboardPhase,
+    TrendDetailView,
+    TrendHistoryView,
+    TrendRowView,
+  } from '../types';
+  import Sparkline from './Sparkline.svelte';
   import TitleBar from './TitleBar.svelte';
   import TrendRow from './TrendRow.svelte';
 
@@ -10,13 +16,28 @@
     status: PulseStatus;
     region: string;
     detail: TrendDetailView | null;
+    history: TrendHistoryView | null;
     selectedId: string;
     onselect: (id: string) => void;
     onmenu: () => void;
   }
 
-  let { phase, rows, status, region, detail, selectedId, onselect, onmenu }: Props =
-    $props();
+  let {
+    phase,
+    rows,
+    status,
+    region,
+    detail,
+    history,
+    selectedId,
+    onselect,
+    onmenu,
+  }: Props = $props();
+
+  /** Movement is only worth a badge when the record actually shows one. */
+  const movement = $derived(
+    history === null || history.movement === 'steady' ? null : history.movement,
+  );
 </script>
 
 <div class="pulse">
@@ -66,25 +87,54 @@
       {#if detail?.isNew}
         <span class="badge">NEW</span>
       {/if}
+      {#if movement !== null}
+        <span class="badge movement">{movement === 'rising' ? 'RISING' : 'COOLING'}</span>
+      {/if}
     </div>
 
     {#if detail === null}
       <p class="details-note">NO TREND SELECTED.</p>
     {:else}
-      <dl class="facts">
-        <dt>SEARCH</dt>
-        <dd class="search">{detail.title}</dd>
+      <div class="split">
+        <dl class="facts">
+          <dt>SEARCH</dt>
+          <dd class="search">{detail.title}</dd>
 
-        {#if detail.volume !== ''}
-          <dt>VOLUME</dt>
-          <dd>{detail.volume} <span class="qualifier">APPROX</span></dd>
-        {/if}
+          {#if detail.volume !== ''}
+            <dt>VOLUME</dt>
+            <dd>{detail.volume} <span class="qualifier">APPROX</span></dd>
+          {/if}
 
-        {#if detail.firstReported !== ''}
-          <dt>REPORTED</dt>
-          <dd>{detail.firstReported} <span class="qualifier">{detail.age}</span></dd>
-        {/if}
-      </dl>
+          {#if detail.firstReported !== ''}
+            <dt>REPORTED</dt>
+            <dd>{detail.firstReported} <span class="qualifier">{detail.age}</span></dd>
+          {/if}
+
+          <!--
+            Ours, not Google's: when this Pi first recorded the trend and how
+            many times it has seen it since.
+          -->
+          {#if history !== null && history.firstSeen !== ''}
+            <dt>SEEN</dt>
+            <dd>{history.firstSeen} <span class="qualifier">{history.observed}</span></dd>
+          {/if}
+        </dl>
+
+        <div class="graph">
+          <p class="graph-label">
+            RANK{history?.sparkline == null ? '' : ` · LAST ${history.sparkline.windowLabel}`}
+          </p>
+
+          {#if history?.sparkline != null}
+            <div class="plot"><Sparkline {...history.sparkline} /></div>
+            <p class="graph-foot">
+              PEAK {history.peakRank} · NOW {history.latestRank}
+            </p>
+          {:else}
+            <p class="graph-empty">NO HISTORY RECORDED YET.</p>
+          {/if}
+        </div>
+      </div>
     {/if}
   </div>
 </div>
@@ -99,9 +149,15 @@
    * order the design calls for, and it is what puts the freshness figure and
    * the LIVE lamp on the two rows that later have to carry them.
    */
+  /*
+   * The details band grew to take the graph, and the trend rows gave up the
+   * room — five rows at 67px rather than 82px. That is the trade the design
+   * makes: the list still ranks at a glance, and the selected trend now has
+   * somewhere to show its history.
+   */
   .pulse {
     display: grid;
-    grid-template-rows: 96px 64px minmax(0, 1fr) 148px;
+    grid-template-rows: 96px 64px minmax(0, 1fr) 212px;
     width: 100%;
     height: 100%;
   }
@@ -225,6 +281,14 @@
     color: var(--c-blue);
   }
 
+  /* Facts on the left, the record's own graph on the right. */
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 268px;
+    gap: 20px;
+    min-height: 0;
+  }
+
   /*
    * A real definition list: a screen reader announces "search, does
    * sheepstealer die" rather than two loose strings. `display: grid` on the
@@ -232,10 +296,40 @@
    */
   .facts {
     display: grid;
-    grid-template-columns: 122px minmax(0, 1fr);
+    grid-template-columns: 104px minmax(0, 1fr);
+    align-content: center;
     align-items: baseline;
-    gap: 4px 14px;
+    gap: 4px 12px;
     margin: 0;
+    min-width: 0;
+  }
+
+  .graph {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 2px;
+    min-height: 0;
+  }
+
+  .graph-label,
+  .graph-foot,
+  .graph-empty {
+    margin: 0;
+    font-size: 15px;
+    letter-spacing: 2px;
+    color: var(--c-blue);
+  }
+
+  .graph-foot {
+    text-align: right;
+  }
+
+  .graph-empty {
+    align-self: center;
+  }
+
+  .plot {
+    min-height: 0;
   }
 
   .facts dt {
@@ -255,8 +349,18 @@
     color: var(--c-ink);
   }
 
-  .search {
+  /*
+   * The one value allowed to wrap. Naming the selected search is what this
+   * panel is for, so clipping it to "BRYAN KOHBERGER MO…" defeats the band;
+   * the other fields are short and stay on one line.
+   */
+  /* `.facts dd` also matches this element and outranks a bare class. */
+  .facts dd.search {
     font-weight: 700;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    line-height: 1.1;
   }
 
   /*

@@ -2,7 +2,9 @@ import type {
   DashboardFailure,
   ForecastPeriod,
   ForecastPoint,
+  TrendHistory,
   TrendingSearch,
+  TrendMovement,
   TrendsSnapshot,
   WeatherCondition,
   WeatherSnapshot,
@@ -218,3 +220,58 @@ function isTrendingSearch(value: unknown): value is TrendingSearch {
 function isOptionalString(value: unknown): boolean {
   return value === undefined || typeof value === 'string';
 }
+
+/**
+ * The Pi's own record for one trend. Separate from `/api/trends/now` because
+ * only the selected trend needs it, and it is a local SQLite read rather than
+ * anything upstream — a tap costs nothing outside the machine.
+ */
+export async function requestTrendHistory(
+  key: string,
+  signal: AbortSignal,
+): Promise<TrendHistory> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/trends/history?key=${encodeURIComponent(key)}`, {
+      signal,
+      headers: { accept: 'application/json' },
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new TrendsRequestError(
+      { kind: 'network', message: 'CANNOT REACH API' },
+      { cause: error },
+    );
+  }
+
+  if (!response.ok) {
+    throw new TrendsRequestError({
+      kind: 'server',
+      message: response.status === 503 ? 'NO HISTORY STORE' : `API ERROR ${response.status}`,
+    });
+  }
+
+  const payload: unknown = await response.json().catch(() => null);
+  if (!isTrendHistory(payload)) {
+    throw new TrendsRequestError({ kind: 'malformed', message: 'BAD RESPONSE' });
+  }
+  return payload;
+}
+
+function isTrendHistory(value: unknown): value is TrendHistory {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v['trendKey'] === 'string' &&
+    typeof v['timesObserved'] === 'number' &&
+    MOVEMENTS.includes(v['movement'] as TrendMovement) &&
+    Array.isArray(v['points']) &&
+    v['points'].every((p) => {
+      if (typeof p !== 'object' || p === null) return false;
+      const point = p as Record<string, unknown>;
+      return typeof point['at'] === 'string' && typeof point['rank'] === 'number';
+    })
+  );
+}
+
+const MOVEMENTS: readonly TrendMovement[] = ['rising', 'cooling', 'steady'];

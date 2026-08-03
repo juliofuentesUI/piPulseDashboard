@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 
 import { config } from './config.js';
 import { TtlCache } from './cache.js';
+import { TrendHistoryStore } from './history.js';
 import { GoogleTrendingRssProvider, type TrendProvider } from './trends.js';
 import type { ApiErrorBody, TrendingSearch, TrendsSnapshot, WeatherSnapshot } from './types.js';
 import { fetchWeather } from './weather.js';
@@ -23,6 +24,18 @@ const trendProvider: TrendProvider = new GoogleTrendingRssProvider({
   timeoutMs: config.trends.requestTimeoutMs,
 });
 
+/**
+ * The local record. Opening it is allowed to fail — a Pi with a full or
+ * read-only disk should still show what is trending right now, just without
+ * remembering it — so every use of this is guarded.
+ */
+let history: TrendHistoryStore | null = null;
+try {
+  history = new TrendHistoryStore(config.trends.databasePath);
+} catch (error) {
+  app.log.error({ err: error }, 'Trend history unavailable; running without it');
+}
+
 /*
  * The screen polls us every minute and we poll Google every ten. This cache is
  * what keeps those two rates apart, so a browser refresh — or a second Pi on
@@ -30,7 +43,23 @@ const trendProvider: TrendProvider = new GoogleTrendingRssProvider({
  */
 const trendsCache = new TtlCache<readonly TrendingSearch[]>({
   ttlMs: config.trends.cacheTtlMs,
-  load: () => trendProvider.getTrendingNow(config.trends.region),
+  load: async () => {
+    const trends = await trendProvider.getTrendingNow(config.trends.region);
+
+    /*
+     * `load` runs only on a cache miss, which is exactly once per successful
+     * upstream fetch — so this is the one place a snapshot belongs. The write
+     * is deliberately not awaited into the failure path: losing a history row
+     * must never cost the screen its live list.
+     */
+    try {
+      history?.record(trends, Date.now());
+    } catch (error) {
+      app.log.error({ err: error }, 'Could not record trend snapshot');
+    }
+
+    return trends;
+  },
 });
 
 app.get('/api/health', async () => ({
@@ -99,6 +128,39 @@ app.get('/api/trends/now', async (request, reply) => {
   }
 });
 
+app.get('/api/trends/history', async (request, reply) => {
+  const key = (request.query as { key?: string }).key?.trim();
+  if (key === undefined || key === '') {
+    const body: ApiErrorBody = {
+      error: 'key_required',
+      message: 'Pass ?key= the trend id to look up.',
+    };
+    return reply.code(400).send(body);
+  }
+
+  if (history === null) {
+    const body: ApiErrorBody = {
+      error: 'history_unavailable',
+      message: 'Trend history storage is not available.',
+    };
+    return reply.code(503).send(body);
+  }
+
+  try {
+    reply.header('cache-control', 'no-cache');
+    // An unseen trend is a normal answer, not an error: it is what every
+    // trend looks like on a Pi that has only just been switched on.
+    return history.historyFor(key, Date.now());
+  } catch (error) {
+    request.log.error({ err: error }, 'Trend history lookup failed');
+    const body: ApiErrorBody = {
+      error: 'history_unavailable',
+      message: 'Could not read trend history.',
+    };
+    return reply.code(503).send(body);
+  }
+});
+
 async function start(): Promise<void> {
   try {
     await app.listen({ port: config.port, host: config.host });
@@ -115,7 +177,10 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
     app.log.info(`${signal} received, shutting down`);
     void app.close().then(
-      () => process.exit(0),
+      () => {
+        history?.close();
+        process.exit(0);
+      },
       () => process.exit(1),
     );
   });

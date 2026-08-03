@@ -137,6 +137,7 @@
             status={trends.status}
             region={trends.region}
             detail={trends.detail}
+            history={trends.history}
             selectedId={trends.selectedId}
             onselect={(id) => trends.select(id)}
             onmenu={() => (menuOpen = true)}

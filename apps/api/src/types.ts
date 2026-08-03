@@ -199,6 +199,40 @@ export interface TrendsSnapshot {
   readonly updatedAt: string;
 }
 
+/** One stored observation: where a trend sat at one moment. */
+export interface TrendHistoryPoint {
+  /** ISO 8601 instant the list was fetched. */
+  readonly at: string;
+  /** 1 is the top of the list. */
+  readonly rank: number;
+}
+
+/**
+ * Rank direction, from a documented rule over stored observations. `steady`
+ * also covers "not enough history to say", which is the honest answer for a
+ * trend seen once.
+ */
+export type TrendMovement = 'rising' | 'cooling' | 'steady';
+
+/**
+ * What the local record knows about one trend. Every figure is counted from
+ * observations this Pi made; none of it comes from Google.
+ */
+export interface TrendHistory {
+  readonly trendKey: string;
+  /** Oldest first, within the history window. Empty when never observed. */
+  readonly points: readonly TrendHistoryPoint[];
+  readonly timesObserved: number;
+  readonly movement: TrendMovement;
+  /** All-time, not windowed. Absent when never observed. */
+  readonly firstSeenAt?: string;
+  readonly latestRank?: number;
+  /** Best position ever held, so the *lowest* rank number. */
+  readonly peakRank?: number;
+  /** First to most recent observation. Not a claim of continuous presence. */
+  readonly activeMinutes?: number;
+}
+
 export interface ApiErrorBody {
   readonly error: string;
   readonly message: string;

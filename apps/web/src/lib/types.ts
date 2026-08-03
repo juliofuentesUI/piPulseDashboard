@@ -212,3 +212,47 @@ export interface TrendDetailView {
   /** Google first reported it under 30 minutes ago. */
   readonly isNew: boolean;
 }
+
+/** One stored observation of where a trend sat. Mirrors the API. */
+export interface TrendHistoryPoint {
+  readonly at: string;
+  readonly rank: number;
+}
+
+export type TrendMovement = 'rising' | 'cooling' | 'steady';
+
+/** What this Pi has recorded about one trend. Never sourced from Google. */
+export interface TrendHistory {
+  readonly trendKey: string;
+  readonly points: readonly TrendHistoryPoint[];
+  readonly timesObserved: number;
+  readonly movement: TrendMovement;
+  readonly firstSeenAt?: string;
+  readonly latestRank?: number;
+  readonly peakRank?: number;
+  readonly activeMinutes?: number;
+}
+
+/** Sparkline geometry in design pixels, ready for the SVG to draw. */
+export interface SparklineView {
+  readonly width: number;
+  readonly height: number;
+  /** "x,y x,y …" for the polyline. */
+  readonly path: string;
+  /** Marker per observation, so a single reading is still visible. */
+  readonly dots: readonly { readonly x: number; readonly y: number }[];
+  readonly topLabel: string;
+  readonly bottomLabel: string;
+  /** The span the x-axis actually covers, e.g. "4H" — never more than 24H. */
+  readonly windowLabel: string;
+}
+
+/** The history half of the details band. */
+export interface TrendHistoryView {
+  readonly sparkline: SparklineView | null;
+  readonly firstSeen: string;
+  readonly peakRank: string;
+  readonly latestRank: string;
+  readonly observed: string;
+  readonly movement: TrendMovement;
+}

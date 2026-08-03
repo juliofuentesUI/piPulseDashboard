@@ -138,6 +138,7 @@ piPulseDashboard/
 │   │   │   ├── server.ts         routes, error handling, shutdown
 │   │   │   ├── weather.ts        Open-Meteo fetch, validation, normalisation
 │   │   │   ├── trends.ts         TrendProvider, Google RSS fetch and parsing
+│   │   │   ├── history.ts        SQLite snapshots, rank metrics, movement
 │   │   │   ├── cache.ts          TTL cache, coalescing, stale-on-error
 │   │   │   ├── config.ts         environment-driven config
 │   │   │   └── types.ts          upstream types vs. our API contract
@@ -158,8 +159,8 @@ piPulseDashboard/
 │       │       ├── view.ts       snapshot → view model, time formatting
 │       │       ├── trend-view.ts trend rows, log bar scale, volume formatting
 │       │       ├── components/   WeatherDashboard, WeekDashboard, ForecastTable,
-│       │       │                 SearchPulse, TrendRow, PageDots, StatusHeader,
-│       │       │                 TitleBar, FooterBar, …
+│       │       │                 SearchPulse, TrendRow, Sparkline, PageDots,
+│       │       │                 StatusHeader, TitleBar, FooterBar, …
 │       │       └── weather-icons/  thirteen original pixel-art sprites,
 │       │                           plus the sprite/outline helpers
 │       ├── index.html
@@ -333,6 +334,43 @@ feature does not make.
 Response headers include `x-cache` and `age`, as `/api/weather` does. Cached for **10
 minutes**; a cold cache plus a failed fetch returns `503`.
 
+### `GET /api/trends/history?key=…`
+
+Everything this Pi has recorded about one trend. `key` is a `TrendingSearch.id`.
+
+```json
+{
+  "trendKey": "bryan kohberger motive",
+  "points": [{ "at": "2026-08-03T04:43:27.012Z", "rank": 5 }],
+  "timesObserved": 25,
+  "movement": "cooling",
+  "firstSeenAt": "2026-08-03T00:43:27.012Z",
+  "latestRank": 5,
+  "peakRank": 1,
+  "activeMinutes": 240
+}
+```
+
+None of this comes from Google. Every figure is counted from observations this machine
+made, which is the point: `peakRank` is the best position it has been seen holding,
+`timesObserved` how many fetches it appeared in, `activeMinutes` the span from first to
+most recent sighting — a span, not a claim of continuous presence.
+
+An unseen key is a normal `200` with `timesObserved: 0`, not a `404`. That is what every
+trend looks like on a Pi that has only just been switched on.
+
+`movement` is a documented rule, not a judgement. A *lower* rank number is a better
+position, so a decrease is a rise:
+
+| Value | Rule |
+| --- | --- |
+| `rising` | The latest observation ranks better than the one before |
+| `cooling` | Two consecutive declines |
+| `steady` | Neither, including "not enough history to say" |
+
+The asymmetry is deliberate: attention arrives abruptly, so one improvement is enough to
+call a rise, while a single slip down the list is as often noise as it is a trend fading.
+
 ### `GET /api/health`
 
 Liveness plus the configured location and cache TTL.
@@ -367,6 +405,7 @@ Every value has a working default, so a `.env` file is optional. Copy `.env.exam
 | `TRENDS_REGION` | `US` | Google geo code for the trends feed |
 | `TRENDS_CACHE_TTL_MS` | `600000` | How often the backend refetches (10 minutes) |
 | `TRENDS_REQUEST_TIMEOUT_MS` | `8000` | Upstream request timeout |
+| `TRENDS_DB_PATH` | `data/trends.db` | Local history, relative to the API's cwd |
 
 ## Layout
 
@@ -487,12 +526,31 @@ Its bottom padding is the page indicator's lane: unlike the weather screens, who
 band has slack for the dots to sit in, this one is dense enough to run a line of text
 straight under them.
 
+The band's right half is the local record: a rank graph and, beneath the facts, when this
+Pi first saw the trend and how many fetches it has appeared in.
+
+**The graph's x-axis spans the history that exists, capped at 24 hours** — not a fixed 24
+hours always, and the label states which. A trend four hours old drawn on a day-wide axis
+occupies the rightmost sixth and is unreadable, and most trends are hours old, so that
+would be the normal case rather than the edge one. Stretching to fit is only honest if
+the axis says what it covers, hence `RANK · LAST 4H`. The floor is one hour, so the first
+few observations of a brand-new trend are not spread across the full width, which would
+read as far more movement than twenty minutes of watching can support.
+
+The y-axis is the opposite: **fixed at ranks 1 to 10**, the length of the list Google
+returns, never scaled to what the trend happened to do. A search that only ever wobbled
+between #8 and #9 should read as a flat line near the bottom, not as drama across a
+zoomed axis. Observations are marked individually as well as joined, because a single
+reading would otherwise draw nothing at all — which is exactly the state a freshly booted
+Pi is in.
+
 One label is ours rather than Google's: `NEW`, when the feed first reported the trend
 under 30 minutes ago. The plan words that rule as "first observed less than 30 minutes
 ago", meaning first observed by us — but until Phase 3 stores snapshots there is no
 record of when we first saw anything, so it is measured against the feed's own `pubDate`.
 That is Google's report time: exact, needing no storage, and it does not reset when the
-Pi does. `RISING` and `COOLING` need real stored history and arrive with it in Phase 3.
+Pi does. `RISING` and `COOLING` come from the stored rank history and are described under
+`GET /api/trends/history` above.
 
 ## Controls
 
@@ -615,7 +673,9 @@ closes it, because the thing that changed is behind the panel.
 
 ## Requirements
 
-- Node.js 20 or newer (developed on 24).
-- No database, no Docker, no API key.
+- Node.js 24 or newer. Search Pulse stores its history in `node:sqlite`, which Node 22
+  has only behind `--experimental-sqlite`.
+- No Docker, no API key, and no dependency for the database — SQLite is built into Node,
+  which keeps a native module and its compile step off the Raspberry Pi.
 - Browser automation is optional and downloads ~300 MB on first use. Skip it and
   everything else still works.

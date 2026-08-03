@@ -1,4 +1,11 @@
-import type { TrendDetailView, TrendingSearch, TrendRowView } from './types';
+import type {
+  SparklineView,
+  TrendDetailView,
+  TrendHistory,
+  TrendHistoryView,
+  TrendingSearch,
+  TrendRowView,
+} from './types';
 import { formatClock, relativeTime } from './view';
 
 /** How many of the feed's trends the band has room for at 720 x 720. */
@@ -138,4 +145,146 @@ const REGION_NAMES: Readonly<Record<string, string>> = {
 export function regionName(code: string | undefined): string {
   if (code === undefined) return '';
   return REGION_NAMES[code] ?? code.toUpperCase();
+}
+
+// --- Local history --------------------------------------------------------
+
+/** The window the graph covers. Matches `HISTORY_WINDOW_MS` in the API. */
+const HISTORY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The rank space the axis spans, which is the length of the list Google
+ * returns. Fixed rather than scaled to whatever the trend happened to do:
+ * a search that only ever wobbled between #8 and #9 should read as a flat
+ * line near the bottom, not as dramatic movement across a zoomed axis.
+ */
+const RANK_SPACE = 10;
+
+const SPARK_WIDTH = 250;
+const SPARK_HEIGHT = 76;
+
+/** Half the side of an observation marker, in the same design pixels. */
+const MARKER = 3;
+
+/**
+ * Narrowest the axis will get. Below this the first few observations of a
+ * brand-new trend would be spread across the full width, which reads as much
+ * more movement than twenty minutes of watching can support.
+ */
+const MIN_WINDOW_MS = 60 * 60 * 1000;
+
+export function toSparkline(
+  history: TrendHistory,
+  nowMs: number,
+): SparklineView | null {
+  if (history.points.length === 0) return null;
+
+  const stamps = history.points
+    .map((point) => Date.parse(point.at))
+    .filter((at) => !Number.isNaN(at));
+  if (stamps.length === 0) return null;
+
+  /*
+   * The axis spans the history that exists, capped at 24 hours — not a fixed
+   * 24 hours always.
+   *
+   * A trend four hours old plotted on a fixed day-wide axis draws into the
+   * rightmost sixth and is unreadable, and most trends are hours old, so that
+   * would be the normal case rather than the edge one. Stretching to fit is
+   * only honest if the axis says what it covers, so the label carries the real
+   * span and the graph is titled from it.
+   */
+  const oldest = Math.min(...stamps);
+  const spanMs = Math.max(
+    MIN_WINDOW_MS,
+    Math.min(HISTORY_WINDOW_MS, nowMs - oldest),
+  );
+
+  const dots = history.points
+    .map((point) => {
+      const at = Date.parse(point.at);
+      if (Number.isNaN(at)) return null;
+
+      const elapsed = clamp((nowMs - at) / spanMs, 0, 1);
+      const rank = clamp(point.rank, 1, RANK_SPACE);
+
+      /*
+       * Inset by the marker's half-width at both ends. The newest observation
+       * sits at the right edge by definition, and without this its mark is
+       * drawn half outside the plot.
+       */
+      const span = SPARK_WIDTH - MARKER * 2;
+
+      return {
+        x: Math.round(MARKER + span * (1 - elapsed)),
+        y: Math.round(((rank - 1) / (RANK_SPACE - 1)) * SPARK_HEIGHT),
+      };
+    })
+    .filter((dot): dot is { x: number; y: number } => dot !== null);
+
+  if (dots.length === 0) return null;
+
+  return {
+    width: SPARK_WIDTH,
+    height: SPARK_HEIGHT,
+    path: dots.map((dot) => `${dot.x},${dot.y}`).join(' '),
+    dots,
+    topLabel: '1',
+    bottomLabel: String(RANK_SPACE),
+    windowLabel: coarseDuration(Math.round(spanMs / 60_000)),
+  };
+}
+
+export function toTrendHistoryView(
+  history: TrendHistory,
+  now: Date,
+): TrendHistoryView {
+  return {
+    sparkline: toSparkline(history, now.getTime()),
+    firstSeen:
+      history.firstSeenAt === undefined ? '' : durationAgo(history.firstSeenAt, now),
+    peakRank: history.peakRank === undefined ? '' : `#${history.peakRank}`,
+    latestRank: history.latestRank === undefined ? '' : `#${history.latestRank}`,
+    observed: history.timesObserved === 0 ? '' : `${history.timesObserved}×`,
+    movement: history.movement,
+  };
+}
+
+/**
+ * "2H 20M AGO", keeping the minutes that `relativeTime` drops.
+ *
+ * On this screen the difference matters: the weather's "2 HRS AGO" is about a
+ * reading that is either current or not, while here it is how long a search
+ * has been holding public attention.
+ */
+export function durationAgo(iso: string, now: Date): string {
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return '';
+
+  const minutes = Math.max(0, Math.floor((now.getTime() - then) / 60_000));
+  return `${formatDuration(minutes)} AGO`;
+}
+
+/**
+ * The axis label's version of a duration: "4H", not "4H 2M".
+ *
+ * An axis states the scale, and stating it to the minute implies the graph is
+ * readable to the minute, which at 250 pixels for four hours it is not.
+ */
+function coarseDuration(minutes: number): string {
+  if (minutes < 60) return `${Math.max(5, Math.round(minutes / 5) * 5)}M`;
+  return `${Math.round(minutes / 60)}H`;
+}
+
+/** "45M", "2H 20M", "1D 3H". */
+export function formatDuration(totalMinutes: number): string {
+  if (totalMinutes < 60) return `${totalMinutes}M`;
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours < 24) return minutes === 0 ? `${hours}H` : `${hours}H ${minutes}M`;
+
+  const days = Math.floor(hours / 24);
+  const spare = hours % 24;
+  return spare === 0 ? `${days}D` : `${days}D ${spare}H`;
 }

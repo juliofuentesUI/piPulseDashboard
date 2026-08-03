@@ -26,6 +26,8 @@ export interface TrendsConfig {
    */
   readonly cacheTtlMs: number;
   readonly requestTimeoutMs: number;
+  /** SQLite file for the local history, resolved against the API's cwd. */
+  readonly databasePath: string;
 }
 
 export interface AppConfig {
@@ -52,5 +54,6 @@ export const config: AppConfig = {
     region: str(process.env['TRENDS_REGION'], 'US'),
     cacheTtlMs: num(process.env['TRENDS_CACHE_TTL_MS'], 10 * 60 * 1000),
     requestTimeoutMs: num(process.env['TRENDS_REQUEST_TIMEOUT_MS'], 8000),
+    databasePath: str(process.env['TRENDS_DB_PATH'], 'data/trends.db'),
   },
 };

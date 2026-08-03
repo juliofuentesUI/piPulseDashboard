@@ -12,8 +12,8 @@ Lines marked **AMENDED** record where the plan met reality and reality won.
 | 0 | Carousel shell and placeholder screen | Done — 2026-08-02 |
 | 1 | Live Trending Now list | Done — 2026-08-02 |
 | 2 | Selected-trend details panel | Done — 2026-08-02 |
-| 3 | SQLite history and rank graph | Next |
-| 4 | Daily history view | Not started |
+| 3 | SQLite history and rank graph | Done — 2026-08-02 |
+| 4 | Daily history view | Next |
 | 5 | Reliability and polish | Not started |
 
 **Each phase is merged and usable before the next one starts.** Finishing the current
@@ -299,7 +299,7 @@ Acceptance criteria:
 
 ---
 
-## Phase 3 — Local history and the graph
+## Phase 3 — Local history and the graph · **DONE**
 
 Begin building a personal historical record of public attention.
 
@@ -317,8 +317,20 @@ trend_snapshots
 - related_queries
 - first_seen_at
 - observed_at
-- active
 ```
+
+Stored with `node:sqlite`, built into Node, so the history costs no dependency and no
+native build on the Pi. It needs **Node 24** — 22 has it only behind
+`--experimental-sqlite` — which raised the deploy floor.
+
+**AMENDED — `active` was dropped.** A row exists only because the trend was in that
+response, so the column would be `1` on every row ever written: dead weight that reads
+like it means something. Presence is the observation. Phase 4's active duration comes
+from the span between first and last sighting, which the timestamps already give.
+
+Opening the database is allowed to fail. A Pi with a full or read-only disk still shows
+what is trending right now, just without remembering it, and a failed write is logged
+rather than propagated — losing a history row must never cost the screen its live list.
 
 Deduplicate on a normalised key: lowercase, trim, collapse repeated spaces. Do **not**
 merge differently worded searches because they look semantically similar.
