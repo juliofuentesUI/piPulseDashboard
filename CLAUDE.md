@@ -23,6 +23,11 @@ not tell you whether it renders correctly. Start the app with `npm run dev` and 
 Playwright MCP server against `http://localhost:5173` with the viewport set to 720 × 720.
 First-run setup is under "Browser automation" in `README.md`.
 
+There are two screens, and a change to shared styling, sprites or theming can regress
+either one. Check both: the app opens on whichever screen was last chosen, so switch with
+`browser_snapshot` and a click on **Open settings**, then the **WEATHER NOW** or
+**7-DAY FORECAST** option — never by pixel coordinate. Picking a screen closes the panel.
+
 **720 × 720 is not negotiable, because any other size lies about the artwork.**
 [App.svelte](apps/web/src/App.svelte) scales the design by
 `Math.min(window.innerWidth, window.innerHeight) / 720`, which is exactly 1 on the
