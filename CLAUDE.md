@@ -27,6 +27,9 @@ tooling, and it does not loosen.
 
 ### Search Pulse guardrails
 
+**Starting a fresh session? Read [docs/HANDOFF.md](docs/HANDOFF.md) first** — where the
+work stands, what surprised us, and the decisions not to silently revisit.
+
 The plan — phases, screen layout, acceptance criteria — is
 [docs/search-pulse-plan.md](docs/search-pulse-plan.md). Read it before starting a phase
 and update it as phases land.
