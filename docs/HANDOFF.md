@@ -1,7 +1,8 @@
 # Handoff — 2026-08-03
 
-Written at the end of the session that built Search Pulse Phases 0–3. Read this first,
-then the three documents it points at. Delete or rewrite it when it stops being true.
+Written at the end of the session that built Search Pulse Phases 0–3 and specified 3.5.
+Read this first, then the three documents it points at. Delete or rewrite it when it stops
+being true.
 
 ## Where the work stands
 
@@ -12,10 +13,14 @@ then the three documents it points at. Delete or rewrite it when it stops being 
 | 2 | Tap-to-select, trend details panel | Done |
 | 3 | SQLite history, rank graph, movement labels | Done |
 | — | Ordering fix: SURGING / BIGGEST modes | Done |
-| 4 | Daily history view (`TODAY`) | **Next** |
+| 3.5 | Full-screen trend card: image + 3 headlines | **Next** |
+| 4 | Daily history view (`TODAY`) | After 3.5 |
 | 5 | Reliability and polish | Not started |
 
-Six commits on `main`, all pushed, working tree clean. Nothing is parked on a branch.
+All commits pushed, working tree clean. Nothing is parked on a branch.
+
+**Start with Phase 3.5** — specified in full in the plan doc, decided with the user on
+2026-08-03. It comes before Phase 4 at their request.
 
 ## Read these, in this order
 
@@ -45,8 +50,8 @@ recorded trends only ever moved *down* the feed, because a `pubDate` never chang
 
 **2. `relatedQueries` is always empty.** The feed has no related-searches field. Its
 `ht:news_item` entries are articles *about* a trend, not searches anyone ran. Phase 2's
-details panel was planned around related queries; three options for what to do instead are
-listed in the plan under Phase 2. **This is still an open decision.**
+details panel was planned around related queries; **that gap is now filled by Phase 3.5**
+rather than by inventing them — see 2b below.
 
 **2b. There *is* an image and there *are* headlines — verified 2026-08-03.** Checked after
 the user asked whether a trend could show something explaining what it is about:
@@ -64,11 +69,23 @@ So there is no prose about a trend, but the headlines answer "what is this about
 researchers tells you everything. This is the strongest candidate for filling the hole
 left by `relatedQueries`.
 
-Three costs to weigh, discussed with the user and **not yet decided**: a photographic
-thumbnail will look alien in a flat pixel-art dashboard and needs a deliberate treatment;
-loading `gstatic.com` images directly would be the first time the client talks to Google,
-which the API could proxy to avoid; and headlines may be shown **quoted with attribution
-only** — never summarised, interpreted, or presented as related searches.
+**This is now Phase 3.5** and the decisions are made — see the plan doc for the full spec.
+In short: a full-screen card inside Search Pulse, the image posterized to the active theme
+palette, all three headlines quoted with their sources, the article link shown, QR deferred.
+
+**Showing one headline would have been a bug.** Sampled 2026-08-03: four of five trends had
+three headlines about one event, but `artificial intelligence news` returned three
+different stories. Picking the first would have asserted the trend was about the first when
+it was about all three. That is why all three are shown.
+
+**CORS is not a blocker** — verified 2026-08-03, `encrypted-tbn*.gstatic.com` returns
+`access-control-allow-origin: *`, so a canvas can read those pixels with
+`crossorigin="anonymous"` and posterizing needs no proxy. The only open sub-decision is
+whether to proxy anyway, since this would be the first time the client talks to Google
+rather than to our API.
+
+Headlines may be shown **quoted with attribution only** — never summarised, interpreted, or
+presented as related searches.
 
 **3. There is no relevance ordering available.** Complete element list: `title`,
 `ht:approx_traffic`, `pubDate`, `link`, `description`, `ht:picture`, `ht:picture_source`,
@@ -85,6 +102,8 @@ for trends up to a day old; ours shows trends in their first hours. Both are rea
 bounds Phase 4 — see below.
 
 ## What Phase 4 needs to know before starting
+
+(Phase 3.5 comes first — see the plan doc.)
 
 The plan's `TODAY` view is "the day's strongest trends, from stored history". It is
 buildable, but **be precise with the user about what it can say.**
@@ -116,6 +135,9 @@ scrolling on a wall display.
 | `ACTIVE` label dropped | True of every row always; it is noise |
 | `active` column dropped from the schema | Would be `1` on every row ever written |
 | Carousel stays two pages | User's rule. New views go *inside* Search Pulse |
+| Trend card shows all three headlines | One headline misrepresents broad queries |
+| Card image posterized to the theme palette | A raw news photo clashes with flat pixel art |
+| Article link shown, QR deferred | QR suits a wall display but needs an encoder |
 
 ## Gotchas
 

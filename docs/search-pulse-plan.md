@@ -13,7 +13,8 @@ Lines marked **AMENDED** record where the plan met reality and reality won.
 | 1 | Live Trending Now list | Done — 2026-08-02 |
 | 2 | Selected-trend details panel | Done — 2026-08-02 |
 | 3 | SQLite history and rank graph | Done — 2026-08-02 |
-| 4 | Daily history view | Next |
+| 3.5 | Full-screen trend card | **Next** |
+| 4 | Daily history view | Not started |
 | 5 | Reliability and polish | Not started |
 
 **Each phase is merged and usable before the next one starts.** Finishing the current
@@ -383,6 +384,106 @@ Acceptance criteria:
 - Selecting a trend displays its last 24 hours.
 - Rank history uses real stored observations.
 - Approximate volume stays clearly labelled approximate.
+
+---
+
+## Phase 3.5 — Full-screen trend card
+
+Added 2026-08-03, ahead of Phase 4, at the user's request. A trend's title often explains
+nothing on its own — `PROFESSOR`, `XMEN`, `AERODIANA` — while the feed carries a picture
+and three news headlines that explain it completely. This surfaces them.
+
+### The view
+
+A **view inside Search Pulse**, not a new carousel page — the two-page rule holds. Tapping
+the details band of a selected trend swaps the list for a full-screen card; a tap goes
+back. The list stays glanceable by default and the card gets room to breathe.
+
+```
+┌────────────────────────────────────────────┐
+│ ← TORNADOES                     1K+ · 2H   │
+├────────────────────────────────────────────┤
+│  ┌──────────────┐  GALLERY: Storm damage   │
+│  │  posterized  │  after apparent tornado  │
+│  │    image     │  hits Tri-State          │
+│  │              │  WKRC · wkrc.com         │
+│  └──────────────┘                          │
+│  Strong storms and tornado warnings rattle │
+│  Southwest Ohio — WYSO Public Radio        │
+│                                            │
+│  Tornado warning issued in Butler County   │
+│  as storms barrel toward area — Cincinnati │
+│  Enquirer                                  │
+├────────────────────────────────────────────┤
+│  RANK · LAST 2H        [graph]   PEAK #3   │
+└────────────────────────────────────────────┘
+```
+
+### All three headlines, not one
+
+**Showing a single headline is unreliable and the feed proves it.** Sampled 2026-08-03:
+`tornadoes`, `daredevil`, `upcoming meteor showers` and `what is a data breach` each had
+three headlines describing one event, so any single one would do. But `artificial
+intelligence news` returned three *different* stories — Chinese military AI, an Anthropic
+complaint, and Chinese tech advances. Picking the first would have asserted the trend was
+about the first when it was about all three.
+
+So all three are shown. Where they agree you learn the event; where they diverge you can
+see the trend is broad, and that divergence is itself information.
+
+How Google associates articles with a query is **not published**. Do not describe a
+mechanism for it.
+
+### The image, posterized to the theme
+
+Snap the photo to the active theme's seven colours and render it with
+`image-rendering: pixelated`, so a news photograph becomes chunky GBA-era artwork that
+**recolours when the theme changes**. This turns the one element that would clash with a
+flat pixel-art screen into the most on-brand thing on it. Draw small to a canvas, map each
+pixel to the nearest theme colour, scale up. Roughly 40 lines, no dependency, the same
+spirit as the hand-rolled sprites and outlines.
+
+**Verified 2026-08-03: this works client-side with no proxy.** `encrypted-tbn*.gstatic.com`
+returns `access-control-allow-origin: *`, so with `crossorigin="anonymous"` the canvas is
+not tainted and `getImageData` is allowed. Images are `cache-control: public,
+max-age=31536000`, so repeat loads are free.
+
+The one open sub-decision: doing this loads images **directly from Google in the browser**,
+which is the first time the client talks to Google at all — every other request goes to our
+API. There is no technical need to proxy them; it is a question of whether that property is
+worth keeping.
+
+### The article link
+
+Show it. The user asked for it and the feed provides `ht:news_item_url` per headline.
+
+**QR codes are explicitly deferred** — considered and held off. They would suit a wall
+display, since an article is unreadable on a 720 × 720 panel but scannable to a phone, and
+a QR is black-and-white blocks that fit the aesthetic. The cost is an encoder: a small
+library or ~250 lines of Reed-Solomon. Revisit if reaching articles becomes a real need.
+
+Worth remembering: tapping a link on a wall-mounted kiosk navigates away from the
+dashboard. Decide deliberately whether the link is tappable or shown as text.
+
+### Work this needs
+
+The API does not carry any of this yet:
+
+- `parseTrendingRss` must extract `ht:picture`, `ht:picture_source`, and each
+  `ht:news_item`'s title, source and URL.
+- `TrendingSearch` gains optional `imageUrl`, `imageSource`, and a `news` array. Same rule
+  as everything else: absent when the feed does not state it.
+- Decide whether headlines and image belong in `trend_snapshots`. They describe the
+  present rather than history, so probably not — but say so on purpose.
+
+### Acceptance criteria
+
+- Tapping into a trend shows its card; a tap returns to the list.
+- All three headlines appear, quoted verbatim, each with its source named.
+- The image reads as pixel art and recolours with the theme.
+- A trend whose feed entry lacks an image or headlines renders without them, not with a
+  placeholder.
+- Nothing on the card is summarised, interpreted, or presented as a related search.
 
 ---
 
