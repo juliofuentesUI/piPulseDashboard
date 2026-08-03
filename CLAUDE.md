@@ -12,12 +12,24 @@ screen, done well. Do not overbuild it.
 Prefer plain CSS and hand-rolled helpers over new dependencies. The pixel sprites and the
 runtime payload validation are hand-written on purpose, not for lack of a library.
 
+"Do not overbuild" is about **scope, not tools**. There is no banned-technology list — an
+earlier constraint against React, Tailwind and Docker was lifted, and the stack is settled
+as Svelte + Vite + Fastify. Adding a dev-tooling script is fine; adding a second screen to
+the demo is not.
+
 ## Verifying UI changes
 
 The layout is authored at a fixed 720 × 720 and never reflows, so reading the CSS does
 not tell you whether it renders correctly. Start the app with `npm run dev` and drive the
 Playwright MCP server against `http://localhost:5173` with the viewport set to 720 × 720.
 First-run setup is under "Browser automation" in `README.md`.
+
+**720 × 720 is not negotiable, because any other size lies about the artwork.**
+[App.svelte](apps/web/src/App.svelte) scales the design by
+`Math.min(window.innerWidth, window.innerHeight) / 720`, which is exactly 1 on the
+HyperPixel but about 0.54 on a phone. At a fractional scale the sprite grid resamples
+unevenly, so layout and touch targets stay honest while sprite crispness and outline
+alignment do not. Judge those only at 720 × 720 — a capture, or the panel itself.
 
 Do not pass `filename` to `browser_take_screenshot`. Without it the file is auto-named
 into `.playwright-mcp/`, which is gitignored; with it the file lands in the repository
