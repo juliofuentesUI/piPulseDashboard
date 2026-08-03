@@ -26,9 +26,26 @@ there is no frame to find around something that *is* a frame.
 | --- | --- |
 | `yugi.png` | Title band of both weather layouts, behind the heading |
 | `kaiba.png` | Title band of Search Pulse, behind the heading |
+| `corner-tl/tr/bl/br.png` | The panel's four corners, on one pseudo-element |
+| `divider-eye.png` | Stretched across the rule under every band heading |
+| `plaque-blank.png` | 9-sliced: the rank cartouches, and the `UNITED STATES` tablet |
+| `panel-wide.png` | 9-sliced: the settings dialog's frame |
 
-Swapping either is a one-line change in `apps/web/src/styles/millennium.css` — every file
-below is prepared the same way and will drop straight in.
+Swapping any of them is a one-line change in `apps/web/src/styles/millennium.css` — every
+file below is prepared the same way and will drop straight in.
+
+### Two things worth knowing before adding more
+
+**A 9-slice is how a fixed-size painting fits a box it was never drawn for.** The corners
+are drawn at their own scale and only the edges and centre stretch, so one 836 × 184
+plaque fits a 44px rank cartouche *and* a 560px dialog without the bevel thinning on
+either. `fill` keeps the painted face rather than only its border. This is why source
+resolution does not matter here.
+
+**It needs a border thick enough to hold the bevel, so it needs a fixed box.** The
+ordering chips were the obvious candidate and had to be turned down: `.mode` is a 2px
+border on a content-sized chip, and taking the active one to 10px makes it wider and
+taller than the inactive one, so the pair jumps every time the ordering changes.
 
 ## Available, not currently used
 
@@ -40,26 +57,20 @@ below is prepared the same way and will drop straight in.
 | `puzzle-medallion.png` | Millennium Puzzle on a carved medallion |
 | `puzzle-tile.png` | Millennium Puzzle on a plain stone tile |
 | `puzzle-mark.png` | Millennium Puzzle alone, transparent — the one usable as an icon |
-| `corners.png` | Four corner ornaments on one sheet; needs slicing to use |
 | `banner-hieroglyph.png` | Wide hieroglyph banner with a winged eye |
-| `divider-eye.png` | Slim divider bar with a winged eye |
-| `plaque-blank.png` | Blank gold plaque |
-| `panel-wide.png` | Framed hieroglyph panel, blue field |
 | `panel-tall.png` | Framed hieroglyph panel, blue field, deeper |
+| `corners.png` | The unsliced source sheet for the four corner files |
 
-**These are deliberately unused rather than forgotten.** The panel is a 720 × 720
-information display whose every band is already a plaque with data on it, and each of
-these would have to displace something to appear. The two that are in use went into the
-one place with genuine slack. Adding more means deciding what leaves the screen — a real
-design call, not a matter of dropping in a file.
+`corners.png` is kept as the source of the four `corner-*.png` files. Re-cut them with:
 
-Two notes if you do reach for them:
+```sh
+node scripts/theme-art.mjs apps/web/public/themes/millennium/corners.png \
+  apps/web/public/themes/millennium/corner-tl.png \
+  --cell=0,0,2,2 --height=110 --keep-frame --no-key
+```
 
-- `corners.png` is a **sheet of four**, not a single ornament. It needs slicing into
-  quadrants before anything can use one corner.
-- The panel's own corners are occupied on every layout — the date and clock at the top,
-  the metric icons at the bottom — so corner ornaments have nowhere to sit without
-  covering a reading.
+`--cell=col,row,cols,rows` takes one tile from a sheet; the other three are `1,0`, `0,1`
+and `1,1`.
 
 ## Where the originals are
 

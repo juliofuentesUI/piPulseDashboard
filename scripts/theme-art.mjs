@@ -362,8 +362,31 @@ const keepFrame = flags.includes('--keep-frame');
  */
 const noKey = flags.includes('--no-key');
 
+/*
+ * `--cell=col,row,cols,rows` takes one tile out of a sheet before anything else
+ * runs. The corner ornaments arrive as a 2x2 sheet and each corner has to
+ * become its own file, because CSS cannot address a quadrant of a background
+ * image and position it independently four times.
+ *
+ * Cutting on the grid is enough — `trim` then tightens each quadrant down to
+ * its own ornament, so the cut only has to be roughly right.
+ */
+const cell = flags.find((f) => f.startsWith('--cell='))?.slice(7).split(',').map(Number);
+
 const original = decode(readFileSync(source));
 let image = original;
+
+if (cell !== undefined) {
+  const [col, row, cols, rows] = cell;
+  const w = Math.floor(image.width / cols);
+  const h = Math.floor(image.height / rows);
+  image = crop(image, {
+    left: col * w,
+    right: image.width - (col + 1) * w,
+    top: row * h,
+    bottom: image.height - (row + 1) * h,
+  });
+}
 
 if (!keepFrame) {
   image = crop(image, {

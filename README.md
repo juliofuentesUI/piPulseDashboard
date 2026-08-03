@@ -807,6 +807,18 @@ slack. Behind the page instead, under opaque plaques, a figure lands at roughly 
 visible; brightened to compensate it sits under a 64 px temperature. The theme is complete
 without the files: a `url()` that 404s paints nothing.
 
+Painted chrome sits on top of that: ornaments in the panel's four corners, a winged-eye
+rail across the rule under every band heading, gold plaques behind the rank numerals and
+the `UNITED STATES` tablet, and a hieroglyph frame around the settings dialog. The plaques
+and the frame are **CSS 9-slices** (`border-image … fill`), which is what lets one
+836 × 184 painting fit both a 44 px cartouche and a 560 px dialog without the bevel
+thinning — source resolution does not matter. It does require a fixed box, which is why the
+ordering chips are still drawn in CSS: a border thick enough to hold the bevel would make
+the active chip larger than its inactive twin and the pair would jump on every change.
+
+The corners cost four per-theme padding adjustments, all measured against real collisions
+and recorded in the plan doc.
+
 Art enters `apps/web/public/themes/millennium/` through **`scripts/theme-art.mjs`**, never
 by copying. It arrives as framed gallery tiles at ~2.4 MB each; the script crops the
 painted frame, keys the near-black backdrop to transparency, trims and downsamples, taking

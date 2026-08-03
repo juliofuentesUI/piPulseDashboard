@@ -17,6 +17,7 @@ what it says.
 | M5 | Verified at 720×720 across all three layouts + the trend card | **Done** |
 | M6 | Verified the other five themes are unchanged | **Done** |
 | M7 | Character art prepared and placed | **Done** |
+| M8 | Painted overlays: corners, divider, plaques, dialog frame | **Done** |
 
 ## Objective
 
@@ -170,15 +171,62 @@ In use: `yugi.png` on both weather layouts, `kaiba.png` on Search Pulse. Swappin
 is a one-line change; the other twelve are prepared identically and listed in
 `apps/web/public/themes/millennium/README.md`.
 
-### Twelve pieces are deliberately unused
+### M8 — the painted overlays
 
-Obelisk, Slifer, Exodia, two Puzzles, a Puzzle mark, a corner-ornament sheet, two banners,
-a plaque and two hieroglyph panels. They are placed and documented, not wired in, because
-**each would have to displace something to appear** on a 720 × 720 display whose every band
-already carries data. Adding one is a design decision about what leaves the screen, not a
-matter of dropping in a file. Two specifics worth knowing: `corners.png` is a sheet of four
-and needs slicing, and the panel's own corners are occupied on every layout — date and
-clock at the top, metric icons at the bottom.
+Added at the user's request after M7: four of the UI pieces applied as real chrome rather
+than archived. All four are in, and the sizing problem the user anticipated is solved by
+**CSS 9-slicing**, which makes source resolution irrelevant — corners are drawn at their
+own scale and only edges and centre stretch.
+
+| Piece | Where | How |
+| --- | --- | --- |
+| `corners` | The panel's four corners | Sliced into four files, all four on one pseudo-element as four background layers |
+| `divider-eye` | The rule under every band heading | Stretched to the full 704 |
+| `plaque-blank` | Rank cartouches, `UNITED STATES` tablet | `border-image` 9-slice with `fill` |
+| `panel-wide` | The settings dialog's frame | `border-image`, asymmetric slices |
+
+**The corners cost four per-theme padding adjustments**, all measured rather than guessed:
+
+| Collision | Fix |
+| --- | --- |
+| Ornament over the date and clock | `button.bar` padding 24 → 62 |
+| Ornament over the 7-day footer | `div.bar` padding 24 → 44, *not* 62 — the footer carries four things and closed up into one run of words |
+| Ornament over `SEARCH PULSE`, the one layout leading with its title band | That band's `padding-left` → 56, left only: padding the right walks the menu glyph into the character |
+| Ornament over the menu dots, top-right | Ornaments 46 → 40px, so what reaches the dots is the thin tip of the diagonal |
+
+The trend list is the deliberate exception — its bottom row reaches both bottom corners and
+cannot be padded, because the rank cartouche sits on a fixed 52px grid column and moving it
+would misalign all five rows. The ornaments sit over the row's outer margin, which is empty
+on every row.
+
+**The divider bar is stretched, not drawn at its own aspect.** Held to its 9.7:1 it comes
+out ~250px wide, and at that size the dark field between the gold rails is most of it — on
+the panel it read as a smudge under the heading. Full width the rails run the length of the
+band and the eye sits centred over the rule. The cost is a flattened eye; a relief carving
+survives being flattened better than being small.
+
+**The plaque needs a fixed box**, which is why the ordering chips were turned down: a
+9-slice needs a border thick enough to hold the bevel, and taking `.mode.active` from 2px
+to 10px makes it larger than its inactive twin, so the pair jumps on every ordering change.
+The rank cartouche is 44 × 44 and fixed, so it suits it. The `UNITED STATES` tablet also
+needs 14px of horizontal padding as *clearance*: the plaque's field is chamfered at both
+ends and a 9-slice scales those cuts down with the border, so they land inside the content
+box and bite the first and last letter.
+
+**One latent bug surfaced.** `html[data-theme='millennium'] .screen` was painting the stone
+field, the inset ring and the frame's shadow **twice** on the 7-day layout: `.screen` is
+used by both App.svelte's panel and WeekDashboard's root. It is now `.device > .screen`.
+Found by reading the markup, not the render — doubling a dark vignette over a dark vignette
+is nearly invisible, which is exactly why the class-coupling this file depends on is worth
+being nervous about.
+
+### Ten pieces are deliberately unused
+
+Obelisk, Slifer, Exodia, two Puzzles, a Puzzle mark, a banner and a second hieroglyph
+panel — plus `corners.png`, kept as the source sheet the four `corner-*.png` files are cut
+from. They are placed and documented, not wired in, because **each would have to displace
+something to appear** on a 720 × 720 display whose every band already carries data. Adding
+one is a design decision about what leaves the screen, not a matter of dropping in a file.
 
 **The theme is still complete without any of it.** A `url()` that 404s paints nothing —
 verified by rendering with the directory empty.

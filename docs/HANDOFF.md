@@ -50,6 +50,19 @@ specified a page-background figure and it was wrong; behind opaque plaques it la
 about 2% visible, and brightening it to compensate puts a face under a 64px temperature.
 The title band is the only slack on any of the three layouts.
 
+**Four of the UI pieces are applied as chrome** (M8): corner ornaments, a winged-eye rail
+under every band heading, gold plaques on the rank numerals and the region tablet, and a
+hieroglyph frame on the settings dialog. The plaques and the frame are `border-image`
+9-slices, which is what makes source resolution irrelevant — but a 9-slice needs a border
+thick enough to hold the bevel, so it only suits a **fixed-size box**. That ruled out the
+ordering chips, whose active state would grow larger than its inactive twin.
+
+**`.screen` is used by two components** — App.svelte's panel and WeekDashboard's root — and
+a bare `html[data-theme='millennium'] .screen` rule painted the stone field and inset
+shadow twice on the 7-day layout for two commits before anyone noticed. It is
+`.device > .screen` now. Read the markup before writing a selector in that file; a doubled
+dark vignette is nearly invisible in a render.
+
 Working tree clean, everything merged to `main`. Nothing is parked on a branch.
 
 **Do not start Phase 4.** The user deferred it on 2026-08-03 to get the current version
