@@ -25,6 +25,11 @@ stack is settled as Svelte + Vite + Fastify. Adding a dev-tooling script is fine
 Search Pulse list below is a different thing: it bans sources and methods, not build
 tooling, and it does not loosen.
 
+The weather half has its own plan, [docs/weather-provider-plan.md](docs/weather-provider-plan.md)
+— switching from Open-Meteo to Google's Weather API. It is a separate document because the
+Search Pulse guardrails below do not apply to it, and three questions have to be settled
+before any of it is built.
+
 ### Search Pulse guardrails
 
 **Starting a fresh session? Read [docs/HANDOFF.md](docs/HANDOFF.md) first** — where the

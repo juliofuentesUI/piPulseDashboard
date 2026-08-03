@@ -33,6 +33,14 @@ separates "Node is too old" from "this SD card is read-only" — the two look id
 the screen. History moves across with `node scripts/history-db.mjs export`; never copy
 `trends.db` by hand, because WAL mode leaves most of the data in a sidecar.
 
+**A weather-provider switch is planned**, Open-Meteo to Google's Weather API, at the user's
+request on 2026-08-03 because he finds Google noticeably more accurate for San Jose. It has
+its own document, `docs/weather-provider-plan.md`, and it is deliberately **not** in the
+Search Pulse plan — different half of the dashboard, different rules. Three questions have
+to be answered before any code: how many billable calls one refresh really costs, whether
+the 7-day table's three columns can survive Google only offering day/night splits, and demo
+key versus real key. Do not start at Phase W1 without W0.
+
 ## Read these, in this order
 
 1. **`CLAUDE.md`** — guardrails. The ban list, one-phase-at-a-time, the two-page carousel
