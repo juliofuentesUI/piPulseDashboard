@@ -28,9 +28,13 @@ Run `npm run typecheck` before calling a change done — it covers both workspac
 ## Showing the user the dashboard
 
 When the user asks to see the dashboard — "show me", "what does it look like now", "send
-me a screenshot" — use the **`show-dashboard`** skill. It captures at 720 × 720 and
-publishes a link they can open on a phone, which a local file path or an inline image
-cannot do. They can also invoke it directly as `/show-dashboard`.
+me a screenshot" — use the **`show-dashboard`** skill, or let them invoke it directly as
+`/show-dashboard`.
+
+It has two modes, and the skill covers when to pick which. Default to the inline
+screenshot: it renders on mobile and costs two fewer round trips. Publish an Artifact link
+when the user wants something bookmarkable, or when sprite crispness is the question —
+inline arrives at roughly 0.2 scale on a phone, which cannot answer that.
 
 ## Remote access
 
