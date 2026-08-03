@@ -1,8 +1,15 @@
 # Handoff — 2026-08-03
 
-Written at the end of the session that built Search Pulse Phases 0–3 and specified 3.5.
-Read this first, then the three documents it points at. Delete or rewrite it when it stops
-being true.
+Two sessions are folded into this. The first built Search Pulse Phases 0–3.5 and the Pi
+deploy scripts; the second built the `millennium` theme end to end, including the supplied
+artwork. Read this first, then the documents it points at. Delete or rewrite it when it
+stops being true.
+
+**Nothing is in flight.** Working tree clean, `main` pushed, no branch parked, no question
+outstanding. The next session starts from a standing stop — which means picking what to do
+next is a conversation to have with the user, not something to infer from this file. The
+two candidates are Phase 4 and the weather-provider switch, and **both are explicitly
+gated**; see below.
 
 ## Where the work stands
 
@@ -15,55 +22,54 @@ being true.
 | — | Ordering fix: SURGING / BIGGEST modes | Done |
 | 3.5 | Full-screen trend card: image + 3 headlines | Done |
 | — | Raspberry Pi deploy scripts | Done |
-| — | `millennium` theme, character art included | Done |
+| — | `millennium` theme, M1–M8, artwork included | Done |
 | 4 | Daily history view (`TODAY`) | **Deferred — deploy first** |
 | 5 | Reliability and polish | Not started |
 
-**The `millennium` theme was inserted before Phase 4** at the user's request on
-2026-08-03, and has its own document, `docs/millennium-theme-plan.md`. It is a whole-app
-theme rather than a Search Pulse phase, so the Search Pulse guardrails do not bear on it —
-it adds no data, no source and no claim. Two things about it are worth knowing without
-opening the doc:
+## The `millennium` theme
+
+Built 2026-08-03 as an intermediary phase at the user's request, between 3.5 and 4. Its
+own document is **`docs/millennium-theme-plan.md`** and it is thorough — read it before
+touching the theme. The short version, and the parts that reach outside the theme:
 
 - **It is the one thing allowed to break "flat by design" and "original pixel art only."**
   The user made that call explicitly. It is itself the sixth theme; do not generalise the
   exception to the app or to a seventh.
-- **It grew the theme system by exactly two things**: a `--line` token in `app.css`, so
-  structural rules can differ from `ink`; and `styles/millennium.css`, keyed off
-  `[data-theme]`, which reaches into components' private class names by specificity rather
-  than by editing them. That coupling is deliberate and documented — renaming a class like
-  `.column` silently drops the gold off one band without failing a build.
+- **It grew the theme system by exactly two things.** A `--line` token in `app.css`, so
+  structural rules can differ from `ink` — this one touches all five flat themes and was
+  verified not to change them. And `styles/millennium.css`, keyed off `[data-theme]`,
+  which reaches into components' private class names by specificity rather than by editing
+  them.
+- **That class coupling is the theme's main hazard.** Renaming `.column` in
+  `ForecastColumn.svelte` drops the gold off one band without failing a build or touching
+  the other themes. It already bit once: `.screen` is used by *both* App.svelte's panel and
+  WeekDashboard's root, so a bare `.screen` rule painted the stone field and inset shadow
+  twice on the 7-day layout for two commits. It is `.device > .screen` now. **Read the
+  markup before writing a selector in that file** — a doubled dark vignette is nearly
+  invisible in a render.
+- **Character art goes in the title band, not behind the page.** The plan originally said
+  page-background and was wrong: behind opaque plaques a figure lands at about 2% visible,
+  and brightening it to compensate puts a face under a 64px temperature.
+- **The painted plaques and frames are `border-image` 9-slices**, which is what makes the
+  source resolution irrelevant. A 9-slice needs a border thick enough to hold the bevel,
+  so it only suits a **fixed-size box** — that is why the ordering chips are still CSS.
 
-The user supplied fourteen art files. **Do not add art to that folder by copying it in** —
-it arrives as framed gallery tiles at ~2.4 MB each, and `scripts/theme-art.mjs` is what
-turns one into a panel asset (crops the painted frame, keys the black backdrop, trims,
-downsamples; 34 MB → 7.7 MB for the set). Use `--keep-frame --no-key` for anything that
-already has an alpha channel, or the key will eat it.
+### Adding or changing art
 
-Two are wired in — Yugi on the weather layouts, Kaiba on Search Pulse — and **twelve are
-placed but deliberately unused.** That is not an oversight: every band on this panel
-already carries data, so adding one is a decision about what leaves the screen. The
-inventory is in `apps/web/public/themes/millennium/README.md`.
+**Never copy a file into `apps/web/public/themes/millennium/`.** Art arrives as framed
+gallery tiles at ~2.4 MB each; `scripts/theme-art.mjs` is what turns one into a panel asset
+— crops the painted frame, keys the black backdrop, trims, downsamples. It took the
+supplied set from 34 MB to 7.7 MB. Pass `--keep-frame --no-key` for anything that already
+has an alpha channel or the key will eat its dark field, and `--cell=col,row,cols,rows` to
+take one tile out of a sheet.
 
-**Character art belongs in the title band, not behind the page.** The plan originally
-specified a page-background figure and it was wrong; behind opaque plaques it lands at
-about 2% visible, and brightening it to compensate puts a face under a 64px temperature.
-The title band is the only slack on any of the three layouts.
+Six of the fourteen supplied pieces are wired in; **eight are placed and deliberately
+unused.** That is not an oversight — every band on this panel already carries data, so
+adding one is a decision about what leaves the screen. The inventory, and which is which,
+is in that directory's `README.md`. (Eighteen files for fourteen pieces: the corner sheet
+was cut into four.)
 
-**Four of the UI pieces are applied as chrome** (M8): corner ornaments, a winged-eye rail
-under every band heading, gold plaques on the rank numerals and the region tablet, and a
-hieroglyph frame on the settings dialog. The plaques and the frame are `border-image`
-9-slices, which is what makes source resolution irrelevant — but a 9-slice needs a border
-thick enough to hold the bevel, so it only suits a **fixed-size box**. That ruled out the
-ordering chips, whose active state would grow larger than its inactive twin.
-
-**`.screen` is used by two components** — App.svelte's panel and WeekDashboard's root — and
-a bare `html[data-theme='millennium'] .screen` rule painted the stone field and inset
-shadow twice on the 7-day layout for two commits before anyone noticed. It is
-`.device > .screen` now. Read the markup before writing a selector in that file; a doubled
-dark vignette is nearly invisible in a render.
-
-Working tree clean, everything merged to `main`. Nothing is parked on a branch.
+## Neither of the two obvious next steps is unblocked
 
 **Do not start Phase 4.** The user deferred it on 2026-08-03 to get the current version
 onto the Pi first, and that ordering is right on its own merits: Phase 4 is only as good as
@@ -95,6 +101,12 @@ key versus real key. Do not start at Phase W1 without W0.
    expensive lessons.
 3. **`README.md`** — API contract, layout bands, and the reasoning behind the bar scale,
    the graph axes, and the two orderings.
+
+Then, only if the work touches them:
+
+4. **`docs/millennium-theme-plan.md`** — the theme, and every placement that was tried and
+   rejected before the one that shipped.
+5. **`docs/weather-provider-plan.md`** — the Open-Meteo → Google switch, still at W0.
 
 Per-project memories also load automatically in this directory. They cover Pi deployment,
 git workflow, and two gotchas repeated below.
@@ -238,22 +250,44 @@ scrolling on a wall display.
 | Card is entered from the details band | The band already describes the trend; biggest target |
 | Headlines and image not stored in SQLite | They describe the present; the card reads the live list |
 | Card image fetched by the browser, not proxied | The rule protected the rate-limited feed, not a CDN |
+| `millennium` may break flat design; nothing else may | User's explicit call, scoped to that one theme |
+| The three layouts do not change for a theme | The reference merges the two weather screens; we kept them apart |
+| Theme-specific CSS lives in one `[data-theme]` sheet | Beats scattering rules through twenty components |
+| Character art sits in the title band | The only slack on any layout; behind the page it is 2% visible |
+| Eight of fourteen art pieces stay unused | Each would have to displace a reading to appear |
+| Art is committed, not gitignored | User's call, told it was third-party art in a public repo |
 
 ## Gotchas
 
-**The dev server serves stale code.** Both Vite and `tsx watch` silently missed rapid
-file rewrites in this WSL setup, twice, and both times it looked like a code bug. Vite
-served a module missing a function the file plainly had; `tsx watch` stopped restarting
-the API entirely and a new route 404'd. Not inotify exhaustion — 9 of 128 instances in
-use. **Before debugging code that "isn't working", check what is actually being served:**
+**The dev server serves stale code.** Three times now, and every time it presented as a
+code bug. Vite served a module missing a function the file plainly had; `tsx watch`
+stopped restarting the API entirely and a new route 404'd; and a CSS rule that had worked
+minutes earlier simply stopped applying. Not inotify exhaustion — 9 of 128 instances in
+use.
+
+**A `git checkout` triggers it too.** That third case was `git checkout main` before a
+fast-forward merge: it briefly reverts a file to main's version and then restores it, and
+the watcher latched the intermediate. So it is not only rapid rewrites — any fast
+swap-and-restore of a watched file can do it, and branch switching does that by design.
+
+**Comparing served bytes to disk is not a sufficient check.** In the CSS case `curl` came
+back byte-identical to disk (19,836 both) with every rule present, while the browser had
+parsed only the first of four. Check what the *browser* ended up with:
 
 ```bash
 curl -s http://localhost:5173/src/lib/trend-view.ts | grep -c someNewFunction
 ps --ppid <tsx-watch-pid> -o pid,etime          # is the API child stale?
 ```
 
-`touch` on the file usually revives Vite. `tsx watch` needed a full restart. Avoid
-rewriting one file several times in quick succession — batch edits into a single write.
+```js
+// in the page: does the rule exist, and did it apply?
+getComputedStyle(el).position;
+[...document.styleSheets].flatMap((s) => [...s.cssRules]).filter((r) => /* … */);
+```
+
+`touch` on the file revives Vite. `tsx watch` needed a full restart. Avoid rewriting one
+file several times in quick succession — batch edits into a single write — and `touch`
+after any branch switch before trusting what you see.
 
 **The API may not be running.** The previous session left it running as a background
 process, which dies with the session. Run `npm run dev` from the repo root; it starts both
@@ -263,8 +297,20 @@ the Fastify API on 3000 and Vite on 5173.
 This raised the Pi's deploy floor — see CLAUDE.md.
 
 **Verify at exactly 720 × 720, and check all three layouts** — `WEATHER NOW`,
-`7-DAY FORECAST`, and Search Pulse. Drive Playwright by accessible name, never by pixel
-coordinate. Never pass `filename` to `browser_take_screenshot`.
+`7-DAY FORECAST`, and Search Pulse — plus the settings dialog and the trend card, which
+are separate surfaces with their own framing. Drive Playwright by accessible name, never
+by pixel coordinate. Never pass `filename` to `browser_take_screenshot`.
+
+**Anything touching a shared token means checking a flat theme too.** `millennium.css` is
+keyed off `[data-theme]` and cannot reach the others, but `--line`, `--font-display` and
+everything else in `app.css` reaches everything. `midnight` is the one to check: its `ink`
+is near-white where every other theme's is dark, so it breaks assumptions the other four
+share.
+
+**Measure collisions, do not eye them.** Every overlay placement in the theme was settled
+by reading back `getBoundingClientRect()` for the element and the thing it might cover.
+Guessing produced four wrong answers in a row; measuring produced the right one first
+time.
 
 **Do not deliver screenshots with `SendUserFile`.** They arrive on the user's phone as
 broken cards. Let the `browser_take_screenshot` tool result be the image and say in the
@@ -272,13 +318,18 @@ reply which capture shows what.
 
 ## The data
 
-SQLite at `apps/api/data/trends.db`, gitignored, WAL mode. As of this handoff: 180 rows,
-18 fetches, 21 distinct trends, ~150 minutes of history, 484 KB on disk. Roughly 1,440
-rows/day, ~26 MB for 90 days.
+SQLite at `apps/api/data/trends.db`, gitignored, WAL mode. As of this handoff: **500 rows,
+50 fetches, 136 distinct trends, ~16.5 hours of history** (2026-08-03 04:43Z → 21:16Z),
+~2 MB on disk with the WAL. Roughly 1,440 rows/day, ~26 MB for 90 days.
 
-Schema is one row per trend per fetch: `trend_key`, `title`, `approximate_volume`, `rank`
-(feed position), `related_queries`, `first_seen_at`, `observed_at`. A unique index on
-`(trend_key, observed_at)` makes a repeated write idempotent.
+That 16.5 hours is still a laptop's record, not the Pi's, and it is the thing Phase 4 is
+waiting on — 136 distinct trends across a day is a real sample, but it is one day and it
+stops whenever this machine sleeps.
+
+The table is **`trend_snapshots`**, one row per trend per fetch: `id`, `trend_key`,
+`title`, `approximate_volume`, `rank` (feed position), `related_queries`, `first_seen_at`,
+`observed_at`. A unique index on `(trend_key, observed_at)` makes a repeated write
+idempotent.
 
 **`rank` in the table is feed position.** The volume ranking the graph uses is computed at
 read time in `historyFor`, by grouping the window's rows by `observed_at` and sorting on

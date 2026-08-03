@@ -40,6 +40,18 @@ and a seventh theme does not inherit it. The theme changes no layout, and must n
 to — the reference it was drawn from merges the two weather screens, and we deliberately
 kept them separate.
 
+Two operational rules for it:
+
+- **Never copy an image into `apps/web/public/themes/millennium/`.** Art arrives as framed
+  gallery tiles at ~2.4 MB each and goes through `scripts/theme-art.mjs`, which crops the
+  frame, keys the black backdrop, trims and downsamples — 34 MB to 7.7 MB for the supplied
+  set. Use `--keep-frame --no-key` on anything that already has an alpha channel.
+- **`millennium.css` targets other components' class names**, so those names are part of
+  its contract and renaming one breaks it silently. Check for collisions before writing a
+  selector there: `.row`, `.title`, `.bar`, `.head`, `.icon` and `.screen` each belong to
+  more than one component, and `.screen` in particular is both the panel and the 7-day
+  layout's root.
+
 ### Search Pulse guardrails
 
 **Starting a fresh session? Read [docs/HANDOFF.md](docs/HANDOFF.md) first** — where the

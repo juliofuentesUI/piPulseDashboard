@@ -117,7 +117,7 @@ the sepia the card now shows.
 | Plaques are solid stone | The veil existed to reveal page-background art; that art moved to the title band, so the veil stopped paying for itself |
 | Character art lives in the title band, behind the heading | The only slack on any of the three layouts. Behind the page it was 2% visible; forced brighter it sat under a 64px temperature |
 | Art is processed by a script, not copied | Framed tiles at 2.4 MB each; the panel needs unframed, keyed, small. 34 MB → 7.7 MB |
-| Twelve of fourteen pieces placed but unused | Each would have to displace data to appear. That is a design call, not a file drop |
+| Eight of fourteen pieces placed but unused | Each would have to displace data to appear. That is a design call, not a file drop |
 
 ## The character art — M7 — AMENDED
 
@@ -168,7 +168,8 @@ a figure's hand drifting over the only control in the band is worse than a few p
 slack.
 
 In use: `yugi.png` on both weather layouts, `kaiba.png` on Search Pulse. Swapping either
-is a one-line change; the other twelve are prepared identically and listed in
+for one of the other figures — `obelisk`, `slifer`, `exodia`, or a Puzzle — is a one-line
+change, because all of them went through the same preparation. The full inventory is in
 `apps/web/public/themes/millennium/README.md`.
 
 ### M8 — the painted overlays
@@ -220,7 +221,7 @@ Found by reading the markup, not the render — doubling a dark vignette over a 
 is nearly invisible, which is exactly why the class-coupling this file depends on is worth
 being nervous about.
 
-### Ten pieces are deliberately unused
+### Eight pieces are deliberately unused
 
 Obelisk, Slifer, Exodia, two Puzzles, a Puzzle mark, a banner and a second hieroglyph
 panel — plus `corners.png`, kept as the source sheet the four `corner-*.png` files are cut
@@ -247,15 +248,25 @@ anything the panel draws.
 - [x] `gba-blue` and `midnight` render exactly as before the `--line` change
 - [x] `npm run typecheck` clean across both workspaces
 - [x] Character art present, judged at 720 × 720, and clear of the menu control
+- [x] Painted overlays applied without covering a control or clipping a reading, each
+      placement measured with `getBoundingClientRect()` rather than eyed
+- [x] Production build clean; art and font both reach `dist/` (7.9 MB)
 
 ## Out of scope
 
 Deliberately not done, and not to be added without being asked:
 
 - Merging the two weather layouts, as the reference does. The user kept them separate
-- A raster frame or 9-slice border. The frame is a `border-image` gradient: no asset, no
-  request, and exact at any scale the panel is transformed to
-- A hieroglyph bitmap for the stone. It is three CSS gradients, resolution-independent on
-  a panel scaled by a transform
+- ~~A raster frame or 9-slice border~~ — **AMENDED at M8.** This said the frame should stay
+  a `border-image` gradient because it needed no asset and stayed exact at any scale. The
+  user then asked for the painted overlays, and 9-slicing is what made them fit: corners
+  drawn at their own scale, only edges and centre stretching, so one 836 × 184 plaque
+  serves a 44px cartouche and a 560px dialog. The **outer panel frame** is still the
+  gradient; the plaques and the dialog are painted
+- A hieroglyph bitmap for the stone field. It is three CSS gradients, resolution-independent
+  on a panel scaled by a transform, and the painted panels are used as *frames* rather than
+  as a wall texture
 - Animation. The theme is as static as the five before it, which is what keeps the Pi idle
 - Theming the Raspberry Pi wordmark's sprite beyond the palette it already follows
+- Painted chrome on anything without a fixed box. A 9-slice needs a border thick enough to
+  hold its bevel; on a content-sized element the active state outgrows the inactive one
