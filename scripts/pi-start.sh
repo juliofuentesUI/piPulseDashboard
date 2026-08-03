@@ -23,15 +23,6 @@ readonly REQUIRED_NODE_MAJOR=24
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly ROOT
 
-# A profile of its own, not the Pi user's ordinary one. Two reasons, and the
-# second is the one that would otherwise bite: the dashboard keeps the theme,
-# the weather layout and the list ordering in localStorage, so the profile has
-# to persist between launches or the screen forgets itself every time. And if
-# Chromium is already running with its normal profile, launching it again just
-# opens a window in that existing process and exits immediately — which would
-# leave this script tracking a PID that is already gone.
-PROFILE="${PIPULSE_BROWSER_PROFILE:-$HOME/.config/pipulse-kiosk}"
-
 LAUNCH_BROWSER=1
 SERVERS_PID=""
 BROWSER_PID=""
@@ -193,28 +184,13 @@ if [ -z "${WAYLAND_DISPLAY:-}" ] && [ -z "${DISPLAY:-}" ]; then
   note "no display set, assuming :0 — pass --no-browser if that is wrong"
 fi
 
-# Chromium marks a session as crashed whenever it did not exit through its own
-# menu, which covers Ctrl-C here and the wall socket. Left alone it then greets
-# the next launch with a "restore pages?" bubble sitting on top of the
-# dashboard. Clearing the flag before launch is the cure.
-PREFS="$PROFILE/Default/Preferences"
-if [ -f "$PREFS" ]; then
-  sed -i 's/"exit_type":"[^"]*"/"exit_type":"Normal"/; s/"exited_cleanly":false/"exited_cleanly":true/' \
-    "$PREFS" 2>/dev/null || true
-fi
-
 step "Opening $BROWSER in kiosk mode"
-note "profile: $PROFILE"
 note "Alt+F4 in the browser, or Ctrl-C here, stops everything"
 
-"$BROWSER" \
-  --kiosk \
-  --user-data-dir="$PROFILE" \
-  --no-first-run \
-  --noerrdialogs \
-  --disable-session-crashed-bubble \
-  "$URL" \
-  >/dev/null 2>&1 &
+# Exactly the command you would type by hand. Chromium is noisy on a Pi and
+# its output is left alone rather than hidden, so this behaves the same way
+# running it yourself does.
+"$BROWSER" --kiosk "$URL" &
 BROWSER_PID=$!
 
 # Waiting on the browser rather than the servers: closing the dashboard should

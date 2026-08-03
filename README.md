@@ -111,53 +111,31 @@ between sessions. Pin a version instead if you would rather they did not.
 
 ## Kiosk mode on the Pi
 
-`./scripts/pi-start.sh` does this — it starts the servers, waits for the front end to
-actually answer, and then opens Chromium full-screen on it. The manual equivalent is:
+`./scripts/pi-start.sh` runs exactly this, once the servers are up:
 
 ```bash
 chromium --kiosk http://localhost:5173
 ```
 
-- `--kiosk` — full-screen, no tabs or address bar, and the usual ways of leaving the page
-  are blocked. Exit with `Alt+F4`.
+`--kiosk` opens the page full-screen with no tabs or address bar. Exit with `Alt+F4`.
 
-The script adds four things to that command, each for a reason worth knowing:
+No other flags. If something about the browser needs fixing later, add the flag then —
+with an actual problem to point at.
 
-| Flag | Why |
-| --- | --- |
-| `--user-data-dir` | A profile of its own at `~/.config/pipulse-kiosk` |
-| `--no-first-run` | No welcome tour over the dashboard on a fresh profile |
-| `--noerrdialogs` | No modal error boxes on a screen nobody can dismiss them on |
-| `--disable-session-crashed-bubble` | No "restore pages?" bar after an unclean exit |
+What the script adds around that command is timing and cleanup, not options:
 
-**The separate profile is not tidiness.** The dashboard keeps its theme, weather layout
-and list ordering in `localStorage`, so the profile has to persist or the screen forgets
-itself on every launch — and if Chromium is already open on its normal profile, launching
-it again just opens a window in that existing process and returns immediately, which would
-leave the script tracking a process that is already gone.
+- **It waits for port 5173 to answer before launching.** A browser started before Vite is
+  listening lands on an error page and stays there, because nothing reloads it.
+- **Closing the browser stops the servers**, and `Ctrl-C` in the terminal stops both.
+  Teardown walks the process tree rather than signalling the top of it: `npm start` runs
+  `concurrently`, which runs two shells, which run node and vite, and an orphaned `vite`
+  still holding 5173 makes the *next* launch fail in a way that looks like a bug in the app.
+- **`chromium` and `chromium-browser`** are both tried, since Raspberry Pi OS has used
+  each. If neither is installed it says so and keeps serving, because the dashboard is
+  still reachable from another device.
+- **`--no-browser`** serves without opening anything — for SSH, or reading it from a phone.
 
-Chromium also marks a session as crashed whenever it did not exit through its own menu,
-which covers both `Ctrl-C` and the wall socket. The script clears that flag in the
-profile's `Preferences` before each launch, otherwise the next start greets you with a
-restore bar sitting on top of the dashboard.
-
-Waiting for the port matters too: launching the browser before Vite is listening lands on
-an error page and stays there, since nothing reloads it.
-
-Closing the browser stops the servers, and `Ctrl-C` in the terminal stops both. Teardown
-walks the process tree rather than signalling the top of it — `npm start` runs
-`concurrently`, which runs two shells, which run node and vite, and an orphaned `vite`
-still holding port 5173 makes the *next* launch fail in a way that looks like a bug in the
-app.
-
-Pass `--no-browser` to serve without opening anything, which is what you want over SSH or
-when reading the dashboard from a phone.
-
-On some Raspberry Pi OS images the binary is named `chromium-browser` rather than
-`chromium`; the script tries both, and if neither is installed it says so and keeps serving
-rather than exiting.
-
-Launching at boot is **not** automated, by choice — the script is run by hand.
+Launching at boot is **not** automated, by choice. The script is run by hand.
 
 ## Project layout
 
@@ -849,10 +827,9 @@ It asks before installing Node. Pass `--yes` to skip the prompt, or `--skip-node
 the installation alone.
 
 `pi-start.sh` serves the built front end on **5173** and Fastify on **3000**, waits for the
-front end to answer, then opens Chromium full-screen on it — see "Kiosk mode on the Pi"
-below for the flags and why each one is there. It deliberately does no installing and no
-building, so it starts in a second and fails loudly rather than quietly rebuilding a wall
-display. `Ctrl-C`, or `Alt+F4` in the browser, stops everything.
+front end to answer, then runs `chromium --kiosk http://localhost:5173`. It deliberately
+does no installing and no building, so it starts in a second and fails loudly rather than
+quietly rebuilding a wall display. `Ctrl-C`, or `Alt+F4` in the browser, stops everything.
 
 **`npm ci` installs dev dependencies on purpose.** The built front end is served by
 `vite preview`, so Vite has to be there. Do not prune them.
