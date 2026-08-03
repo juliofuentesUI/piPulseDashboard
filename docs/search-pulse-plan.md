@@ -248,13 +248,25 @@ First reported: 7:20 PM
 
 **AMENDED — related queries are not available.** The plan's mockup showed a `Related:`
 list. The official feed carries no such field (see Phase 1), so it cannot be built from
-this source. Options when Phase 2 starts, to be decided then:
+this source. Options, still open:
 
 1. Ship the panel without related queries.
 2. Show the feed's news headlines, clearly labelled as *news about this trend* and never
    as searches.
 3. Find a source that genuinely carries related searches, and put it behind
    `TrendProvider` like everything else.
+
+**Option 2 is better supported than it first looked.** Verified 2026-08-03: every item
+carries three `ht:news_item_title` headlines with a source and article URL, and an
+`ht:picture` thumbnail — 10/10 items, 275 × 183 JPEG, ~9 KB. What it does *not* carry is
+prose: `<description>` is empty on 10/10 and `ht:news_item_snippet` on 30/30.
+
+A headline explains a title that explains nothing on its own — `artificial intelligence
+news` versus a Reuters headline about Chinese military researchers. Quoting one with its
+source attributed is not summarising and is allowed. Costs to settle first: a photographic
+thumbnail clashes with a flat pixel-art screen and needs a deliberate treatment; and
+loading `gstatic.com` images would be the first time the client talks to Google, which the
+API could proxy to avoid.
 
 ### Deterministic local labels
 

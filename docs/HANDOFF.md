@@ -48,6 +48,28 @@ recorded trends only ever moved *down* the feed, because a `pubDate` never chang
 details panel was planned around related queries; three options for what to do instead are
 listed in the plan under Phase 2. **This is still an open decision.**
 
+**2b. There *is* an image and there *are* headlines — verified 2026-08-03.** Checked after
+the user asked whether a trend could show something explaining what it is about:
+
+| Field | State |
+| --- | --- |
+| `ht:picture` | Present on **10/10** items. Fetched one: 200, JPEG, 8.7 KB, 275 × 183 |
+| `ht:picture_source` | Present — names the outlet, e.g. "Reuters" |
+| `ht:news_item_title` | Present, 3 per trend, with source and article URL |
+| `<description>` | **Empty on 10/10** |
+| `ht:news_item_snippet` | **Empty on 30/30** |
+
+So there is no prose about a trend, but the headlines answer "what is this about" well —
+`artificial intelligence news` tells you nothing, its headline about Chinese military
+researchers tells you everything. This is the strongest candidate for filling the hole
+left by `relatedQueries`.
+
+Three costs to weigh, discussed with the user and **not yet decided**: a photographic
+thumbnail will look alien in a flat pixel-art dashboard and needs a deliberate treatment;
+loading `gstatic.com` images directly would be the first time the client talks to Google,
+which the API could proxy to avoid; and headlines may be shown **quoted with attribution
+only** — never summarised, interpreted, or presented as related searches.
+
 **3. There is no relevance ordering available.** Complete element list: `title`,
 `ht:approx_traffic`, `pubDate`, `link`, `description`, `ht:picture`, `ht:picture_source`,
 `ht:news_item*`. No score, no rank. Google's relevance ranking is not published. Do not
