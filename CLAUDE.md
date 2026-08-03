@@ -1,20 +1,67 @@
 # piPulseDashboard
 
-A weather dashboard for a 720 × 720 HyperPixel Square Touch on a Raspberry Pi 5.
-`README.md` covers the architecture, API contract, layout bands, and theming — read it
-before changing anything structural.
+A dashboard for a 720 × 720 HyperPixel Square Touch on a Raspberry Pi 5: the San Jose
+weather, and what the United States is searching Google for. `README.md` covers the
+architecture, API contract, layout bands, and theming — read it before changing anything
+structural.
 
 ## Scope
 
-This is a first demo, deliberately small: the weather for San Jose on two fixed-size
-screens — current conditions and a 7-day forecast — done well. Do not overbuild it.
+The panel is a horizontal carousel of two pages, swiped between:
+
+- **Weather** — the weather for San Jose, on whichever of two fixed-size layouts settings
+  has chosen: current conditions or a 7-day forecast.
+- **Search Pulse** — what the United States is searching Google for right now.
+
+Both stay deliberately small and are meant to be done well rather than made bigger. Do not
+overbuild them.
 
 Prefer plain CSS and hand-rolled helpers over new dependencies. The pixel sprites and the
 runtime payload validation are hand-written on purpose, not for lack of a library.
 
-"Do not overbuild" is about **scope, not tools**. There is no banned-technology list — an
-earlier constraint against React, Tailwind and Docker was lifted, and the stack is settled
-as Svelte + Vite + Fastify. Adding a dev-tooling script is fine.
+"Do not overbuild" is about **scope, not tools**. There is no banned-technology list for
+the stack — an earlier constraint against React, Tailwind and Docker was lifted, and the
+stack is settled as Svelte + Vite + Fastify. Adding a dev-tooling script is fine. The
+Search Pulse list below is a different thing: it bans sources and methods, not build
+tooling, and it does not loosen.
+
+### Search Pulse guardrails
+
+The plan — phases, screen layout, acceptance criteria — is
+[docs/search-pulse-plan.md](docs/search-pulse-plan.md). Read it before starting a phase
+and update it as phases land.
+
+Search Pulse is built in phases, and **each phase is merged and usable before the next
+one starts.** Finishing the current phase is the whole job; do not roll ahead into the
+next to "complete the feature".
+
+**The carousel stays two pages: Weather and Search Pulse.** Everything Search Pulse gains
+is a view *inside* that one section — the trend list, the details panel, the rank graph,
+the daily view — reached by a tap or a vertical switch, never by another card beside the
+weather. A horizontal swipe means "change section" and must keep meaning only that.
+
+Everything the screen shows must trace back to the official Google Trending Now feed, or
+to an explicit local rule over snapshots we stored ourselves. A field the feed does not
+supply is **left out** — never inferred, never approximated, never filled in with a
+plausible-looking value. Status labels like `NEW` or `RISING` come from documented rules
+in code that a person can read and check, not from a model. Approximate volume stays
+labelled approximate; volume buckets are not search counts.
+
+Never add any of these to Search Pulse:
+
+- OpenAI, Gemini, or any other hosted model; local language models
+- News summarisation, sentiment analysis, AI categorisation, AI-written conclusions
+- Reddit, forums, or any unofficial source; scraping of search-result pages
+- Business-idea generation, opportunity scoring, subjective recommendations
+
+Google Trends reports demand movement and nothing else. It does not supply keyword
+difficulty, ranking difficulty, cost per click, advertising competition, or conversion
+probability, so no value on this screen may be labelled as one of those unless a dedicated
+SEO provider is added and is genuinely the thing supplying it.
+
+The question the screen exists to answer is "what searches are suddenly capturing
+people's attention right now?", and later "how long did they last?". Anything that does
+not serve one of those is out of scope.
 
 ## Verifying UI changes
 
@@ -23,10 +70,17 @@ not tell you whether it renders correctly. Start the app with `npm run dev` and 
 Playwright MCP server against `http://localhost:5173` with the viewport set to 720 × 720.
 First-run setup is under "Browser automation" in `README.md`.
 
-There are two screens, and a change to shared styling, sprites or theming can regress
-either one. Check both: the app opens on whichever screen was last chosen, so switch with
-`browser_snapshot` and a click on **Open settings**, then the **WEATHER NOW** or
-**7-DAY FORECAST** option — never by pixel coordinate. Picking a screen closes the panel.
+There are three layouts — the two weather ones and Search Pulse — and a change to shared
+styling, sprites or theming can regress any of them. Check all three, driving the app with
+`browser_snapshot` and clicks by accessible name, never by pixel coordinate:
+
+- **Between pages**, click **Show WEATHER** or **Show SEARCH PULSE**, the page indicator at
+  the bottom of the panel. Those buttons scroll the same carousel a swipe does, so what
+  you capture is what a finger gets.
+- **Between weather layouts**, click **Open settings**, then **WEATHER NOW** or
+  **7-DAY FORECAST**. Picking one closes the panel and returns to the weather page.
+
+The app always opens on the weather page, showing whichever layout was last chosen.
 
 **720 × 720 is not negotiable, because any other size lies about the artwork.**
 [App.svelte](apps/web/src/App.svelte) scales the design by
