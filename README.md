@@ -111,22 +111,53 @@ between sessions. Pin a version instead if you would rather they did not.
 
 ## Kiosk mode on the Pi
 
-Once `npm run dev` (or `npm run start`) is running, launch Chromium full-screen:
+`./scripts/pi-start.sh` does this — it starts the servers, waits for the front end to
+actually answer, and then opens Chromium full-screen on it. The manual equivalent is:
 
 ```bash
 chromium --kiosk http://localhost:5173
 ```
 
-- `chromium` — launches the Chromium browser.
-- `--kiosk` — opens the page full-screen with no tabs, address bar, or other browser
-  chrome, and blocks the usual ways of leaving the page. Exit with `Alt+F4`.
-- `http://localhost:5173` — the locally running Svelte application.
+- `--kiosk` — full-screen, no tabs or address bar, and the usual ways of leaving the page
+  are blocked. Exit with `Alt+F4`.
 
-Startup is **not** automated yet. When you are ready for that, a `systemd --user`
-service or an entry in `~/.config/autostart/` is the usual next step.
+The script adds four things to that command, each for a reason worth knowing:
 
-On some Raspberry Pi OS images the binary is named `chromium-browser` instead of
-`chromium`.
+| Flag | Why |
+| --- | --- |
+| `--user-data-dir` | A profile of its own at `~/.config/pipulse-kiosk` |
+| `--no-first-run` | No welcome tour over the dashboard on a fresh profile |
+| `--noerrdialogs` | No modal error boxes on a screen nobody can dismiss them on |
+| `--disable-session-crashed-bubble` | No "restore pages?" bar after an unclean exit |
+
+**The separate profile is not tidiness.** The dashboard keeps its theme, weather layout
+and list ordering in `localStorage`, so the profile has to persist or the screen forgets
+itself on every launch — and if Chromium is already open on its normal profile, launching
+it again just opens a window in that existing process and returns immediately, which would
+leave the script tracking a process that is already gone.
+
+Chromium also marks a session as crashed whenever it did not exit through its own menu,
+which covers both `Ctrl-C` and the wall socket. The script clears that flag in the
+profile's `Preferences` before each launch, otherwise the next start greets you with a
+restore bar sitting on top of the dashboard.
+
+Waiting for the port matters too: launching the browser before Vite is listening lands on
+an error page and stays there, since nothing reloads it.
+
+Closing the browser stops the servers, and `Ctrl-C` in the terminal stops both. Teardown
+walks the process tree rather than signalling the top of it — `npm start` runs
+`concurrently`, which runs two shells, which run node and vite, and an orphaned `vite`
+still holding port 5173 makes the *next* launch fail in a way that looks like a bug in the
+app.
+
+Pass `--no-browser` to serve without opening anything, which is what you want over SSH or
+when reading the dashboard from a phone.
+
+On some Raspberry Pi OS images the binary is named `chromium-browser` rather than
+`chromium`; the script tries both, and if neither is installed it says so and keeps serving
+rather than exiting.
+
+Launching at boot is **not** automated, by choice — the script is run by hand.
 
 ## Project layout
 
@@ -817,10 +848,11 @@ no history.
 It asks before installing Node. Pass `--yes` to skip the prompt, or `--skip-node` to leave
 the installation alone.
 
-`pi-start.sh` deliberately does no installing and no building — it is the thing that runs
-at boot, so it verifies what it needs and fails loudly rather than quietly rebuilding a
-wall display. It serves the built front end on **5173** and Fastify on **3000**; point the
-Pi's browser at `http://localhost:5173`.
+`pi-start.sh` serves the built front end on **5173** and Fastify on **3000**, waits for the
+front end to answer, then opens Chromium full-screen on it — see "Kiosk mode on the Pi"
+below for the flags and why each one is there. It deliberately does no installing and no
+building, so it starts in a second and fails loudly rather than quietly rebuilding a wall
+display. `Ctrl-C`, or `Alt+F4` in the browser, stops everything.
 
 **`npm ci` installs dev dependencies on purpose.** The built front end is served by
 `vite preview`, so Vite has to be there. Do not prune them.

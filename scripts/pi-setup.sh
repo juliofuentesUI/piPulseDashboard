@@ -44,6 +44,13 @@ note() { printf '    %s%s%s\n' "$DIM" "$1" "$OFF"; }
 good() { printf '    %s%s%s\n' "$GREEN" "$1" "$OFF"; }
 die()  { printf '\n%serror:%s %s\n' "$RED" "$OFF" "$1" >&2; exit 1; }
 
+# The header comment above, minus the shebang and the leading hashes. Reading
+# it rather than counting lines, so editing the header cannot silently start
+# printing shell code as documentation.
+usage() {
+  awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "${BASH_SOURCE[0]}"
+}
+
 # --- Arguments ------------------------------------------------------------
 
 while [ $# -gt 0 ]; do
@@ -53,7 +60,7 @@ while [ $# -gt 0 ]; do
     --force)     FORCE=1; shift ;;
     --yes|-y)    ASSUME_YES=1; shift ;;
     --skip-node) SKIP_NODE=1; shift ;;
-    -h|--help)   sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)   usage; exit 0 ;;
     *)           die "unknown option: $1" ;;
   esac
 done
