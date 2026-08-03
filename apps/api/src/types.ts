@@ -154,6 +154,51 @@ export interface WeatherSnapshot {
   readonly updatedAt: string;
 }
 
+// --- Trends contract ------------------------------------------------------
+
+/**
+ * One trending search, carrying only what the official feed actually states.
+ *
+ * Every optional field is absent rather than guessed when Google does not
+ * supply it. That is the rule the whole screen rests on: a number on it can
+ * always be traced back to something the feed said.
+ */
+export interface TrendingSearch {
+  /** Normalised form of the title. Stable across fetches; see `trendKey`. */
+  readonly id: string;
+  /** The search itself, as Google words it. */
+  readonly title: string;
+  /**
+   * Google's own approximation, verbatim — "200+", "20000+". A lower bound on
+   * a bucket, never an exact count, so it stays a string and keeps its "+".
+   */
+  readonly approximateVolume?: string;
+  /** ISO 8601, from the item's `pubDate`. Absent if that date will not parse. */
+  readonly publishedAt?: string;
+  /**
+   * Other searches Google associates with this one. The Trending Now RSS feed
+   * does not carry them, so this provider always returns an empty array — see
+   * the note in `trends.ts`.
+   */
+  readonly relatedQueries: readonly string[];
+  /** A page about this trend, when the feed names one per item. */
+  readonly sourceUrl?: string;
+}
+
+export interface TrendsSnapshot {
+  /** Google region code the list was fetched for, e.g. "US". */
+  readonly region: string;
+  /** Highest-ranked first, in the order the feed lists them. */
+  readonly trends: readonly TrendingSearch[];
+  /**
+   * ISO 8601 instant this list was actually retrieved from Google — not when
+   * the client last asked us for it. A screen reporting freshness has to
+   * report the data's age, and those two numbers diverge every time we serve
+   * from cache.
+   */
+  readonly updatedAt: string;
+}
+
 export interface ApiErrorBody {
   readonly error: string;
   readonly message: string;

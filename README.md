@@ -1,10 +1,13 @@
 # piPulseDashboard
 
-A Game Boy Advance-inspired weather dashboard for a **720 × 720 HyperPixel Square Touch**
+A Game Boy Advance-inspired dashboard for a **720 × 720 HyperPixel Square Touch**
 display on a Raspberry Pi 5.
 
-It shows the weather for San Jose, California — now, midday and evening, plus a 7-day
-forecast — in a pixel-art neo-brutalist interface, full-screen, with no scrolling.
+It is two pages, swiped between horizontally, in a pixel-art neo-brutalist interface that
+fills the panel:
+
+- **Weather** — San Jose, California: now, midday and evening, plus a 7-day forecast.
+- **Search Pulse** — what the United States is searching Google for right now.
 
 ## Getting started
 
@@ -134,25 +137,29 @@ piPulseDashboard/
 │   │   ├── src/
 │   │   │   ├── server.ts         routes, error handling, shutdown
 │   │   │   ├── weather.ts        Open-Meteo fetch, validation, normalisation
-│   │   │   ├── cache.ts          5-minute TTL cache, coalescing, stale-on-error
+│   │   │   ├── trends.ts         TrendProvider, Google RSS fetch and parsing
+│   │   │   ├── cache.ts          TTL cache, coalescing, stale-on-error
 │   │   │   ├── config.ts         environment-driven config
 │   │   │   └── types.ts          upstream types vs. our API contract
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   └── web/                      Svelte 5 + Vite front end
 │       ├── src/
-│       │   ├── App.svelte        720×720 shell, scaling, theme swap
+│       │   ├── App.svelte        720×720 shell, scaling, page carousel, theme swap
 │       │   ├── app.css           default palette tokens and reset
 │       │   ├── main.ts
 │       │   └── lib/
-│       │       ├── api.ts        typed client for /api/weather
-│       │       ├── dashboard.svelte.ts   state, timers, refresh policy
+│       │       ├── api.ts        typed client for /api/weather and /api/trends/now
+│       │       ├── dashboard.svelte.ts   weather state, timers, refresh policy
+│       │       ├── trends.svelte.ts      trend state, 60s poll, freshness policy
 │       │       ├── theme.svelte.ts       palettes and the hot swap
-│       │       ├── screen.svelte.ts      which of the two layouts is showing
+│       │       ├── screen.svelte.ts      which of the two weather layouts is showing
 │       │       ├── types.ts      transport types vs. view types
 │       │       ├── view.ts       snapshot → view model, time formatting
+│       │       ├── trend-view.ts trend rows, log bar scale, volume formatting
 │       │       ├── components/   WeatherDashboard, WeekDashboard, ForecastTable,
-│       │       │                 StatusHeader, TitleBar, FooterBar, …
+│       │       │                 SearchPulse, TrendRow, PageDots, StatusHeader,
+│       │       │                 TitleBar, FooterBar, …
 │       │       └── weather-icons/  thirteen original pixel-art sprites,
 │       │                           plus the sprite/outline helpers
 │       ├── index.html
@@ -281,6 +288,51 @@ Both fields are served from **one** upstream request: `forecast_days=7` returns 
 hourly entries, which is every hour of all seven days, so the whole screen costs no extra
 API traffic.
 
+### `GET /api/trends/now`
+
+```json
+{
+  "region": "US",
+  "trends": [
+    {
+      "id": "does sheepstealer die",
+      "title": "does sheepstealer die",
+      "approximateVolume": "20000+",
+      "publishedAt": "2026-08-03T01:50:00.000Z",
+      "relatedQueries": []
+    }
+  ],
+  "updatedAt": "2026-08-03T03:43:30.440Z"
+}
+```
+
+Ten trending searches for the region, highest-ranked first, from Google's
+[Trending Now RSS export](https://trends.google.com/trending/rss?geo=US) — public, no
+API key, no account.
+
+`updatedAt` is when the list was **retrieved from Google**, not when the client asked us
+for it. Those differ by up to the cache TTL on every request served from cache, and a
+screen that reports freshness has to report the age of the data.
+
+**Only fields the feed actually states are present.** `approximateVolume` is Google's own
+bucket verbatim, "+" included, because it is the floor of a range and not a count.
+`publishedAt` is absent if the item's `pubDate` will not parse.
+
+`relatedQueries` is **always empty**, and that is a property of the source rather than a
+gap in the code. The feed gives each item a set of `ht:news_item` headlines — articles
+*about* the trend, not other searches people ran. Presenting those as related queries
+would put words on the screen nobody searched for. `sourceUrl` is absent for the same
+kind of reason: every item's `<link>` is the URL of the feed itself, so there is nothing
+per-trend to point at.
+
+`id` is the title lowercased, trimmed, with inner whitespace collapsed. It recognises the
+same search written with different spacing, and deliberately does no more than that —
+deciding that two differently worded searches mean the same thing is a judgement this
+feature does not make.
+
+Response headers include `x-cache` and `age`, as `/api/weather` does. Cached for **10
+minutes**; a cold cache plus a failed fetch returns `503`.
+
 ### `GET /api/health`
 
 Liveness plus the configured location and cache TTL.
@@ -312,10 +364,34 @@ Every value has a working default, so a `.env` file is optional. Copy `.env.exam
 | `WEATHER_TIMEZONE` | `America/Los_Angeles` | |
 | `WEATHER_CACHE_TTL_MS` | `300000` | Cache lifetime (5 minutes) |
 | `WEATHER_REQUEST_TIMEOUT_MS` | `8000` | Upstream request timeout |
+| `TRENDS_REGION` | `US` | Google geo code for the trends feed |
+| `TRENDS_CACHE_TTL_MS` | `600000` | How often the backend refetches (10 minutes) |
+| `TRENDS_REQUEST_TIMEOUT_MS` | `8000` | Upstream request timeout |
 
 ## Layout
 
-Two screens, chosen in settings and remembered in `localStorage`. Both are four bands
+### Pages
+
+The panel is a horizontal carousel: the weather page, then Search Pulse. It is a flex row
+inside the frame with `scroll-snap-type: x mandatory` and one snap point per page, so the
+whole gesture — the pan, the momentum, the settle onto a page edge — is the platform's.
+Nothing reimplements it in JavaScript, and a swipe can never leave two pages half-showing.
+
+Each page is `flex: 0 0 100%` of the track, which is the same 704 px a screen occupied
+before there was a carousel, so the fixed layouts inside are untouched. The track hides
+its scrollbar with `scrollbar-width: none` — not for looks: a classic horizontal scrollbar
+takes its height out of the content box, and every band on every page is budgeted against
+the full 704.
+
+`PageDots.svelte` draws the position indicator over the bottom of the panel, and its two
+marks are also buttons — swiping is the point, but a scroll-snap carousel offers a
+keyboard user nothing on its own. They are overlaid rather than given a band because both
+weather layouts budget their heights to the pixel; the strip is transparent and spaced so
+the `WEATHER NOW` metric divider runs down between the two marks.
+
+### Weather
+
+Two layouts, chosen in settings and remembered in `localStorage`. Both are four bands
 inside the thick outer frame, all at fixed pixel heights because the panel is always
 exactly 720 × 720.
 
@@ -353,6 +429,47 @@ rule would strip the *heading's* divider and leave the final row's in place.
 The midday column is tinted with `color-mix(in srgb, var(--c-sky) 22%, transparent)`, so
 the accent stays a tint of the active theme rather than a sixth hard-coded colour.
 
+### Search Pulse
+
+`SearchPulse.svelte`, on the same four-band budget as the 7-day screen:
+
+| Band | Height | Contents |
+| --- | --- | --- |
+| Title | 96 px | `SEARCH PULSE`, and the 3 × 3 menu grid |
+| Region | 64 px | `UNITED STATES`, and the freshness report |
+| Trends | fills | Five `TrendRow`s, equal height |
+| Details | 132 px | Metadata for the selected trend — Phase 2 |
+
+Title above region is the reverse of the weather screens, which lead with a status strip.
+This screen leads with its name, which is the order the design calls for and the one that
+puts the freshness figure and the live lamp on the two rows that have to carry them.
+
+The region strip's right-hand side is the whole of the screen's self-reporting, and every
+branch of it is a fact rather than a mood:
+
+| Condition | Shows |
+| --- | --- |
+| Online, data younger than 15 minutes | lamp + `LIVE · 4 MINS AGO` |
+| Online, older than that | `UPDATED 38 MINS AGO`, no lamp |
+| Offline, still holding a list | `OFFLINE · CACHED DATA`, no lamp |
+| Nothing ever loaded | the failure, e.g. `TRENDS SOURCE DOWN` |
+
+Fifteen minutes is the backend's ten-minute refresh plus enough slack to absorb one
+missed fetch without crying wolf.
+
+A row is a rank, the search, Google's figure, and a bar. **The bar is logarithmic across
+the list's own range** — smallest bucket present to largest — and that range matters as
+much as the log does. Linear is hopeless when a list runs 200+ against 20000+: the top
+trend pins the scale and flattens the rest to stubs. But log against a fixed origin fails
+the other way; on a list running 200+ to 2000+, `log(v)/log(max)` puts a tenfold gap at
+70% against 100%, so every bar is nearly full and the row order is the only thing left to
+read. Anchoring to the smallest bucket present keeps the rows legible whatever the day's
+spread. The cost is that the shortest bar looks the same whatever its absolute figure,
+which is the honest trade for five rows with Google's own number printed beside each one.
+
+Titles are clipped with an ellipsis rather than wrapped: the band is a fixed height
+divided into five, so a long search term must not push its neighbours out of place.
+
 ## Controls
 
 The reference design has no visible buttons, so both controls are hidden in plain sight:
@@ -366,6 +483,11 @@ Keyboard focus draws a visible outline on both, since neither looks like a contr
 
 The 7-day screen adds one visible control: a refresh glyph in the footer band, which the
 reference art draws there. It does the same thing as tapping the status bar.
+
+**Swipe horizontally** to change pages. The two marks at the bottom of the panel show
+which page is showing and switch to the other when tapped; each carries 9 px of padding
+so a 14 px mark is a 32 px target. Nothing beneath that overhang is interactive on either
+page, so the extra reach costs no other control.
 
 ## Themes
 
@@ -419,7 +541,9 @@ closes it, because the thing that changed is behind the panel.
 
 ## Front-end behaviour
 
-- Shows a styled loading screen, then fetches `/api/weather`.
+- Shows a styled loading screen, then fetches `/api/weather`. Both it and the full-screen
+  error state render *inside* the weather page rather than replacing the panel, so a
+  weather outage cannot take the other page down with it.
 - Auto-refreshes every **10 minutes**; the clock ticks on the wall-clock minute.
 - A failed refresh **never blanks the screen**. The last good reading stays up and the
   middle of the status bar says what went wrong. The full-screen error state only
@@ -430,6 +554,11 @@ closes it, because the thing that changed is behind the panel.
   sit there looking current.
 - Losing and regaining the network is detected via `online`/`offline` events, and
   regaining it triggers an immediate refresh.
+- Search Pulse polls `/api/trends/now` every **60 seconds** and follows the same rule: a
+  failed poll never destroys the last good list. The screen keeps showing it, relabelled
+  as cached, and only reports the failure when nothing has ever loaded. The 60-second
+  poll against a 10-minute backend cache is why the browser can refresh freely without
+  any of it reaching Google.
 
 ## Design notes
 

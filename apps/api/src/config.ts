@@ -17,12 +17,24 @@ export interface LocationConfig {
   readonly timezone: string;
 }
 
+export interface TrendsConfig {
+  /** Google region code for the feed, e.g. "US". */
+  readonly region: string;
+  /**
+   * How often the *backend* asks Google for a new list. The screen polls this
+   * service far more often than this; that is the point of the number.
+   */
+  readonly cacheTtlMs: number;
+  readonly requestTimeoutMs: number;
+}
+
 export interface AppConfig {
   readonly port: number;
   readonly host: string;
   readonly location: LocationConfig;
   readonly cacheTtlMs: number;
   readonly requestTimeoutMs: number;
+  readonly trends: TrendsConfig;
 }
 
 export const config: AppConfig = {
@@ -36,4 +48,9 @@ export const config: AppConfig = {
   },
   cacheTtlMs: num(process.env['WEATHER_CACHE_TTL_MS'], 5 * 60 * 1000),
   requestTimeoutMs: num(process.env['WEATHER_REQUEST_TIMEOUT_MS'], 8000),
+  trends: {
+    region: str(process.env['TRENDS_REGION'], 'US'),
+    cacheTtlMs: num(process.env['TRENDS_CACHE_TTL_MS'], 10 * 60 * 1000),
+    requestTimeoutMs: num(process.env['TRENDS_REQUEST_TIMEOUT_MS'], 8000),
+  },
 };

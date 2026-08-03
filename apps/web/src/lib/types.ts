@@ -163,3 +163,36 @@ export interface DashboardFailure {
 
 /** Nothing yet | showing data | failed with nothing to show. */
 export type DashboardPhase = 'loading' | 'ready' | 'error';
+
+// --- Search Pulse ---------------------------------------------------------
+
+/**
+ * Mirrors the API's `TrendingSearch`. Optional fields are absent whenever the
+ * official feed did not state them, and are never filled in downstream.
+ */
+export interface TrendingSearch {
+  readonly id: string;
+  readonly title: string;
+  readonly approximateVolume?: string;
+  readonly publishedAt?: string;
+  readonly relatedQueries: readonly string[];
+  readonly sourceUrl?: string;
+}
+
+export interface TrendsSnapshot {
+  readonly region: string;
+  readonly trends: readonly TrendingSearch[];
+  /** When the list was retrieved from Google, not when we last polled the API. */
+  readonly updatedAt: string;
+}
+
+/** One rendered row of the trend list. */
+export interface TrendRowView {
+  readonly id: string;
+  readonly rank: string;
+  readonly title: string;
+  /** Google's bucket, compacted for the panel: "20K+". Empty if unstated. */
+  readonly volume: string;
+  /** Bar width as a percentage, on a log scale. */
+  readonly bar: number;
+}
