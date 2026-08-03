@@ -30,6 +30,16 @@ The weather half has its own plan, [docs/weather-provider-plan.md](docs/weather-
 Search Pulse guardrails below do not apply to it, and three questions have to be settled
 before any of it is built.
 
+The `millennium` theme also has its own plan,
+[docs/millennium-theme-plan.md](docs/millennium-theme-plan.md). **It is the one part of
+this project allowed to break "flat by design" and "original pixel art only"** — gradients,
+bevels, a bundled display face and supplied character art, all confined to
+`apps/web/src/styles/millennium.css` and its own palette entry. That exception was the
+user's explicit call and it does not generalise: it licenses nothing outside that theme,
+and a seventh theme does not inherit it. The theme changes no layout, and must not start
+to — the reference it was drawn from merges the two weather screens, and we deliberately
+kept them separate.
+
 ### Search Pulse guardrails
 
 **Starting a fresh session? Read [docs/HANDOFF.md](docs/HANDOFF.md) first** — where the
@@ -81,6 +91,13 @@ First-run setup is under "Browser automation" in `README.md`.
 There are three layouts — the two weather ones and Search Pulse — and a change to shared
 styling, sprites or theming can regress any of them. Check all three, driving the app with
 `browser_snapshot` and clicks by accessible name, never by pixel coordinate:
+
+**Touching a shared token — `--line`, `--font-display`, anything in `app.css` — means
+checking a flat theme as well as `millennium`.** Those two are the ones that can regress
+each other; `millennium.css` is keyed off `[data-theme]` and cannot reach the others, but a
+change to the tokens beneath it reaches everything. `gba-blue` and `midnight` are the pair
+worth checking: `midnight` inverts `ink` to near-white, which is the assumption most rules
+quietly make and the one that breaks first.
 
 - **Between pages**, click **Show WEATHER** or **Show SEARCH PULSE**, the page indicator at
   the bottom of the panel. Those buttons scroll the same carousel a swipe does, so what

@@ -21,7 +21,7 @@
     gap: 18px;
     padding: 0 20px;
     min-width: 0;
-    border-right: var(--divider) solid var(--c-ink);
+    border-right: var(--divider) solid var(--line);
   }
 
   .metric:last-child {

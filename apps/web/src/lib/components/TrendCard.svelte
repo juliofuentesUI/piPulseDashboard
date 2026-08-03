@@ -183,7 +183,7 @@
     /* No left padding: the back button carries it, as hit area. */
     padding: 0 24px 0 0;
     overflow: hidden;
-    border-bottom: var(--divider) solid var(--c-ink);
+    border-bottom: var(--divider) solid var(--line);
   }
 
   .back {
@@ -269,7 +269,7 @@
     min-height: 0;
     padding: 20px 24px;
     overflow: hidden;
-    border-bottom: var(--divider) solid var(--c-ink);
+    border-bottom: var(--divider) solid var(--line);
   }
 
   .lead {
@@ -295,7 +295,7 @@
     width: 204px;
     height: 136px;
     background: var(--c-ink);
-    border: var(--divider) solid var(--c-ink);
+    border: var(--divider) solid var(--line);
   }
 
   .shot img {

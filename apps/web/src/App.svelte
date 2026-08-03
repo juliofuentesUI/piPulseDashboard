@@ -198,7 +198,7 @@
     height: 100%;
     overflow: hidden;
     background: var(--c-bg);
-    border: var(--frame) solid var(--c-ink);
+    border: var(--frame) solid var(--line);
   }
 
   /*

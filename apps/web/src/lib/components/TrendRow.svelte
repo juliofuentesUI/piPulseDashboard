@@ -50,7 +50,7 @@
   .row {
     display: grid;
     min-height: 0;
-    border-bottom: var(--divider) solid var(--c-ink);
+    border-bottom: var(--divider) solid var(--line);
   }
 
   /* The last row's border would double up with the details band's own edge. */
@@ -147,7 +147,7 @@
     display: block;
     height: 14px;
     background: var(--c-bg);
-    border: var(--divider) solid var(--c-ink);
+    border: var(--divider) solid var(--line);
   }
 
   .fill {

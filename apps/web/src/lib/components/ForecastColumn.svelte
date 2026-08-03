@@ -32,7 +32,7 @@
     padding: 12px 8px;
     min-width: 0;
     min-height: 0;
-    border-right: var(--divider) solid var(--c-ink);
+    border-right: var(--divider) solid var(--line);
   }
 
   .column:last-child {

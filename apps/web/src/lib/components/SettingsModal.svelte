@@ -124,7 +124,7 @@
     width: 560px;
     max-height: 580px;
     background: var(--c-bg);
-    border: var(--frame) solid var(--c-ink);
+    border: var(--frame) solid var(--line);
   }
 
   .head {
@@ -132,7 +132,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 20px;
-    border-bottom: var(--divider) solid var(--c-ink);
+    border-bottom: var(--divider) solid var(--line);
   }
 
   .heading {
@@ -151,7 +151,7 @@
     line-height: 1;
     color: var(--c-ink);
     background: var(--c-bg);
-    border: var(--divider) solid var(--c-ink);
+    border: var(--divider) solid var(--line);
     cursor: pointer;
   }
 
@@ -212,7 +212,7 @@
     color: var(--c-ink);
 
     background: var(--c-bg);
-    border: var(--divider) solid var(--c-ink);
+    border: var(--divider) solid var(--line);
     cursor: pointer;
   }
 

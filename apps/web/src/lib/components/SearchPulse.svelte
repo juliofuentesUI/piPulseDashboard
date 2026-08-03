@@ -267,7 +267,7 @@
     gap: 12px;
     padding: 0 24px;
     overflow: hidden;
-    border-bottom: var(--divider) solid var(--c-ink);
+    border-bottom: var(--divider) solid var(--line);
   }
 
   .where {
@@ -336,7 +336,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    border-bottom: var(--divider) solid var(--c-ink);
+    border-bottom: var(--divider) solid var(--line);
   }
 
   .empty {
@@ -345,7 +345,7 @@
     justify-items: center;
     min-height: 0;
     padding: 0 24px;
-    border-bottom: var(--divider) solid var(--c-ink);
+    border-bottom: var(--divider) solid var(--line);
   }
 
   .lead {

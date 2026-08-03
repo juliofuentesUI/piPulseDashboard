@@ -49,7 +49,7 @@
     gap: 16px;
     padding: 0 24px;
     overflow: hidden;
-    border-bottom: var(--divider) solid var(--c-ink);
+    border-bottom: var(--divider) solid var(--line);
   }
 
   .title {

@@ -1,0 +1,538 @@
+/*
+ * MILLENNIUM — the one theme that is more than seven colours.
+ *
+ * The other five are pure data: an object in `THEMES`, no CSS of their own,
+ * because a flat design only ever needed to be told which flat colours to use.
+ * This one is gold leaf over carved stone, and metal is not a colour — it is a
+ * gradient, a bevel and a highlight that has to know which way is up. None of
+ * that is expressible as a palette entry, so it lives here.
+ *
+ * ## How it reaches the components
+ *
+ * Every selector is prefixed `html[data-theme='millennium']`, which `applyTheme`
+ * writes onto the root element. That prefix is worth 0-1-1 of specificity, so a
+ * rule here outranks the component's own scoped rule (Svelte compiles
+ * `.column` to `.column.svelte-hash`, worth 0-2-0, against our 0-2-1) without a
+ * single `!important` and without editing a single component.
+ *
+ * The cost of that trick is real and worth stating: this file reaches into
+ * other components' private class names, so those names are now part of this
+ * theme's contract. Renaming `.column` in ForecastColumn.svelte will not break
+ * the build and will not break the other five themes — it will silently drop
+ * the gold off one band here. The alternative was scattering theme-specific
+ * rules through twenty components, which is worse to write, worse to read and
+ * much worse to delete.
+ *
+ * Class names collide across components — `.row` is a title bar, a trend and a
+ * table row; `.title` is a heading and a search term — so selectors here lean
+ * on the element type (`h1.title`, `li.row`, `tr.row`) rather than the class
+ * alone. Getting that wrong is the likeliest way to break this file.
+ *
+ * ## What it deliberately does not do
+ *
+ * No band changes height, no grid changes its tracks, nothing moves. The
+ * layouts are the ones the other five themes render; this is a surface
+ * treatment over them, which is why it can be this aggressive without putting
+ * the three fixed 720x720 compositions at risk.
+ */
+
+html[data-theme='millennium'] {
+  /*
+   * One light source, top-left, for the whole panel. Every bevel below is cut
+   * from these five stops, which is what stops a screen full of separately
+   * authored gold edges from looking like a screen full of stickers.
+   */
+  --m-gold-hi: #ffeeb8;
+  --m-gold: #e3b23c;
+  --m-gold-mid: #b8862a;
+  --m-gold-lo: #6b4711;
+  --m-gold-deep: #3a2708;
+
+  --m-stone: #221a11;
+  --m-stone-hi: #322517;
+  --m-void: #0a0705;
+
+  /* Structural rules go gold; `ink` stays parchment for the numerals. */
+  --line: var(--m-gold-mid);
+
+  --font-display: 'Cinzel', var(--font-pixel);
+
+  /*
+   * The plaque. A raised stone face, a gold hairline around it, a light edge
+   * along the top and shadow pooling at the bottom. Applied as a shorthand so
+   * the fourteen surfaces that use it cannot drift apart.
+   */
+  --m-plaque-shadow:
+    inset 0 0 0 1px rgba(227, 178, 60, 0.3),
+    inset 0 1px 0 rgba(255, 238, 184, 0.16),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.55);
+
+  /*
+   * The plaque face is a veil rather than a solid, so the artwork behind the
+   * page ghosts through the stone instead of being buried by it. 0.88 was
+   * picked against the busiest thing that can sit behind it — a full-bleed
+   * figure — and still leaves parchment-on-stone well clear of legible.
+   */
+  --m-plaque-fill:
+    linear-gradient(180deg, rgba(255, 238, 184, 0.05), rgba(0, 0, 0, 0.22) 62%),
+    rgba(34, 26, 17, 0.88);
+}
+
+/*
+ * The letterbox around the panel, on a desktop browser. `ink` is parchment in
+ * this theme and both of these ask for `ink`, so without an override the 720
+ * square would float in a field of cream.
+ */
+html[data-theme='millennium'] body,
+html[data-theme='millennium'] .stage {
+  background: var(--m-void);
+}
+
+/*
+ * The frame. `border-image` with a gradient and a slice of 1 paints the whole
+ * 8px border box, so a single declaration gives all four sides a consistent
+ * rolled-metal sheen — brightest at the top-left corner, darkest where the
+ * light has turned away. Four separate borders cannot do this.
+ *
+ * `border-color` is still set, and is not dead: it is what paints if
+ * `border-image` is ever unsupported, and it keeps the frame gold rather than
+ * absent.
+ */
+html[data-theme='millennium'] .screen {
+  border-color: var(--m-gold-mid);
+  border-image: linear-gradient(
+      145deg,
+      var(--m-gold-hi) 0%,
+      var(--m-gold) 18%,
+      var(--m-gold-lo) 40%,
+      var(--m-gold) 58%,
+      var(--m-gold-hi) 74%,
+      var(--m-gold-mid) 100%
+    )
+    1;
+
+  /*
+   * Carved stone, built from gradients rather than a bitmap: three layers,
+   * none of them an image to load, all of them resolution-independent on a
+   * panel that is scaled by a transform.
+   *
+   * Top to bottom — a warm pool of light behind the middle of the panel, a
+   * cool shadow settling into the bottom corners, faint horizontal striation
+   * for the grain of the stone, then the base colour.
+   */
+  background:
+    radial-gradient(120% 90% at 50% 12%, rgba(227, 178, 60, 0.09), transparent 62%),
+    radial-gradient(140% 100% at 50% 100%, rgba(0, 0, 0, 0.55), transparent 55%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 238, 184, 0.016) 0px,
+      rgba(255, 238, 184, 0.016) 1px,
+      transparent 1px,
+      transparent 4px
+    ),
+    var(--c-bg);
+
+  /* Depth at the frame's inner edge, so the stone reads as recessed into it. */
+  box-shadow:
+    inset 0 0 0 2px var(--m-gold-deep),
+    inset 0 0 28px rgba(0, 0, 0, 0.7);
+}
+
+/* ----------------------------------------------------------- the character art */
+
+/*
+ * A figure standing behind each page, bleeding off the bottom outer corner —
+ * the weather page's to the left, Search Pulse's to the right, so swiping
+ * between them changes who is on the panel.
+ *
+ * ## Why a background rather than an element
+ *
+ * There is no free space on a 720x720 information display, so this cannot be a
+ * foreground cut-out without covering something that matters. Painting it as
+ * the *page's own background* puts it above the carved stone and below every
+ * band, with no `z-index`, no pseudo-element and no stacking context invented
+ * for it — the plaques above are veiled rather than solid, so it reads through
+ * them as a mural under the stonework.
+ *
+ * The flat gradient stacked on top is doing the job `opacity` cannot: a
+ * background image has no opacity of its own, so a wash of the panel colour
+ * over it is how you knock a background back without dimming the text in
+ * front of it.
+ *
+ * ## When the files are absent
+ *
+ * A `url()` that 404s paints nothing and the wash paints over nothing, so the
+ * theme is complete and correct without these two files — they add a figure to
+ * a screen that already works. That is deliberate: nothing about this theme
+ * should be waiting on an asset.
+ *
+ * Expected: PNG with transparency, roughly 2:3 portrait, the figure bled to
+ * the bottom edge of its own canvas so it stands on the frame rather than
+ * floating above it.
+ */
+html[data-theme='millennium'] section[aria-label='Weather'],
+html[data-theme='millennium'] section[aria-label='Search Pulse'] {
+  background-repeat: no-repeat;
+  background-size:
+    auto 100%,
+    auto 66%;
+}
+
+html[data-theme='millennium'] section[aria-label='Weather'] {
+  background-image:
+    linear-gradient(rgba(21, 15, 10, 0.84), rgba(21, 15, 10, 0.84)),
+    url('/themes/millennium/weather-figure.png');
+  background-position:
+    center,
+    left -30px bottom;
+}
+
+html[data-theme='millennium'] section[aria-label='Search Pulse'] {
+  background-image:
+    linear-gradient(rgba(21, 15, 10, 0.84), rgba(21, 15, 10, 0.84)),
+    url('/themes/millennium/pulse-figure.png');
+  background-position:
+    center,
+    right -30px bottom;
+}
+
+/* ---------------------------------------------------------------- headings */
+
+/*
+ * The band titles, and the settings heading. Cinzel is inscriptional Roman
+ * capitals — the letterform this theme's reference is cut from — and it is the
+ * only place the pixel stack is displaced. Everything that carries a number
+ * stays monospace, because that is what keeps the columns aligned.
+ *
+ * The gold is a gradient clipped to the glyphs, which forces `color:
+ * transparent` and so rules out `text-shadow`. `filter: drop-shadow` does the
+ * same job on the composited result and, unlike a text shadow, follows the
+ * letterforms rather than their box.
+ */
+html[data-theme='millennium'] h1.title,
+html[data-theme='millennium'] .panel .heading {
+  font-family: var(--font-display);
+  font-weight: 900;
+  letter-spacing: 4px;
+
+  background: linear-gradient(
+    180deg,
+    #fff6d6 0%,
+    #f0cc6a 36%,
+    #a9761b 52%,
+    #e8bd4a 68%,
+    #fff0c0 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.6))
+    drop-shadow(0 0 12px rgba(227, 178, 60, 0.28));
+}
+
+/*
+ * Cinzel sets wider than the monospace it replaces, and two of the three band
+ * headings were already sized to just fit their band. `7-DAY FORECAST` is
+ * fourteen characters sharing 704px with the menu grid and overruns outright;
+ * `SEARCH PULSE` clears it but sits closer to the grid than it should.
+ *
+ * `--title-size` is the inline custom property TitleBar already exposes for
+ * exactly this, so these are one-line corrections rather than a fork of the
+ * component. This is the "some text gets smaller" latitude, spent where the
+ * typeface actually costs width.
+ */
+html[data-theme='millennium'] h1.title {
+  font-size: calc(var(--title-size) * 0.82);
+  line-height: 1;
+}
+
+/*
+ * The second-rank headings — settings groups and the trend details band. Cinzel
+ * again, but flat gold rather than the clipped gradient: at 20px the gradient's
+ * midtone band lands inside the stroke width and reads as a smudge rather than
+ * as metal. Gradients need glyphs big enough to hold them.
+ */
+html[data-theme='millennium'] .group-heading,
+html[data-theme='millennium'] .details-heading {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--m-gold);
+}
+
+/* ------------------------------------------------------------ band framing */
+
+/*
+ * The status strip and the region strip read as inset channels cut into the
+ * stone, which is what gives the plaques below them something to sit proud of.
+ */
+html[data-theme='millennium'] .bar,
+html[data-theme='millennium'] .region {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.45), rgba(255, 238, 184, 0.04));
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+html[data-theme='millennium'] .row:has(> .menu) {
+  background: linear-gradient(180deg, rgba(255, 238, 184, 0.05), transparent 70%);
+}
+
+/* -------------------------------------------------------------- the plaque */
+
+/*
+ * The fourteen raised surfaces. Every one of these is a cell that already had
+ * its own box in the layout, so giving it a face costs no geometry — no
+ * margin, no padding change, nothing that could push a fixed band off its
+ * budget.
+ */
+html[data-theme='millennium'] .column,
+html[data-theme='millennium'] .metric,
+html[data-theme='millennium'] li.row,
+html[data-theme='millennium'] .details,
+html[data-theme='millennium'] .panel {
+  background: var(--m-plaque-fill);
+  box-shadow: var(--m-plaque-shadow);
+}
+
+/*
+ * The scrim behind the settings panel dims with `ink`, on the assumption that
+ * ink is dark. It is parchment here, so unoverridden it washes the dashboard
+ * out in cream instead of dimming it — the same trap `midnight` sets for any
+ * rule that reads `ink` as "the dark one".
+ */
+html[data-theme='millennium'] .scrim {
+  background: var(--m-void);
+  opacity: 0.86;
+}
+
+/* The settings panel is a slab in its own right, so it gets the metal frame too. */
+html[data-theme='millennium'] .panel {
+  border-color: var(--m-gold-mid);
+  border-image: linear-gradient(
+      145deg,
+      var(--m-gold-hi),
+      var(--m-gold) 22%,
+      var(--m-gold-lo) 50%,
+      var(--m-gold) 74%,
+      var(--m-gold-hi)
+    )
+    1;
+}
+
+/*
+ * The selected trend inverts in the flat themes — ink fill, background text.
+ * Inverting onto parchment here would bleach the brightest thing on the panel,
+ * so it lights up instead: the stone warms, the hairline goes to full gold and
+ * the plaque gains a glow. Same signal, opposite mechanism.
+ */
+html[data-theme='millennium'] li.row.selected {
+  background:
+    linear-gradient(180deg, rgba(227, 178, 60, 0.24), rgba(227, 178, 60, 0.06) 70%),
+    var(--m-stone-hi);
+  box-shadow:
+    inset 0 0 0 2px var(--m-gold),
+    inset 0 1px 0 rgba(255, 238, 184, 0.3),
+    inset 0 -3px 10px rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * Inverted, the flat theme sends every mark on the row across to `bg`. Nothing
+ * inverted here, so they all have to come back.
+ */
+html[data-theme='millennium'] li.row.selected .title {
+  color: #fff6d6;
+}
+
+html[data-theme='millennium'] li.row.selected .rank {
+  color: var(--m-gold-deep);
+}
+
+html[data-theme='millennium'] li.row.selected .age {
+  color: var(--m-gold);
+}
+
+html[data-theme='millennium'] li.row.selected .track {
+  background: rgba(0, 0, 0, 0.55);
+  border-color: var(--m-gold);
+}
+
+/* --------------------------------------------------------- the rank stones */
+
+/*
+ * The rank numeral becomes a cartouche — a struck gold tablet with the figure
+ * cut into it. It is the smallest element on the page doing the most work for
+ * the theme, and it costs nothing structurally: `.rank` already had a 52px
+ * grid column to itself.
+ */
+html[data-theme='millennium'] .rank {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0;
+  color: var(--m-gold-deep);
+
+  background: linear-gradient(
+    160deg,
+    var(--m-gold-hi) 0%,
+    var(--m-gold) 34%,
+    var(--m-gold-mid) 62%,
+    var(--m-gold-lo) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.35),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* ------------------------------------------------------------- the gauges */
+
+/*
+ * The trend bar. An inset channel with a struck gold ingot in it, lit along
+ * the top edge like everything else on the panel.
+ */
+html[data-theme='millennium'] .track {
+  background: rgba(0, 0, 0, 0.5);
+  border-color: var(--m-gold-lo);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+html[data-theme='millennium'] .fill {
+  background: linear-gradient(
+    180deg,
+    var(--m-gold-hi) 0%,
+    var(--m-gold) 45%,
+    var(--m-gold-mid) 100%
+  );
+  box-shadow: 0 0 6px rgba(227, 178, 60, 0.5);
+}
+
+/* ------------------------------------------------------------- the sprites */
+
+/*
+ * The weather sprites are drawn with `fill="var(--c-sky)"` and friends, so
+ * redefining those properties on any ancestor re-resolves them for that
+ * subtree and nothing else. That is the whole mechanism here.
+ *
+ * It is needed because two roles share the `blue`/`sky` tokens and this theme
+ * pulls them apart: on the panel they are bronze, the colour of a secondary
+ * label; inside a weather sprite they are rain and wind, which have to stay
+ * blue or the forecast stops being readable at a glance. The tokens are gold
+ * everywhere else, which is what turns the sun and the moon to metal for free.
+ */
+html[data-theme='millennium'] .column .icon,
+html[data-theme='millennium'] .metric .icon,
+html[data-theme='millennium'] .cell .icon {
+  --c-sky: #8fc4e8;
+  --c-blue: #5b8fba;
+  --c-surface: #d7cdba;
+}
+
+/*
+ * The umbrella is the only sprite in the set drawn in `ink`, and it is a metric
+ * icon, so this reaches it and nothing else. At full parchment it was the
+ * brightest object on the panel — a white canopy outshouting the temperatures
+ * two bands above it. Stone grey puts it back in the material the rest of the
+ * screen is carved from and leaves its drops the only colour on the band.
+ */
+html[data-theme='millennium'] .metric .icon {
+  --c-ink: #b3aa99;
+}
+
+/* ------------------------------------------------------------- the marks */
+
+/*
+ * The menu grid and the page indicator: gold studs set into the stone. Both
+ * were flat squares, and both are the only thing on their band that a finger
+ * is meant to find, so they are worth the extra shine.
+ */
+html[data-theme='millennium'] .menu .dot {
+  background: linear-gradient(160deg, var(--m-gold-hi), var(--m-gold-mid) 70%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+html[data-theme='millennium'] .dots .dot::before {
+  background: rgba(0, 0, 0, 0.5);
+  border-color: var(--m-gold-mid);
+}
+
+html[data-theme='millennium'] .dots .dot.active::before {
+  background: linear-gradient(160deg, var(--m-gold-hi), var(--m-gold) 70%);
+  border-color: var(--m-gold-hi);
+  box-shadow: 0 0 8px rgba(227, 178, 60, 0.7);
+}
+
+/*
+ * The ordering chips and the settings options. Flat themes invert the chosen
+ * one to ink; this one strikes it in gold, for the same reason the selected
+ * trend row does.
+ */
+html[data-theme='millennium'] .mode {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: var(--m-gold-lo);
+}
+
+html[data-theme='millennium'] .mode.active,
+html[data-theme='millennium'] .option.active {
+  color: var(--m-gold-deep);
+  background: linear-gradient(180deg, var(--m-gold-hi), var(--m-gold) 55%, var(--m-gold-mid));
+  border-color: var(--m-gold-hi);
+}
+
+html[data-theme='millennium'] .option {
+  background: var(--m-plaque-fill);
+  border-color: var(--m-gold-lo);
+}
+
+/* The `NEW` badge and the live lamp are already `hot`, which is gold here. */
+html[data-theme='millennium'] .badge {
+  color: var(--m-gold-deep);
+  background: linear-gradient(180deg, var(--m-gold-hi), var(--m-gold) 60%, var(--m-gold-mid));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+html[data-theme='millennium'] .lamp {
+  background: var(--m-gold-hi);
+  box-shadow: 0 0 8px var(--m-gold);
+}
+
+/* --------------------------------------------------------------- numerals */
+
+/*
+ * The three figures the screen exists to show. Parchment with a hard shadow
+ * under it, so they lift off the stone rather than lying flat on it — the one
+ * place this theme spends depth on type rather than on framing.
+ */
+html[data-theme='millennium'] .temperature,
+html[data-theme='millennium'] .metric .value,
+html[data-theme='millennium'] .date {
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* --------------------------------------------------------------- the card */
+
+/*
+ * The trend card's header and its picture. The photo is already duotoned
+ * through `--c-sky`, which is amber here, so it arrives in the palette on its
+ * own; all it needs is a frame worth the rest of the panel.
+ */
+html[data-theme='millennium'] .card .head {
+  background: linear-gradient(180deg, rgba(255, 238, 184, 0.06), rgba(0, 0, 0, 0.3));
+}
+
+html[data-theme='millennium'] .shot {
+  box-shadow:
+    inset 0 0 0 2px var(--m-gold-mid),
+    0 3px 10px rgba(0, 0, 0, 0.6);
+}
+
+html[data-theme='millennium'] .quote {
+  background: var(--m-plaque-fill);
+  box-shadow: var(--m-plaque-shadow);
+}

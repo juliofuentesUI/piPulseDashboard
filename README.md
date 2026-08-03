@@ -738,6 +738,8 @@ the app — panel fills, dividers, type, and the pixel sprites — resolves back
 those seven, so swapping is a synchronous property write on one element: no rebuild, no
 reload, nothing re-fetched.
 
+One theme, `millennium`, is more than that; it is described at the end of this section.
+
 | Token | Role |
 | --- | --- |
 | `bg` | Page and panel background |
@@ -751,8 +753,15 @@ reload, nothing re-fetched.
 Tokens are named for their role in the artwork rather than their hue, so an inverted
 theme stays coherent — in `midnight`, `ink` is near-white.
 
-Five ship today: `gba-blue` (the default), `midnight`, `dmg-green`, `brutalist-mono` and
-`amber`. **To add one, append an object to `THEMES` in
+One more property sits beside the seven: **`--line`, the colour every structural rule is
+drawn in** — the outer frame, the band dividers, the plaque edges. It defaults to
+`var(--c-ink)`, which is what those 25 border declarations always said, so it changes
+nothing about the flat themes. It exists because `ink` carried two jobs that only ever
+agreed by coincidence: *the colour of a rule* and *the colour of primary text*. A theme
+with gold framing and parchment numerals needs them apart.
+
+Six ship today: `gba-blue` (the default), `midnight`, `dmg-green`, `brutalist-mono`,
+`amber` and `millennium`. **To add a flat one, append an object to `THEMES` in
 `apps/web/src/lib/theme.svelte.ts`.** That is the whole change; nothing else references
 a colour literal, and the settings list picks it up on its own. The choice is remembered
 in `localStorage` and reapplied before the first paint, so a non-default theme never
@@ -761,6 +770,42 @@ flashes the default one.
 `brutalist-mono` shows what the role-based naming buys: it sets `surface` and `warm` —
 the two fill roles — to the background, so cloud bodies and sun discs go hollow and the
 sprites read as line art without a single sprite being redrawn.
+
+### `millennium`, the one that is more than a palette
+
+Gold leaf over carved stone. It is the stated exception to "flat by design" and to
+"original pixel art only" above — those hold for everything else, and this one theme is
+allowed to break them. Full write-up in
+[docs/millennium-theme-plan.md](docs/millennium-theme-plan.md).
+
+Metal is not a colour — it is a gradient, a bevel and a highlight that knows which way is
+up — so this theme needs rules no palette entry can hold. They live in
+`apps/web/src/styles/millennium.css`, imported once in `main.ts`, with every selector
+prefixed `html[data-theme='millennium']`. That prefix is worth 0-1-1 of specificity, which
+outranks Svelte's own scoped rule (`.column` compiles to `.column.svelte-hash`, 0-2-0,
+against our 0-2-1), so **the theme is expressed without editing a single component.**
+
+The catch is worth knowing before you rename anything: that sheet targets other
+components' private class names, so those names are now part of this theme's contract.
+Renaming `.column` in `ForecastColumn.svelte` breaks neither the build nor the other five
+themes — it silently drops the gold off one band. Class names also collide across
+components (`.row` is a title bar, a trend and a table row), so selectors there lean on
+the element type: `h1.title`, `li.row`, `tr.row`.
+
+It bundles the only webfont in the project — Cinzel, latin subset, variable 400–900 in
+26 KB — used for band headings only, through `--font-display`. That property defaults to
+the pixel stack, so the other five themes neither use the face nor pay for it. Everything
+carrying a number stays monospace, which is what keeps the columns aligned.
+
+**The layouts are untouched.** No band changes height, no grid changes its tracks. The
+reference this was drawn from merges the two weather screens into one; this deliberately
+does not, so the screen picker keeps meaning what it always did.
+
+Two optional PNGs in `apps/web/public/themes/millennium/` put a figure behind each page,
+drawn as the page's own background — above the carved stone, beneath every band, with the
+plaques veiled rather than opaque so a figure reads through them. The theme is complete
+and correct without them: a `url()` that 404s paints nothing. That directory's `README.md`
+covers sizing and the one number that tunes how strongly they show.
 
 ## Settings
 
@@ -805,7 +850,9 @@ closes it, because the thing that changed is behind the panel.
 ## Design notes
 
 - Original pixel art only — no Nintendo logos, game graphics, or Game Boy Advance
-  branding.
+  branding. The `millennium` theme is the one exception, by the user's explicit call: it
+  is drawn from a supplied reference and may carry supplied character art. Everything
+  structural — every sprite, every layout — is still original.
 - Sprites are built from rects on a 32 × 32 grid (`lib/weather-icons/sprite.ts`) and
   rendered as SVG with `shape-rendering="crispEdges"`, so every edge lands on a whole
   pixel at any scale.
@@ -824,12 +871,15 @@ closes it, because the thing that changed is behind the panel.
 - The layout is authored at a fixed 720 × 720 and scaled with a single transform, so it
   is pixel-exact on the HyperPixel and never reflows or produces a scrollbar on a
   desktop browser.
-- Flat by design: no gradients, shadows, rounded corners or scanline overlays. The only
-  animation left is the loading meter, disabled under `prefers-reduced-motion: reduce`.
-  The sprites are static, which keeps the Pi idle.
-- No webfont is bundled, so the type falls back to the sharpest monospace available.
-  To go fully pixel, drop a `.woff2` into `apps/web/public/fonts/` and add a matching
+- Flat by design: no gradients, shadows, rounded corners or scanline overlays — again with
+  `millennium` as the stated exception, which is all three of those and confined to its own
+  stylesheet. The only animation anywhere is the loading meter, disabled under
+  `prefers-reduced-motion: reduce`. The sprites are static, which keeps the Pi idle.
+- The body type falls back to the sharpest monospace available; no webfont is bundled for
+  it. To go fully pixel, drop a `.woff2` into `apps/web/public/fonts/` and add a matching
   `@font-face` named `Pixel Operator` — the font stack in `app.css` already looks for it.
+  The one bundled face, Cinzel, is a display face used by `millennium` alone and reached
+  through `--font-display`, which every other theme leaves pointing at the monospace stack.
 
 ## Deploying to the Raspberry Pi
 

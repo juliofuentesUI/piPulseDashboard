@@ -33,7 +33,7 @@
     display: flex;
     gap: 8px;
     padding: 10px;
-    border: var(--divider) solid var(--c-ink);
+    border: var(--divider) solid var(--line);
   }
 
   .block {

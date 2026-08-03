@@ -21,12 +21,51 @@
   --divider: 4px;
 
   /*
+   * The colour every structural rule is drawn in — the outer frame, the band
+   * dividers, the plaque edges. It follows `ink` in all five flat themes, which
+   * is what those themes always did, so this indirection changes nothing they
+   * render.
+   *
+   * It exists because `ink` carries two jobs that only ever agreed by
+   * coincidence: "the colour of a rule" and "the colour of primary text". A
+   * theme with gold framing and parchment numerals needs them apart, and
+   * splitting them here costs one property rather than a fork of every
+   * component.
+   */
+  --line: var(--c-ink);
+
+  /*
    * No webfont is bundled, so this falls back to the sharpest monospace the
    * machine has. To go full pixel, drop a .woff2 into apps/web/public/fonts/
    * and add an @font-face named "Pixel Operator" — the stack picks it up.
    */
   --font-pixel: 'Pixel Operator', 'Press Start 2P', 'DejaVu Sans Mono',
     ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /*
+   * Display face for band headings. Defaults to the pixel stack, so the five
+   * flat themes are unchanged and never pay for a font they do not use — only
+   * `millennium` points this at Cinzel.
+   */
+  --font-display: var(--font-pixel);
+}
+
+/*
+ * Cinzel, the latin subset only: Roman inscriptional capitals, which is the
+ * letterform the Millennium theme's headings are cut from. Variable 400-900 in
+ * 26 KB, so the whole weight range costs one file.
+ *
+ * `font-display: block` rather than `swap`. This face is used on three band
+ * headings at 56-100px; swapping monospace in and Cinzel out at that size is a
+ * visible reflow of the largest thing on the panel. A kiosk loads once from
+ * localhost, so the block period is not a real wait.
+ */
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: block;
+  src: url('/fonts/cinzel-latin.woff2') format('woff2');
 }
 
 *,

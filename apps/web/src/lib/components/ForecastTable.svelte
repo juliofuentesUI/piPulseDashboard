@@ -93,7 +93,7 @@
     display: grid;
     grid-template-columns: 96px repeat(3, minmax(0, 1fr)) 116px;
     min-height: 0;
-    border-bottom: var(--divider) solid var(--c-ink);
+    border-bottom: var(--divider) solid var(--line);
   }
 
   .day,
@@ -108,7 +108,7 @@
     padding: 0 6px;
     margin: 0;
     font-weight: 400;
-    border-right: var(--divider) solid var(--c-ink);
+    border-right: var(--divider) solid var(--line);
   }
 
   .rain {
@@ -129,7 +129,7 @@
   /* --- Header row --- */
 
   .head {
-    border-bottom: var(--divider) solid var(--c-ink);
+    border-bottom: var(--divider) solid var(--line);
   }
 
   .head .day,

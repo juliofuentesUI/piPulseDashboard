@@ -57,7 +57,7 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     min-height: 0;
-    border-bottom: var(--divider) solid var(--c-ink);
+    border-bottom: var(--divider) solid var(--line);
   }
 
   .metrics {

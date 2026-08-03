@@ -47,7 +47,7 @@
     color: inherit;
     background: none;
     border: 0;
-    border-bottom: var(--divider) solid var(--c-ink);
+    border-bottom: var(--divider) solid var(--line);
     cursor: pointer;
   }
 

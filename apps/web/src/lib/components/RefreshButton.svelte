@@ -33,7 +33,7 @@
     color: var(--c-ink);
 
     background: var(--c-warm);
-    border: var(--divider) solid var(--c-ink);
+    border: var(--divider) solid var(--line);
     cursor: pointer;
   }
 

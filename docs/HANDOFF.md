@@ -15,10 +15,31 @@ being true.
 | — | Ordering fix: SURGING / BIGGEST modes | Done |
 | 3.5 | Full-screen trend card: image + 3 headlines | Done |
 | — | Raspberry Pi deploy scripts | Done |
+| — | `millennium` theme | Built — **awaiting two art files** |
 | 4 | Daily history view (`TODAY`) | **Deferred — deploy first** |
 | 5 | Reliability and polish | Not started |
 
-All commits pushed, working tree clean. Nothing is parked on a branch.
+**The `millennium` theme was inserted before Phase 4** at the user's request on
+2026-08-03, and has its own document, `docs/millennium-theme-plan.md`. It is a whole-app
+theme rather than a Search Pulse phase, so the Search Pulse guardrails do not bear on it —
+it adds no data, no source and no claim. Two things about it are worth knowing without
+opening the doc:
+
+- **It is the one thing allowed to break "flat by design" and "original pixel art only."**
+  The user made that call explicitly. It is itself the sixth theme; do not generalise the
+  exception to the app or to a seventh.
+- **It grew the theme system by exactly two things**: a `--line` token in `app.css`, so
+  structural rules can differ from `ink`; and `styles/millennium.css`, keyed off
+  `[data-theme]`, which reaches into components' private class names by specificity rather
+  than by editing them. That coupling is deliberate and documented — renaming a class like
+  `.column` silently drops the gold off one band without failing a build.
+
+Everything is done but **M7: the two character-art PNGs**, which have to come from the
+user; they are conversation attachments, not something the repo can generate. The theme is
+complete and correct without them and shows no error when they are absent. Paths and
+sizing are in `apps/web/public/themes/millennium/README.md`.
+
+Working tree clean, everything merged to `main`. Nothing is parked on a branch.
 
 **Do not start Phase 4.** The user deferred it on 2026-08-03 to get the current version
 onto the Pi first, and that ordering is right on its own merits: Phase 4 is only as good as

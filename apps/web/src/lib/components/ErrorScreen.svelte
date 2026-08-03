@@ -51,14 +51,14 @@
     width: 30px;
     height: 80px;
     background: var(--c-hot);
-    border: var(--divider) solid var(--c-ink);
+    border: var(--divider) solid var(--line);
   }
 
   .dot {
     width: 30px;
     height: 30px;
     background: var(--c-hot);
-    border: var(--divider) solid var(--c-ink);
+    border: var(--divider) solid var(--line);
   }
 
   .headline {

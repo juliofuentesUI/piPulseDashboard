@@ -106,6 +106,35 @@ export const THEMES: readonly Theme[] = [
       hot: '#ff9e2c',
     },
   },
+  {
+    /*
+     * The one theme that is more than a palette. Gold framing, carved stone and
+     * an inscriptional display face need rules the other five have no use for,
+     * so they live in `styles/millennium.css`, keyed off `[data-theme]`. This
+     * object is still the whole of its colour.
+     *
+     * `surface` is the odd one: it is the cloud body and nothing else — the
+     * only `var(--c-surface)` outside the sprite module is the sprite module —
+     * so it is free to be an overcast grey while every other token is metal.
+     *
+     * `sky` has to keep real chroma. It fills the trend bar, strokes the rank
+     * plot, and is the overlay the trend card's photo is duotoned through, and
+     * that blend hands back the overlay's own `max - min` RGB spread. A
+     * near-neutral here would render the card greyscale, which is the failure
+     * `midnight` already taught us to test for.
+     */
+    id: 'millennium',
+    name: 'MILLENNIUM',
+    palette: {
+      bg: '#150f0a',
+      surface: '#cdc3b0',
+      ink: '#f4e6c4',
+      blue: '#b9975b',
+      sky: '#c9963f',
+      warm: '#f7d777',
+      hot: '#e3a71c',
+    },
+  },
 ];
 
 /** Falls back to the first theme, which app.css also hard-codes as its default. */
