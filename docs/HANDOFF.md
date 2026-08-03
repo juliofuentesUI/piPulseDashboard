@@ -81,8 +81,14 @@ it was about all three. That is why all three are shown.
 
 **The image treatment is CSS, not canvas.** An earlier version of this spec called for
 palette-posterizing on a canvas; tested against a real feed image on 2026-08-03 and it was
-overkill. `filter: grayscale(1) contrast(1.35)` plus `mix-blend-mode: screen` over a
-theme-coloured panel does the job in four lines and recolours with the theme for free.
+overkill. `filter: grayscale(1) contrast(1.35)` plus `mix-blend-mode: multiply` over a
+theme-coloured panel does the job in four lines and recolours with the theme for free —
+confirmed against all five themes.
+
+**Use `multiply`, not `screen`.** `screen` was specified first and only suits `gba-blue`;
+it blows out on `midnight`, whose `ink` is near-white while every other theme's is dark.
+**Test any image treatment against `midnight`** — it is the one theme that inverts, and it
+breaks assumptions the other four share.
 Chunky pixels are a separate effect that CSS genuinely cannot do — `image-rendering:
 pixelated` only engages when upscaling, and these images are displayed smaller than they
 arrive — so that needs canvas and is deferred.

@@ -441,12 +441,24 @@ Greyscale the photo and blend it onto a panel painted in a theme colour:
 ```css
 .shot { background: var(--c-ink); }
 .shot img { filter: grayscale(1) contrast(1.35) brightness(1.05);
-            mix-blend-mode: screen; }
+            mix-blend-mode: multiply; }
 ```
 
 That is the whole treatment. Four lines, no JavaScript, and it **recolours with the
 theme** for free because the blend target is a theme token — switch to Amber CRT and the
 photo goes amber.
+
+**`multiply`, not `screen` — tested against all five themes 2026-08-03.** `screen` was
+specified first and is wrong: it suits `gba-blue`, blows out to near-white on `midnight`
+(whose `ink` is `#eaf2ff`, near-white, unlike every other theme), and washes out on
+`dmg-green`, `brutalist-mono` and `amber`. `multiply` reads correctly on all five.
+
+A subtler alternative that also works everywhere: leave the image unblended and lay a
+`var(--c-ink)` panel over it with `mix-blend-mode: color`, which keeps more of the photo's
+tonal range. `luminosity` was tried and is unusable — it renders a flat grey block.
+
+**Test any image treatment against `midnight` specifically.** It is the one theme with a
+light `ink` on a dark `bg`, so it breaks assumptions the other four share.
 
 **AMENDED — the original spec said canvas palette-posterizing; that was overkill.** Tested
 side by side on 2026-08-03 against a real feed image. The duotone alone takes the photo
