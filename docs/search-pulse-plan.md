@@ -438,27 +438,41 @@ mechanism for it.
 
 Greyscale the photo and blend it onto a panel painted in a theme colour:
 
+```html
+<div class="shot"><img src={imageUrl} alt=""></div>
+```
 ```css
-.shot { background: var(--c-ink); }
-.shot img { filter: grayscale(1) contrast(1.35) brightness(1.05);
-            mix-blend-mode: multiply; }
+.shot {
+  position: relative;
+  isolation: isolate;          /* keep the blend inside this box */
+  background: var(--c-ink);
+}
+.shot img { filter: grayscale(1) contrast(1.35) brightness(1.05); }
+.shot::after {                 /* the theme colour, laid over the photo */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--c-ink);
+  mix-blend-mode: color;
+}
 ```
 
-That is the whole treatment. Four lines, no JavaScript, and it **recolours with the
-theme** for free because the blend target is a theme token — switch to Amber CRT and the
-photo goes amber.
+Pure CSS, no JavaScript, and it **recolours with the theme** for free because the overlay
+is a theme token — switch to Amber CRT and the photo goes amber.
 
-**`multiply`, not `screen` — tested against all five themes 2026-08-03.** `screen` was
-specified first and is wrong: it suits `gba-blue`, blows out to near-white on `midnight`
-(whose `ink` is `#eaf2ff`, near-white, unlike every other theme), and washes out on
-`dmg-green`, `brutalist-mono` and `amber`. `multiply` reads correctly on all five.
+**`color` overlay, chosen after testing all five themes side by side on 2026-08-03.** It
+holds a visible theme hue in every one *and* keeps the photo's tonal range, so the subject
+stays legible. Two alternatives were tried and rejected:
 
-A subtler alternative that also works everywhere: leave the image unblended and lay a
-`var(--c-ink)` panel over it with `mix-blend-mode: color`, which keeps more of the photo's
-tonal range. `luminosity` was tried and is unusable — it renders a flat grey block.
+| Tried | Result |
+| --- | --- |
+| `mix-blend-mode: screen` on the image | Suits `gba-blue` only. Blows out to near-white on `midnight` and washes out on the other three |
+| `mix-blend-mode: multiply` on the image | Works everywhere, but goes **nearly greyscale on `midnight`** — which defeats the point of a theme-coloured treatment |
+| `mix-blend-mode: luminosity` overlay | Unusable. Renders a flat grey block |
 
-**Test any image treatment against `midnight` specifically.** It is the one theme with a
-light `ink` on a dark `bg`, so it breaks assumptions the other four share.
+**Test any image treatment against `midnight` specifically.** Its `ink` is `#eaf2ff` — near
+white — while every other theme's is dark, so it inverts assumptions the other four share.
+It is what broke both rejected options.
 
 **AMENDED — the original spec said canvas palette-posterizing; that was overkill.** Tested
 side by side on 2026-08-03 against a real feed image. The duotone alone takes the photo
