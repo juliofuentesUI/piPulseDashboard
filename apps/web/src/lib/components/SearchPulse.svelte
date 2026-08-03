@@ -126,7 +126,23 @@
           </p>
 
           {#if history?.sparkline != null}
-            <div class="plot"><Sparkline {...history.sparkline} /></div>
+            <!--
+              The plot is framed rather than self-labelling: rank numbers down
+              the left, and both ends of the time axis named underneath, so
+              nothing about the scale has to be inferred from the heading.
+            -->
+            <div class="frame">
+              <div class="ranks">
+                <span>{history.sparkline.topLabel}</span>
+                <span>{history.sparkline.bottomLabel}</span>
+              </div>
+              <div class="plot"><Sparkline {...history.sparkline} /></div>
+              <div class="times">
+                <span>{history.sparkline.startLabel}</span>
+                <span>{history.sparkline.endLabel}</span>
+              </div>
+            </div>
+
             <p class="graph-foot">
               PEAK {history.peakRank} · NOW {history.latestRank}
             </p>
@@ -304,10 +320,11 @@
     min-width: 0;
   }
 
+  /* Enough gap that the plot's top rule does not read as underlining the heading. */
   .graph {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
-    gap: 2px;
+    gap: 6px;
     min-height: 0;
   }
 
@@ -328,8 +345,43 @@
     align-self: center;
   }
 
-  .plot {
+  /* Rank gutter beside the plot, time labels beneath it. */
+  .frame {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    column-gap: 6px;
     min-height: 0;
+  }
+
+  .plot {
+    grid-column: 2;
+    min-height: 0;
+  }
+
+  /*
+   * Sits against the plot's own top and bottom, which is where ranks 1 and 10
+   * actually are — the axis is fixed, so the labels can be too.
+   */
+  .ranks {
+    grid-column: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--c-blue);
+  }
+
+  .times {
+    grid-column: 2;
+    display: flex;
+    justify-content: space-between;
+    padding-top: 3px;
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: var(--c-blue);
   }
 
   .facts dt {

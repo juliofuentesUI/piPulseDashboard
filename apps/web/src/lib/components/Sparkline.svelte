@@ -1,14 +1,14 @@
 <script lang="ts">
   import type { SparklineView } from '../types';
 
-  let { width, height, path, dots, topLabel, bottomLabel }: SparklineView = $props();
-
-  /** Room for the axis numbers to the left of the plot. */
-  const GUTTER = 22;
-  const PAD = 4;
+  let { width, height, path, dots }: SparklineView = $props();
 </script>
 
 <!--
+  Geometry only. Every label around this lives in HTML, because the SVG is
+  stretched to fill its box with `preserveAspectRatio="none"` and text inside
+  it would be stretched with it.
+
   Drawn on the same terms as the sprites: whole-pixel geometry with
   `crispEdges`, no curves and no smoothing. A rank is an integer observed at a
   moment, and joining the observations with straight segments claims nothing
@@ -16,30 +16,38 @@
 -->
 <svg
   class="spark"
-  viewBox="0 0 {width + GUTTER} {height + PAD * 2}"
+  viewBox="0 0 {width} {height}"
   role="img"
-  aria-label="Rank over the last 24 hours"
+  aria-label="Rank over time"
   shape-rendering="crispEdges"
   preserveAspectRatio="none"
 >
-  <text class="axis" x="0" y={PAD + 7}>{topLabel}</text>
-  <text class="axis" x="0" y={height + PAD}>{bottomLabel}</text>
+  <!-- Top and bottom of the rank space, so the line has something to sit against. -->
+  <line class="rule" x1="0" y1="0.5" x2={width} y2="0.5" />
+  <line class="rule" x1="0" y1={height - 0.5} x2={width} y2={height - 0.5} />
 
-  <g transform="translate({GUTTER} {PAD})">
-    <!-- Top and bottom of the rank space, so the line has something to sit against. -->
-    <line class="rule" x1="0" y1="0" x2={width} y2="0" />
-    <line class="rule" x1="0" y1={height} x2={width} y2={height} />
+  <polyline class="line" points={path} fill="none" />
 
-    <polyline class="line" points={path} fill="none" />
-
+  <!--
+    One mark per observation. Without these a single reading would draw
+    nothing at all, which is exactly the state a freshly booted Pi is in.
+  -->
+  {#each dots as dot, i (i)}
     <!--
-      One mark per observation. Without these a single reading would draw
-      nothing at all, which is exactly the state a freshly booted Pi is in.
+      The marker is nudged inside the plot at the extremes rather than the
+      data being inset: rank 1 is the top line and most observations of an
+      interesting trend sit on it, so a marker centred there would lose its
+      top half to the edge. The polyline vertex stays exactly where the
+      observation was.
     -->
-    {#each dots as dot, i (i)}
-      <rect class="dot" x={dot.x - 2} y={dot.y - 2} width="4" height="4" />
-    {/each}
-  </g>
+    <rect
+      class="dot"
+      x={Math.min(Math.max(dot.x - 3, 0), width - 6)}
+      y={Math.min(Math.max(dot.y - 3, 0), height - 6)}
+      width="6"
+      height="6"
+    />
+  {/each}
 </svg>
 
 <style>
@@ -47,12 +55,6 @@
     display: block;
     width: 100%;
     height: 100%;
-  }
-
-  .axis {
-    font-family: inherit;
-    font-size: 13px;
-    fill: var(--c-blue);
   }
 
   .rule {
@@ -64,6 +66,7 @@
   .line {
     stroke: var(--c-sky);
     stroke-width: 3;
+    vector-effect: non-scaling-stroke;
   }
 
   .dot {

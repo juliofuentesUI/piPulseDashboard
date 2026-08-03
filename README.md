@@ -530,19 +530,25 @@ The band's right half is the local record: a rank graph and, beneath the facts, 
 Pi first saw the trend and how many fetches it has appeared in.
 
 **The graph's x-axis spans the history that exists, capped at 24 hours** — not a fixed 24
-hours always, and the label states which. A trend four hours old drawn on a day-wide axis
-occupies the rightmost sixth and is unreadable, and most trends are hours old, so that
-would be the normal case rather than the edge one. Stretching to fit is only honest if
-the axis says what it covers, hence `RANK · LAST 4H`. The floor is one hour, so the first
-few observations of a brand-new trend are not spread across the full width, which would
-read as far more movement than twenty minutes of watching can support.
+hours always. A trend four hours old drawn on a day-wide axis occupies the rightmost
+sixth and is unreadable, and most trends are hours old, so that would be the normal case
+rather than the edge one.
+
+Stretching to fit is only honest if the axis says what it covers, so **both ends are
+named** — `9:43 PM` under the left edge, `NOW` under the right, and the span in the
+heading as `RANK · LAST 40M`. Without those the empty part of a short axis reads as
+missing data rather than as "we only started watching recently", which is what it
+actually means. The floor is one refresh interval, which exists only so a single
+observation has a span to sit in.
 
 The y-axis is the opposite: **fixed at ranks 1 to 10**, the length of the list Google
 returns, never scaled to what the trend happened to do. A search that only ever wobbled
 between #8 and #9 should read as a flat line near the bottom, not as drama across a
 zoomed axis. Observations are marked individually as well as joined, because a single
 reading would otherwise draw nothing at all — which is exactly the state a freshly booted
-Pi is in.
+Pi is in. A marker is nudged inside the plot at the extremes while its polyline vertex
+stays put: rank 1 is the top line and most observations of an interesting trend sit on
+it, so a marker centred there would lose its top half to the edge.
 
 One label is ours rather than Google's: `NEW`, when the feed first reported the trend
 under 30 minutes ago. The plan words that rule as "first observed less than 30 minutes

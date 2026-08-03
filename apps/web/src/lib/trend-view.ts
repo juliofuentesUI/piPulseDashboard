@@ -167,11 +167,16 @@ const SPARK_HEIGHT = 76;
 const MARKER = 3;
 
 /**
- * Narrowest the axis will get. Below this the first few observations of a
- * brand-new trend would be spread across the full width, which reads as much
- * more movement than twenty minutes of watching can support.
+ * Narrowest the axis will get: one refresh interval, which is the smallest
+ * gap two observations can genuinely have.
+ *
+ * This was an hour to begin with, and an hour was wrong. A trend observed for
+ * twenty-four minutes then drew into the right 40% with the left half blank —
+ * which reads as missing data rather than as "we started watching recently",
+ * and is the same unreadable crowding a fixed 24-hour axis produced. The floor
+ * exists only so a single observation has a span to sit in.
  */
-const MIN_WINDOW_MS = 60 * 60 * 1000;
+const MIN_WINDOW_MS = 10 * 60 * 1000;
 
 export function toSparkline(
   history: TrendHistory,
@@ -232,6 +237,10 @@ export function toSparkline(
     topLabel: '1',
     bottomLabel: String(RANK_SPACE),
     windowLabel: coarseDuration(Math.round(spanMs / 60_000)),
+    // The axis start, not the first observation: with the floor applied the
+    // two differ, and the label has to describe the axis it sits under.
+    startLabel: formatClock(new Date(nowMs - spanMs)),
+    endLabel: 'NOW',
   };
 }
 
@@ -245,7 +254,12 @@ export function toTrendHistoryView(
       history.firstSeenAt === undefined ? '' : durationAgo(history.firstSeenAt, now),
     peakRank: history.peakRank === undefined ? '' : `#${history.peakRank}`,
     latestRank: history.latestRank === undefined ? '' : `#${history.latestRank}`,
-    observed: history.timesObserved === 0 ? '' : `${history.timesObserved}×`,
+    // "5 FETCHES", not "5×". The multiplier read as a quantity of something
+    // rather than a count of times we looked, which is what it is.
+    observed:
+      history.timesObserved === 0
+        ? ''
+        : `${history.timesObserved} ${history.timesObserved === 1 ? 'FETCH' : 'FETCHES'}`,
     movement: history.movement,
   };
 }

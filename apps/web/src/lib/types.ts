@@ -245,6 +245,10 @@ export interface SparklineView {
   readonly bottomLabel: string;
   /** The span the x-axis actually covers, e.g. "4H" — never more than 24H. */
   readonly windowLabel: string;
+  /** Clock time at the left edge of the axis, e.g. "9:26 PM". */
+  readonly startLabel: string;
+  /** Right edge. Always the present moment. */
+  readonly endLabel: string;
 }
 
 /** The history half of the details band. */
