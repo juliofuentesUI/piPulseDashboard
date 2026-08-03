@@ -25,6 +25,13 @@ root instead and shows up as an untracked stray.
 
 Run `npm run typecheck` before calling a change done — it covers both workspaces.
 
+## Showing the user the dashboard
+
+When the user asks to see the dashboard — "show me", "what does it look like now", "send
+me a screenshot" — use the **`show-dashboard`** skill. It captures at 720 × 720 and
+publishes a link they can open on a phone, which a local file path or an inline image
+cannot do. They can also invoke it directly as `/show-dashboard`.
+
 ## Remote access
 
 Tailscale lives on the **Windows host**, never inside WSL — installing it in WSL was tried

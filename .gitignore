@@ -22,3 +22,6 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Per-machine permission grants. The skills beside it are shared on purpose.
+.claude/settings.local.json
