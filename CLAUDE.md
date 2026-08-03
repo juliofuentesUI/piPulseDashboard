@@ -14,8 +14,7 @@ runtime payload validation are hand-written on purpose, not for lack of a librar
 
 "Do not overbuild" is about **scope, not tools**. There is no banned-technology list — an
 earlier constraint against React, Tailwind and Docker was lifted, and the stack is settled
-as Svelte + Vite + Fastify. Adding a dev-tooling script is fine; adding a second screen to
-the demo is not.
+as Svelte + Vite + Fastify. Adding a dev-tooling script is fine.
 
 ## Verifying UI changes
 
