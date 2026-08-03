@@ -436,6 +436,58 @@ position, so a decrease is a rise:
 The asymmetry is deliberate: attention arrives abruptly, so one improvement is enough to
 call a rise, while a single slip down the list is as often noise as it is a trend fading.
 
+### `GET /api/trends/today`
+
+The day so far, ranked from stored rows. Takes no parameters: the window is always local
+midnight to now, drawn in the dashboard's configured zone.
+
+```json
+{
+  "startsAt": "2026-08-03T07:00:00.000Z",
+  "endsAt": "2026-08-03T22:16:08.013Z",
+  "timezone": "America/Los_Angeles",
+  "entries": [
+    {
+      "trendKey": "ryan zeferjahn",
+      "title": "ryan zeferjahn",
+      "peakVolume": "20000+",
+      "peakRank": 1,
+      "timesObserved": 6,
+      "firstSeenAt": "2026-08-03T20:01:49.542Z",
+      "lastSeenAt": "2026-08-03T20:54:45.461Z",
+      "activeMinutes": 53
+    }
+  ],
+  "trendCount": 160,
+  "fetchCount": 41
+}
+```
+
+**The window is local, and that is not cosmetic.** Rows are stored in UTC and San Jose is
+seven hours behind it, so a UTC boundary would roll the day over in the late afternoon.
+`startOfLocalDay` reads the zone's offset through `Intl`, twice — the offset *now* is not
+the offset that was in force at midnight on a DST changeover day.
+
+`entries` is capped at ten, which is what the screen has room for. `trendCount` is how many
+distinct trends the day actually holds, so ten rows out of a hundred and sixty read as a
+top ten rather than as the whole day.
+
+**Ranking, in order:** peak volume bucket, then best rank reached, then fetches appeared in,
+then how long it stayed, then `trend_key`. Every step is a stored quantity and the last one
+guarantees a total order, so the same rows always produce the same list. `peakRank` uses the
+same volume-within-a-fetch standing as `/api/trends/history` above, never feed position.
+
+**What this endpoint does not claim.** `peakVolume` is the largest bucket Google published
+while the trend was young and on the feed — not a total for the day. The feed holds ten
+slots covering about 2.5 hours, so a search that goes on to be far bigger has dropped out
+long before it gets there. This answers *what caught fire today*, which is a different list
+from *the day's biggest searches*; the screen says "CAUGHT FIRE" for that reason and must
+keep doing so. `activeMinutes` is first sighting to last, a span rather than a claim of
+continuous presence.
+
+A trend Google stated no volume for still appears, with `peakVolume` absent, ranked below
+every trend that has one — never dropped, and never given a number we invented.
+
 ### `GET /api/health`
 
 Liveness plus the configured location and cache TTL.
@@ -535,14 +587,26 @@ the accent stays a tint of the active theme rather than a sixth hard-coded colou
 
 ### Search Pulse
 
-`SearchPulse.svelte`, on the same four-band budget as the 7-day screen:
+`SearchPulse.svelte` holds two list views, `NOW` and `TODAY`, on a shared band budget:
 
-| Band | Height | Contents |
-| --- | --- | --- |
-| Title | 96 px | `SEARCH PULSE`, and the 3 × 3 menu grid |
-| Region | 64 px | `UNITED STATES`, and the freshness report |
-| Trends | fills | Five `TrendRow`s, equal height |
-| Details | 212 px | What the feed said about the selected trend, and the rank graph |
+| Band | Height | `NOW` | `TODAY` |
+| --- | --- | --- | --- |
+| Title | 96 px | `SEARCH PULSE`, and the 3 × 3 menu grid | same |
+| Region | 64 px | `UNITED STATES`, and the freshness report | the window, and the day's counts |
+| Views | 44 px | `NOW`/`TODAY`, and `SURGING`/`BIGGEST` | `NOW`/`TODAY`, and the fixed ordering |
+| List | fills | Five `TrendRow`s, equal height | Ten `DayList` rows, two columns, plus the axis |
+| Details | 212 px | The selected trend, and the rank graph | — |
+
+The views band exists because neither strip above it had room, and both were measured
+rather than eyed: the region strip had **12px** of slack against the ~142px a chip pair
+needs, and the title bar had **50px**. Its 44px came out of the trend list, whose rows went
+66px → 57px against the 48px their content occupies. The ordering chips came down with it,
+which leaves the region strip describing what is shown and the views band holding the two
+controls that shape it.
+
+Beware measuring slack in the title bar: `millennium` restyles `h1.title` to its own face
+and size, so the answer is theme-dependent. A flat theme is the wider case, and the one to
+measure against.
 
 Title above region is the reverse of the weather screens, which lead with a status strip.
 This screen leads with its name, which is the order the design calls for and the one that
@@ -561,12 +625,36 @@ branch of it is a fact rather than a mood:
 Fifteen minutes is the backend's ten-minute refresh plus enough slack to absorb one
 missed fetch without crying wolf.
 
+### The TODAY view
+
+The day so far, from `/api/trends/today`, in ten rows down two columns of five — filled
+down the left column first, so the ordering never appears to run sideways. Two columns
+rather than a scroll: nobody is standing at a wall display to drag a scrollbar, so anything
+below the fold is simply gone.
+
+A row is a rank, the search, Google's biggest bucket for it that day, how long it stayed on
+the feed, and a strip. Both figures are qualified where they sit — `PEAK` so the volume is
+not read as a day's total, `ON FEED` so the duration is not read as attendance.
+
+**The strip is a time axis, not a quantity, and that replaced a volume bar.** Ranking by
+peak volume clusters the ten rows into one or two buckets — on a real day, exactly two — so
+a log-scaled volume bar drew every row at either 100% or its 12% floor, turning a twofold
+difference into an eightfold one. The strip now spans local midnight to now, with the fill
+running first sighting to last, and the axis is named once beneath the list. It reads
+straight off the row as "ran mid-morning, held for twenty minutes".
+
+`TODAY` is fetched only while it is open. It is a scan of the whole day's rows rather than
+one trend's, and it can only change when the backend records a new fetch, which is every
+ten minutes. Unlike the ordering and the theme it is **not** remembered across a restart:
+`NOW` is the resting state of a wall display, the same reasoning that reopens the carousel
+on the weather page.
+
 ### Ordering: SURGING and BIGGEST
 
 **The feed is ordered newest-detected-first, not by popularity.** Verified against the
 live export: `published strictly newest-first` is true, `volume descending` is false, and
 the largest trend routinely sits at position six. Treating feed position as a rank is
-therefore wrong, and two chips in the region strip choose what the list means:
+therefore wrong, and two chips in the views band choose what the list means:
 
 | Mode | Order | #1 is |
 | --- | --- | --- |

@@ -509,10 +509,21 @@ html[data-theme='millennium'] .details-heading {
  * stone, which is what gives the plaques below them something to sit proud of.
  */
 html[data-theme='millennium'] .bar,
-html[data-theme='millennium'] .region {
+html[data-theme='millennium'] .region,
+html[data-theme='millennium'] .views {
   background:
     linear-gradient(180deg, rgba(0, 0, 0, 0.45), rgba(255, 238, 184, 0.04));
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * The view band's chips line up with the region plaque above them. `.region`
+ * is pulled in to 14px here to fit its plaque, so a band left at the flat
+ * themes' 24px would step its first chip ten pixels to the right of it.
+ */
+html[data-theme='millennium'] .views {
+  padding-left: 14px;
+  padding-right: 14px;
 }
 
 html[data-theme='millennium'] .row:has(> .menu) {

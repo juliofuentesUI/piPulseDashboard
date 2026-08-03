@@ -2,6 +2,8 @@ import type {
   DashboardFailure,
   ForecastPeriod,
   ForecastPoint,
+  TrendDay,
+  TrendDayEntry,
   TrendHistory,
   TrendingSearch,
   TrendMovement,
@@ -281,6 +283,73 @@ export async function requestTrendHistory(
     throw new TrendsRequestError({ kind: 'malformed', message: 'BAD RESPONSE' });
   }
   return payload;
+}
+
+/**
+ * The Pi's record for the whole day, already ranked by the API.
+ *
+ * Ranked there rather than here on purpose: the ordering is a documented rule
+ * over stored rows, and the rows are in SQLite. Sorting in the browser would
+ * mean shipping the day's history to it and keeping a second copy of the rule.
+ */
+export async function requestTrendDay(signal: AbortSignal): Promise<TrendDay> {
+  let response: Response;
+  try {
+    response = await fetch('/api/trends/today', {
+      signal,
+      headers: { accept: 'application/json' },
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new TrendsRequestError(
+      { kind: 'network', message: 'CANNOT REACH API' },
+      { cause: error },
+    );
+  }
+
+  if (!response.ok) {
+    throw new TrendsRequestError({
+      kind: 'server',
+      message: response.status === 503 ? 'NO HISTORY STORE' : `API ERROR ${response.status}`,
+    });
+  }
+
+  const payload: unknown = await response.json().catch(() => null);
+  if (!isTrendDay(payload)) {
+    throw new TrendsRequestError({ kind: 'malformed', message: 'BAD RESPONSE' });
+  }
+  return payload;
+}
+
+function isTrendDay(value: unknown): value is TrendDay {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v['startsAt'] === 'string' &&
+    typeof v['endsAt'] === 'string' &&
+    typeof v['timezone'] === 'string' &&
+    typeof v['trendCount'] === 'number' &&
+    typeof v['fetchCount'] === 'number' &&
+    Array.isArray(v['entries']) &&
+    v['entries'].every(isTrendDayEntry)
+  );
+}
+
+function isTrendDayEntry(value: unknown): value is TrendDayEntry {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v['trendKey'] === 'string' &&
+    typeof v['title'] === 'string' &&
+    typeof v['peakRank'] === 'number' &&
+    typeof v['timesObserved'] === 'number' &&
+    typeof v['firstSeenAt'] === 'string' &&
+    typeof v['lastSeenAt'] === 'string' &&
+    typeof v['activeMinutes'] === 'number' &&
+    // Absent whenever Google stated no bucket, which is the normal case for a
+    // trend that never grew — not a malformed payload.
+    isOptionalString(v['peakVolume'])
+  );
 }
 
 function isTrendHistory(value: unknown): value is TrendHistory {

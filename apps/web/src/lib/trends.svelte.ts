@@ -1,9 +1,16 @@
-import { requestTrendHistory, requestTrends, TrendsRequestError } from './api';
+import {
+  requestTrendDay,
+  requestTrendHistory,
+  requestTrends,
+  TrendsRequestError,
+} from './api';
 import { readSetting, writeSetting } from './storage';
 import {
   orderTrends,
   type PulseMode,
+  type PulseView,
   regionName,
+  toDayView,
   toTrendCard,
   toTrendDetail,
   toTrendHistoryView,
@@ -13,6 +20,7 @@ import {
 import type {
   DashboardFailure,
   DashboardPhase,
+  TrendDay,
   TrendHistory,
   TrendsSnapshot,
 } from './types';
@@ -81,6 +89,20 @@ export class Trends {
    */
   mode = $state<PulseMode>(storedMode());
 
+  /**
+   * Which list is showing. Deliberately *not* remembered across a restart,
+   * unlike the ordering and the theme: NOW is the resting state of a wall
+   * display, and the same reasoning already puts the carousel back on the
+   * weather page and closes the trend card on reload.
+   */
+  view = $state<PulseView>('now');
+
+  #day = $state<TrendDay | null>(null);
+  #dayController: AbortController | undefined;
+
+  /** Null until the day's record has actually arrived, so the view can say so. */
+  day = $derived(this.#day === null ? null : toDayView(this.#day));
+
   #ordered = $derived(
     this.#snapshot === null ? [] : orderTrends(this.#snapshot.trends, this.mode),
   );
@@ -146,6 +168,35 @@ export class Trends {
     void this.#loadHistory(this.selectedId);
   }
 
+  /**
+   * The day's record is only fetched while TODAY is showing.
+   *
+   * It is a scan of the whole day's rows rather than one trend's, so polling it
+   * behind an unopened view would spend that on nothing — and it can only
+   * change when the backend records a new fetch, which is every ten minutes.
+   */
+  setView(view: PulseView): void {
+    this.view = view;
+    if (view === 'today') void this.#loadDay();
+  }
+
+  async #loadDay(): Promise<void> {
+    const controller = new AbortController();
+    this.#dayController?.abort();
+    this.#dayController = controller;
+
+    try {
+      this.#day = await requestTrendDay(controller.signal);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      /*
+       * Left exactly as it was, on purpose. Same policy as the graph: a failed
+       * lookup keeps the last good record on screen instead of blanking a
+       * working view, and an empty one keeps saying it has nothing yet.
+       */
+    }
+  }
+
   async #loadHistory(key: string): Promise<void> {
     if (key === '') return;
 
@@ -204,6 +255,8 @@ export class Trends {
     window.removeEventListener('offline', this.#handleOffline);
     clearInterval(this.#timer);
     this.#controller?.abort();
+    this.#historyController?.abort();
+    this.#dayController?.abort();
   }
 
   async refresh(): Promise<void> {
@@ -225,6 +278,10 @@ export class Trends {
        * nobody ever tapped.
        */
       void this.#loadHistory(this.selectedId);
+
+      // The backend has just recorded a fetch, so the day has a row it did not
+      // have a moment ago — but only the open view is worth re-reading for it.
+      if (this.view === 'today') void this.#loadDay();
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
 

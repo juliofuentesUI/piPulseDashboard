@@ -1,6 +1,8 @@
 import type {
   SparklineView,
   TrendCardView,
+  TrendDay,
+  TrendDayView,
   TrendDetailView,
   TrendHistory,
   TrendHistoryView,
@@ -371,6 +373,85 @@ export function formatDuration(totalMinutes: number): string {
   return spare === 0 ? `${days}D` : `${days}D ${spare}H`;
 }
 
+// --- The day's record -----------------------------------------------------
+
+/**
+ * The day so far, as the TODAY view renders it.
+ *
+ * Ranking already happened in the API, over stored rows and by a documented
+ * rule, so this only formats. Three deliberate omissions:
+ *
+ * **Peak rank is not shown**, though it is part of the ordering. Measured
+ * against a real day of history: 20% of the day's 160 trends topped a fetch at
+ * some point, but *every one of the ten shown here did* — ranking by peak
+ * volume selects almost exactly the trends that led a fetch. A column reading
+ * `PEAK #1` on all ten rows is the same noise the `ACTIVE` label was dropped
+ * for. It still breaks ties in the sort, where it costs nothing and disappears.
+ *
+ * **Nothing here is called a total.** The volume is the biggest bucket Google
+ * published while the trend was young and on the feed; a search that went on to
+ * be far bigger dropped out of the feed hours before it got there. The band
+ * heading says "caught fire", never "biggest".
+ *
+ * **The duration is a span, not attendance.** It is first sighting to last, and
+ * the row labels it `ON FEED` rather than `ACTIVE` for that reason.
+ */
+export function toDayView(day: TrendDay): TrendDayView {
+  const start = Date.parse(day.startsAt);
+  const end = Date.parse(day.endsAt);
+
+  /*
+   * Two separate questions. The label only needs a start to state the window,
+   * but the axis needs a span to divide by — and at the moment a day turns over
+   * those are the same instant. Tying the label to the span blanked it on a day
+   * zero seconds old, which is the one moment it most needs to say so.
+   */
+  const dated = !Number.isNaN(start);
+  const known = dated && !Number.isNaN(end) && end > start;
+  const dayMs = known ? end - start : 0;
+
+  return {
+    window: dated ? `SINCE ${formatClock(new Date(start))}` : '',
+    // The count is what the day holds, not what the screen shows: ten rows out
+    // of a hundred and sixty has to read as a top ten, not as the whole day.
+    scope: `${day.trendCount} TRENDS · ${day.fetchCount} FETCHES`,
+    // The axis is only drawn when there is a span to place runs along.
+    axisStart: known ? formatClock(new Date(start)) : '',
+    axisEnd: known ? 'NOW' : '',
+    rows: day.entries.map((entry, index) => {
+      const first = Date.parse(entry.firstSeenAt);
+      const last = Date.parse(entry.lastSeenAt);
+      const plottable = known && !Number.isNaN(first) && !Number.isNaN(last);
+
+      /*
+       * A trend seen in a single fetch has a zero-width run, and drawing it as
+       * nothing would say we never saw it. The floor keeps one sighting
+       * visible; it is the same reasoning as the trend list's minimum bar.
+       */
+      const width = plottable
+        ? clamp(Math.max(((last - first) / dayMs) * 100, MIN_RUN), MIN_RUN, 100)
+        : 0;
+
+      return {
+        key: entry.trendKey,
+        rank: String(index + 1),
+        title: entry.title.toUpperCase(),
+        volume: formatVolume(entry.peakVolume),
+        duration: entry.activeMinutes <= 0 ? '' : formatDuration(entry.activeMinutes),
+        // Held inside the axis: a run still going at this moment starts at the
+        // width back from the right edge, rather than overhanging it.
+        spanStart: plottable
+          ? clamp(((first - start) / dayMs) * 100, 0, 100 - width)
+          : 0,
+        spanWidth: width,
+      };
+    }),
+  };
+}
+
+/** Narrowest a run is drawn, as a percentage of the day. One sighting shows. */
+const MIN_RUN = 1.5;
+
 // --- Ordering -------------------------------------------------------------
 
 /**
@@ -384,6 +465,21 @@ export type PulseMode = 'surging' | 'biggest';
 export const PULSE_MODES: readonly { id: PulseMode; name: string }[] = [
   { id: 'surging', name: 'SURGING' },
   { id: 'biggest', name: 'BIGGEST' },
+];
+
+/**
+ * Which of Search Pulse's two list views is showing.
+ *
+ * A view *inside* the section, like the trend card — never a third page beside
+ * the weather. `now` is what the feed says this minute; `today` is what this Pi
+ * recorded since local midnight, which is a different question over different
+ * data and so cannot be an ordering of the same list.
+ */
+export type PulseView = 'now' | 'today';
+
+export const PULSE_VIEWS: readonly { id: PulseView; name: string }[] = [
+  { id: 'now', name: 'NOW' },
+  { id: 'today', name: 'TODAY' },
 ];
 
 /**

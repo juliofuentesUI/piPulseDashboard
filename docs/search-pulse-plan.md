@@ -16,14 +16,13 @@ Lines marked **AMENDED** record where the plan met reality and reality won.
 | — | Ordering fix: `SURGING` / `BIGGEST` — see the AMENDED section at the end | Done — 2026-08-02 |
 | 3.5 | Full-screen trend card | Done — 2026-08-03 |
 | — | Raspberry Pi deploy scripts | Done — 2026-08-03 |
-| 4 | Daily history view | **Deferred until after the Pi deploy** |
+| 4 | Daily history view (`TODAY`) | Done — 2026-08-03 |
 | 5 | Reliability and polish | Not started |
 
-**Phase 4 is deferred on purpose, at the user's request, 2026-08-03.** Deploy the current
-version to the Pi first and let it run. Phase 4 is only as good as the history behind it,
-and at the time of the decision that was 230 rows over 3.7 hours — a day view designed and
-tested against a third of an afternoon would be designed against the wrong shape of data.
-Waiting costs nothing and the record accumulates on its own.
+**Phase 4 was deferred on 2026-08-03 and un-deferred the same day**, once the Pi had been
+deployed and had collected its own history. The reason for waiting held: a day view is only
+as good as the record behind it, and at the time of the deferral that record was 230 rows
+over 3.7 hours. It was built against 167 trends over 43 fetches of a full local day.
 
 **Each phase is merged and usable before the next one starts.** Finishing the current
 phase is the whole job; do not roll ahead into the next to "complete the feature".
@@ -61,12 +60,13 @@ Dashboard carousel  (horizontal, two pages, and it stops at two)
                      ├── NOW      the live trend list          (Phase 1, built)
                      ├── details  metadata for a selected trend (Phase 2)
                      ├── history  rank over time for a trend    (Phase 3)
-                     └── TODAY    the day's strongest trends    (Phase 4)
+                     ├── card     image and headlines for a trend (Phase 3.5)
+                     └── TODAY    the day so far, from our record (Phase 4, built)
 ```
 
 So the horizontal swipe keeps meaning "change dashboard section". Moving between Search
-Pulse's own views is a different gesture — a tap, or the vertical switch Phase 4
-describes — and never another card in the horizontal carousel.
+Pulse's own views is a different gesture — a tap on the details band for the card, a chip
+in the views band for `NOW` / `TODAY` — and never another card in the horizontal carousel.
 
 This is why the screen's layout reserves its bands from the beginning: new views change
 what is *in* a band, not how many pages exist.
@@ -584,28 +584,79 @@ lines` returned three headlines that agreed on the event and **disagreed on the 
 
 ---
 
-## Phase 4 — Daily search history
+## Phase 4 — Daily search history — BUILT 2026-08-03
 
 Turn Search Pulse into a record of what captured attention each day.
 
-A vertical switch between two views **inside the Search Pulse section**:
+Two views **inside the Search Pulse section**, reached by a visible `NOW` / `TODAY` switch:
 
 - **NOW** — current live trends.
 - **TODAY** — the day's trends, ranked deterministically by highest reported volume
   bucket, then best rank reached, then number of snapshots observed, then total active
-  duration.
+  duration, then `trend_key`.
+
+The ordering is exactly as planned. `trend_key` was added as a final tiebreak so that
+"reproducible from stored data" is literally true, order included.
+
+### What shipped, and the three places it differs from the sketch above
+
+**The switch is a pair of chips, not a vertical swipe — AMENDED.** The plan said "vertical
+switch". A wall display has no hover and no menu, so a gesture nobody can see is a view
+nobody knows exists — the same reasoning that already keeps both ordering chips visible.
+The horizontal swipe also already means "change section", and a second swipe axis on one
+panel is easy to catch with a thumb.
+
+**It needed a new band, and the band was measured before it was built — AMENDED.** Neither
+existing strip could hold the switch: the region strip had **12px** of slack against the
+~142px a chip pair needs, and the title bar had **50px** at a flat theme's title size. So
+Search Pulse gained a fifth band of 44px, paid for out of the trend list — rows went from
+66px to 57px, against the 48px their text and bar actually occupy. The ordering chips moved
+down into that band, which leaves the region strip describing what is shown and the new
+band holding the two controls that shape it.
+
+Watch the measurement trap here: `millennium` restyles `h1.title` to a different face and
+size, so slack in that bar is **theme-dependent**. Measure a flat theme, which is the wider
+case.
+
+**Peak rank is ranked on but not displayed — AMENDED.** The sketch put `Peak #1` on every
+row. Measured against a real day: 20% of the day's 160 trends topped a fetch at some point,
+but **all ten rows shown did** — ranking by peak volume selects almost exactly the trends
+that led a fetch, so the column would have read `PEAK #1` ten times out of ten. That is the
+same noise the `ACTIVE` label was dropped for. It still breaks ties in the sort.
+
+**The row's bar plots time, not volume — AMENDED.** A volume bar was built first, on the
+live list's log-over-own-range scale. It was wrong here for a structural reason: ranking by
+peak volume clusters the ten rows into one or two buckets, and on that day it was exactly
+two, so every bar drew either 100% or the 12% floor — rendering a twofold difference as an
+eightfold one. The strip now spans local midnight to now, with the filled part running from
+first sighting to last, and the axis is labelled under the list. It answers the screen's
+second question directly, from the same stored fields.
 
 ```
-TODAY'S SEARCH ACTIVITY
+UNITED STATES        SINCE 12:00 AM      167 TRENDS · 43 FETCHES
+[NOW][TODAY]                        CAUGHT FIRE · BY PEAK VOLUME
 
-1. Major event
-   Peak #1 · Active 6h 20m
-
-2. Sports result
-   Peak #2 · Active 3h 10m
+ 1  RYAN ZEFERJAHN            6  JOEY BART
+    20K+ PEAK 53M ON FEED        10K+ PEAK 22M ON FEED
+    ─────────────────▂──         ──────────────▂─────
+ …                            …
+12:00 AM  TIME ON FEED                                     NOW
 ```
 
 No written summary is generated. The records speak for themselves.
+
+### The day boundary
+
+`TODAY` runs from **local midnight** in the dashboard's own zone, not UTC and not a rolling
+24 hours. The user chose the calendar day: it is what the name claims, and the same query
+run twice gives the same answer, where a rolling window silently changes membership on
+every fetch. The cost is that the view is nearly empty at 1 a.m., which the band states
+outright — `SINCE 12:00 AM` beside the trend and fetch counts.
+
+Rows are stored in UTC and San Jose is seven hours behind it, so a UTC boundary would have
+rolled the list over in the late afternoon and called it a new day. `startOfLocalDay` in
+`history.ts` reads the zone's offset through `Intl` — twice, because the offset *at this
+moment* is not the offset in force at midnight on a DST changeover day.
 
 ### Retention
 
@@ -613,12 +664,18 @@ No written summary is generated. The records speak for themselves.
 - Daily aggregates permanently.
 - Add cleanup only after storage size is measured.
 
-Acceptance criteria:
+**No aggregate table was added, deliberately.** `dayDigest` scans the day's rows and ranks
+them at read time, which is ~1,440 rows for a full day and well under a millisecond in
+SQLite. It is the same choice Phase 3 made for the rank graph, for the same reason: it
+avoids a migration and keeps every figure recomputable from the raw record. Revisit it if a
+90-day view is ever built, not before.
 
-- The strongest trends of the current day are viewable.
-- Daily results are reproducible from stored data.
-- Restarting or updating the app does not erase the archive.
-- No news interpretation, no AI summary.
+Acceptance criteria — all met:
+
+- The strongest trends of the current day are viewable. ✔ ten of them, two columns
+- Daily results are reproducible from stored data. ✔ total order, `trend_key` last
+- Restarting or updating the app does not erase the archive. ✔ unchanged schema
+- No news interpretation, no AI summary. ✔ nothing but arithmetic over stored rows
 
 ---
 

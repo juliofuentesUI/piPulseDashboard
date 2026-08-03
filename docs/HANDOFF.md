@@ -1,15 +1,23 @@
 # Handoff — 2026-08-03
 
-Two sessions are folded into this. The first built Search Pulse Phases 0–3.5 and the Pi
+Three sessions are folded into this. The first built Search Pulse Phases 0–3.5 and the Pi
 deploy scripts; the second built the `millennium` theme end to end, including the supplied
-artwork. Read this first, then the documents it points at. Delete or rewrite it when it
-stops being true.
+artwork; the third built Phase 4, the `TODAY` view. Read this first, then the documents it
+points at. Delete or rewrite it when it stops being true.
 
-**Nothing is in flight.** Working tree clean, `main` pushed, no branch parked, no question
-outstanding. The next session starts from a standing stop — which means picking what to do
-next is a conversation to have with the user, not something to infer from this file. The
-two candidates are Phase 4 and the weather-provider switch, and **both are explicitly
-gated**; see below.
+**Nothing is in flight.** Working tree clean, no branch parked. The one candidate left in
+the Search Pulse plan is Phase 5; the weather-provider switch is still gated at W0. Picking
+what to do next is a conversation to have with the user, not something to infer from here.
+
+**One thing is genuinely open, and it is not code.** The Pi was deployed on the night of
+2026-08-02/03 and has been collecting since, but **its history has never been read** — the
+numbers below and everything Phase 4 was verified against come from the laptop's database.
+Run `node scripts/history-db.mjs stats` on the Pi to see what it actually holds. Nothing
+depends on the answer; it is worth knowing before trusting the day view's counts.
+
+**The Pi is also running a pre-`millennium`, pre-Phase-4 build.** Picking both up is
+`git pull` then `./scripts/pi-setup.sh` and `./scripts/pi-start.sh`. That does **not**
+touch the history: `apps/api/data/` is gitignored and stays where it is.
 
 ## Where the work stands
 
@@ -23,8 +31,30 @@ gated**; see below.
 | 3.5 | Full-screen trend card: image + 3 headlines | Done |
 | — | Raspberry Pi deploy scripts | Done |
 | — | `millennium` theme, M1–M8, artwork included | Done |
-| 4 | Daily history view (`TODAY`) | **Deferred — deploy first** |
+| 4 | Daily history view (`TODAY`) | Done — 2026-08-03 |
 | 5 | Reliability and polish | Not started |
+
+## Phase 4 — the TODAY view
+
+A second list view inside Search Pulse, reached by a visible `NOW` / `TODAY` chip pair.
+`docs/search-pulse-plan.md` has the full write-up; the parts worth knowing up front:
+
+- **It is a calendar day in local time**, midnight to now, not a rolling 24 hours. The
+  user chose that. `startOfLocalDay` in `history.ts` resolves the boundary through `Intl`,
+  reading the offset **twice** — the offset now is not the offset at midnight on a DST
+  changeover day.
+- **Search Pulse gained a fifth band, 44px, and the ordering chips moved into it.** Neither
+  existing strip could hold a chip pair: measured, the region strip had 12px of slack and
+  the title bar 50px, against the ~142px needed. The band was paid for out of the trend
+  list, whose rows went 66px → 57px against 48px of content.
+- **Two figures from the plan's sketch did not survive contact with real data** — peak rank
+  and the volume bar. Both are written up under Gotchas below, because both were the kind
+  of wrong that renders perfectly.
+- **`dayDigest` ranks at read time; no aggregate table was added.** ~1,440 rows a day is
+  nothing for SQLite, and it keeps every figure recomputable from the raw record.
+- `ranksByFetch` is now shared between the rank graph and the day digest, so the
+  tie-sharing rule exists once. Two copies of it would have drifted without failing a
+  build.
 
 ## The `millennium` theme
 
@@ -69,14 +99,12 @@ adding one is a decision about what leaves the screen. The inventory, and which 
 is in that directory's `README.md`. (Eighteen files for fourteen pieces: the corner sheet
 was cut into four.)
 
-## Neither of the two obvious next steps is unblocked
+## What is left
 
-**Do not start Phase 4.** The user deferred it on 2026-08-03 to get the current version
-onto the Pi first, and that ordering is right on its own merits: Phase 4 is only as good as
-the history behind it, and there were 230 rows over 3.7 hours when the call was made. Let
-the Pi accumulate a real record before designing a day view against it. Read "What Phase 4
-needs to know before starting" below when it does come round — the promise it can honestly
-make is narrower than its name suggests.
+**Phase 5, reliability and polish**, is the only Search Pulse phase not built. It is not
+gated, but it is loosely specified — request timeouts and retry, feed-parsing tests,
+migration support, burn-in protection, a `/api/trends/health` endpoint. Scope it with the
+user before starting; the plan lists more than one session's work under one heading.
 
 **Deploying is `./scripts/pi-setup.sh` then `./scripts/pi-start.sh`**, both documented in
 `README.md`. Setup proves SQLite can actually write where the history lives, which is what
@@ -211,10 +239,7 @@ and `?status=active` are all ignored — byte-identical responses. The legacy
 for trends up to a day old; ours shows trends in their first hours. Both are real. This
 bounds Phase 4 — see below.
 
-## What Phase 4 needs to know before starting
-
-The plan's `TODAY` view is "the day's strongest trends, from stored history". It is
-buildable, but **be precise with the user about what it can say.**
+## What TODAY claims, and what it must never claim
 
 Our record holds every trend that *started* in a window, with the volume it had **while
 young** — not accumulated totals. A trend that reaches 200K+ over 18 hours is captured
@@ -222,14 +247,14 @@ during its first couple of hours at maybe 5K+, then drops out of the feed and is
 seen again. So `TODAY` answers *"what caught fire today"*, not *"what were the day's
 biggest searches"*. Those sound the same and are not.
 
-The user understands this; it was discussed at length. Do not quietly present the view as
-matching Google's 24-hour page.
+The screen says `CAUGHT FIRE · BY PEAK VOLUME` for exactly this reason, and every volume on
+it is qualified `PEAK`. **Do not soften that wording into "biggest" or "top searches"**, and
+do not present the view as matching Google's 24-hour page. The user understands the
+distinction; it was discussed at length before the view was built.
 
-Also relevant: `TODAY` is the natural home for showing more than five trends. We store all
-ten per fetch but render five, and the user asked about this — the decision was to keep
-five on the live list because the hidden five are, by definition, the least interesting
-under whichever ordering is active. If more are wanted later, two columns of five beats
-scrolling on a wall display.
+`TODAY` is also where the other five trends per fetch finally appear: it shows ten, in two
+columns. The live list still shows five, because its hidden rows are by definition the
+least interesting under whichever ordering is active — that decision stands.
 
 ## Decisions already made — do not silently revisit
 
@@ -256,6 +281,14 @@ scrolling on a wall display.
 | Character art sits in the title band | The only slack on any layout; behind the page it is 2% visible |
 | Eight of fourteen art pieces stay unused | Each would have to displace a reading to appear |
 | Art is committed, not gitignored | User's call, told it was third-party art in a public repo |
+| `TODAY` is a local calendar day, not rolling 24h | User's call: it is what the name claims, and it is reproducible |
+| `NOW`/`TODAY` is a visible chip pair, not a swipe | A gesture nobody can see is a view nobody knows exists |
+| Search Pulse gained a 44px views band | Measured: no existing strip had room for a chip pair |
+| `TODAY` shows ten rows in two columns | The room exists here; scrolling is useless on a wall display |
+| Peak rank ranks but is not displayed | All ten shown rows reach #1; it would read as noise |
+| `TODAY`'s strip plots time, not volume | Two buckets across ten rows made a volume bar misleading |
+| No daily aggregate table | Read-time ranking keeps every figure recomputable from raw rows |
+| The open view is not remembered across restarts | `NOW` is the resting state, as the weather page is for the carousel |
 
 ## Gotchas
 
@@ -310,7 +343,27 @@ share.
 **Measure collisions, do not eye them.** Every overlay placement in the theme was settled
 by reading back `getBoundingClientRect()` for the element and the thing it might cover.
 Guessing produced four wrong answers in a row; measuring produced the right one first
-time.
+time. Phase 4 repeated the lesson twice in one sitting: the `TODAY` axis caption looked
+fine in a render and was measured overlapping the page indicator by 64px — the dots are
+drawn *over* it, so the collision is invisible. And a bar that looked uniform in a
+screenshot measured correctly at 100% and 12%, so the eye was wrong in both directions.
+
+**Slack in the title bar is theme-dependent.** Measuring it under `millennium` gave 133px;
+the same bar at a flat theme's title size has 50px, because the theme restyles `h1.title`
+to another face and size. Measure a flat theme — it is the wider case — or a control will
+be sized to fit a bar it does not fit.
+
+**A figure that is in the ranking need not be on the screen.** `TODAY` ranks partly on peak
+rank, and displaying it would have printed `PEAK #1` on all ten rows: 20% of the day's 160
+trends topped a fetch, but ranking by peak volume selects almost exactly the ones that did.
+The same measurement is what killed the volume bar on that view — the ten rows held two
+distinct buckets, so every bar drew full or at the 12% floor. **Before putting a computed
+field on a row, check its spread across the rows that will actually be shown**, not across
+the whole table.
+
+**Stubbing `window.fetch` from `browser_evaluate` needs `.bind(window)`.** An unbound call
+throws "Illegal invocation", which takes down every other request and drops the panel into
+its error screen — it reads exactly like a bug in the change you are testing.
 
 **Do not deliver screenshots with `SendUserFile`.** They arrive on the user's phone as
 broken cards. Let the `browser_take_screenshot` tool result be the image and say in the
@@ -318,13 +371,16 @@ reply which capture shows what.
 
 ## The data
 
-SQLite at `apps/api/data/trends.db`, gitignored, WAL mode. As of this handoff: **500 rows,
-50 fetches, 136 distinct trends, ~16.5 hours of history** (2026-08-03 04:43Z → 21:16Z),
+SQLite at `apps/api/data/trends.db`, gitignored, WAL mode. As of this handoff: **600 rows,
+60 fetches, 177 distinct trends, ~17.9 hours of history** (2026-08-03 04:43Z → 22:37Z),
 ~2 MB on disk with the WAL. Roughly 1,440 rows/day, ~26 MB for 90 days.
 
-That 16.5 hours is still a laptop's record, not the Pi's, and it is the thing Phase 4 is
-waiting on — 136 distinct trends across a day is a real sample, but it is one day and it
-stops whenever this machine sleeps.
+**That is the laptop's record, and it is the one Phase 4 was built and verified against.**
+It was enough — 167 trends over 43 fetches within a single local day, which is the shape
+the day view actually consumes. The Pi has been collecting since the night of
+2026-08-02/03 and **its database has never been read**; `node scripts/history-db.mjs stats`
+on the Pi is the way to see it. Expect a longer, unbroken record than this one, which stops
+whenever the laptop sleeps.
 
 The table is **`trend_snapshots`**, one row per trend per fetch: `id`, `trend_key`,
 `title`, `approximate_volume`, `rank` (feed position), `related_queries`, `first_seen_at`,
@@ -336,7 +392,12 @@ read time in `historyFor`, by grouping the window's rows by `observed_at` and so
 parsed volume. That was deliberate — it avoided a migration and keeps both orderings
 recoverable from what is already stored.
 
-Endpoints: `/api/health`, `/api/weather`, `/api/trends/now`, `/api/trends/history?key=`.
+Endpoints: `/api/health`, `/api/weather`, `/api/trends/now`, `/api/trends/history?key=`,
+`/api/trends/today`.
+
+`/api/trends/today` takes no parameters — the window is always local midnight to now — and
+caps its list at ten while reporting the day's true `trendCount` alongside it, so ten rows
+out of a hundred and sixty read as a top ten rather than as the whole day.
 
 ## How the user works
 

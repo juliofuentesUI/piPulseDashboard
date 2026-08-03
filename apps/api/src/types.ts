@@ -263,6 +263,63 @@ export interface TrendHistory {
   readonly activeMinutes?: number;
 }
 
+/**
+ * One trend's showing over a single day, counted from stored observations.
+ *
+ * Every figure here is ours. Google supplies the volume bucket and nothing
+ * else on this record: the ranks, the counts and the durations are arithmetic
+ * over rows this Pi wrote, which is the only reason a day view is allowed to
+ * exist at all under the no-inference rule.
+ */
+export interface TrendDayEntry {
+  readonly trendKey: string;
+  /** The title as most recently stored, so a re-worded trend reads current. */
+  readonly title: string;
+  /**
+   * The largest bucket Google stated for it during the day, verbatim —
+   * "20000+". Absent when the feed stated none on any observation.
+   */
+  readonly peakVolume?: string;
+  /**
+   * Best standing **by volume within a single fetch** it reached that day, so
+   * 1 is the top. The same ranking the graph plots, never feed position.
+   */
+  readonly peakRank: number;
+  /** How many fetches it appeared in that day. */
+  readonly timesObserved: number;
+  readonly firstSeenAt: string;
+  readonly lastSeenAt: string;
+  /**
+   * First to last sighting within the day. Presence in between is not
+   * checked, so this is a span, never a claim of continuous presence.
+   */
+  readonly activeMinutes: number;
+}
+
+/**
+ * A calendar day of stored trends, ranked by an explicit local rule.
+ *
+ * This answers "what caught fire today", not "what were the day's biggest
+ * searches" — the feed only ever shows a trend during its first hours, so the
+ * volumes here are the ones it carried while young, never the accumulated
+ * totals `trends.google.com` reports for a day-old trend. Those two questions
+ * sound the same and are not, and the screen must not blur them.
+ */
+export interface TrendDay {
+  /** Local midnight that began the day, as an instant. */
+  readonly startsAt: string;
+  /** The moment the digest was taken — the day so far, not a whole day. */
+  readonly endsAt: string;
+  /** IANA zone the day boundary was drawn in, e.g. "America/Los_Angeles". */
+  readonly timezone: string;
+  /** Ranked best first, already trimmed to what the caller asked for. */
+  readonly entries: readonly TrendDayEntry[];
+  /** Distinct trends recorded in the day, which may exceed `entries.length`. */
+  readonly trendCount: number;
+  /** Fetches recorded in the day. */
+  readonly fetchCount: number;
+}
+
 export interface ApiErrorBody {
   readonly error: string;
   readonly message: string;

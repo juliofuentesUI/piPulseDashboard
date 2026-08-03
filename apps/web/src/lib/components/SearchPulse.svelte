@@ -1,13 +1,20 @@
 <script lang="ts">
-  import { PULSE_MODES, type PulseMode } from '../trend-view';
+  import {
+    PULSE_MODES,
+    PULSE_VIEWS,
+    type PulseMode,
+    type PulseView,
+  } from '../trend-view';
   import type { PulseStatus } from '../trends.svelte';
   import type {
     DashboardPhase,
     TrendCardView,
+    TrendDayView,
     TrendDetailView,
     TrendHistoryView,
     TrendRowView,
   } from '../types';
+  import DayList from './DayList.svelte';
   import Sparkline from './Sparkline.svelte';
   import TitleBar from './TitleBar.svelte';
   import TrendCard from './TrendCard.svelte';
@@ -21,8 +28,11 @@
     detail: TrendDetailView | null;
     card: TrendCardView | null;
     history: TrendHistoryView | null;
+    day: TrendDayView | null;
     selectedId: string;
     mode: PulseMode;
+    view: PulseView;
+    onview: (view: PulseView) => void;
     onmode: (mode: PulseMode) => void;
     onselect: (id: string) => void;
     onmenu: () => void;
@@ -36,8 +46,11 @@
     detail,
     card,
     history,
+    day,
     selectedId,
     mode,
+    view,
+    onview,
     onmode,
     onselect,
     onmenu,
@@ -62,38 +75,99 @@
 {#if open && card !== null}
   <TrendCard {card} {history} onback={() => (open = false)} />
 {:else}
-<div class="pulse">
+<div class="pulse" class:today={view === 'today'}>
   <TitleBar title="SEARCH PULSE" size={56} dotRows={3} {onmenu} />
 
+  <!--
+    What this list is and how fresh it is. TODAY answers both differently: its
+    freshness is the window it covers and the record behind it, not an age.
+  -->
   <div class="region">
     <span class="where">{region}</span>
 
-    <!--
-      Both orderings stay visible rather than cycling on tap: on a wall
-      display there is no hover and no menu, so an ordering you cannot see is
-      an ordering nobody knows exists.
-    -->
-    <nav class="modes" aria-label="List ordering">
-      {#each PULSE_MODES as option (option.id)}
+    {#if view === 'today'}
+      <span class="status-text">{day?.window ?? ''}</span>
+      <span class="status">
+        <span class="status-text">{day?.scope ?? ''}</span>
+      </span>
+    {:else}
+      <span class="status">
+        {#if status.live}
+          <span class="lamp"></span>
+        {/if}
+        <span class="status-text">{status.text}</span>
+      </span>
+    {/if}
+  </div>
+
+  <!--
+    Which list, and how it is ordered — the two controls that shape what the
+    band below shows, kept together and both always visible. On a wall display
+    there is no hover and no menu, so a view or an ordering you cannot see is
+    one nobody knows exists. TODAY has a single ordering fixed by a stored
+    rule, so its slot states that ordering rather than offering a choice.
+  -->
+  <div class="views">
+    <nav class="modes" aria-label="Search Pulse view">
+      {#each PULSE_VIEWS as option (option.id)}
         <button
           class="mode"
-          class:active={option.id === mode}
+          class:active={option.id === view}
           type="button"
-          aria-pressed={option.id === mode}
-          onclick={() => onmode(option.id)}
+          aria-pressed={option.id === view}
+          onclick={() => onview(option.id)}
         >
           {option.name}
         </button>
       {/each}
     </nav>
 
-    <span class="status">
-      {#if status.live}
-        <span class="lamp"></span>
-      {/if}
-      <span class="status-text">{status.text}</span>
-    </span>
+    {#if view === 'today'}
+      <!--
+        The framing is load-bearing, not a caption. Our record holds each trend
+        with the volume it carried while young and on the feed; a search that
+        went on to be far bigger had already dropped out of the ten slots hours
+        before. So this is what caught fire today, which is a different list
+        from the day's biggest searches, and the band has to say which one.
+      -->
+      <span class="note">CAUGHT FIRE · BY PEAK VOLUME</span>
+    {:else}
+      <nav class="modes" aria-label="List ordering">
+        {#each PULSE_MODES as option (option.id)}
+          <button
+            class="mode"
+            class:active={option.id === mode}
+            type="button"
+            aria-pressed={option.id === mode}
+            onclick={() => onmode(option.id)}
+          >
+            {option.name}
+          </button>
+        {/each}
+      </nav>
+    {/if}
   </div>
+
+  {#if view === 'today'}
+    <div class="day-band">
+      {#if day === null}
+        <div class="empty">
+          <p class="lead">READING TODAY'S RECORD…</p>
+        </div>
+      {:else if day.rows.length === 0}
+        <!--
+          The honest empty state for a Pi switched on this morning, or one
+          whose history store could not be opened. It says nothing was
+          recorded, which is a fact about us, not about what people searched.
+        -->
+        <div class="empty">
+          <p class="lead">NOTHING RECORDED YET TODAY.</p>
+        </div>
+      {:else}
+        <DayList rows={day.rows} axisStart={day.axisStart} axisEnd={day.axisEnd} />
+      {/if}
+    </div>
+  {:else}
 
   <!--
     Three ways this band can read, and only the last one shows numbers: still
@@ -234,6 +308,7 @@
       </div>
     {/if}
   </div>
+  {/if}
 </div>
 {/if}
 
@@ -253,11 +328,24 @@
    * makes: the list still ranks at a glance, and the selected trend now has
    * somewhere to show its history.
    */
+  /*
+   * Five bands on NOW, four on TODAY, both adding up to the 704 inside the
+   * frame. The list takes whatever the fixed bands leave.
+   *
+   * The 44px view band was paid for out of the trend list, measured rather than
+   * guessed: a row needs 48px for its text line and bar, and had 66px. At 288px
+   * for five rows they sit at 57.6px, which still clears the content by nearly
+   * ten. TODAY has no details band, so its ten rows get the whole 500px.
+   */
   .pulse {
     display: grid;
-    grid-template-rows: 96px 64px minmax(0, 1fr) 212px;
+    grid-template-rows: 96px 64px 44px minmax(0, 1fr) 212px;
     width: 100%;
     height: 100%;
+  }
+
+  .pulse.today {
+    grid-template-rows: 96px 64px 44px minmax(0, 1fr);
   }
 
   .region {
@@ -276,6 +364,41 @@
     letter-spacing: 2px;
     white-space: nowrap;
     color: var(--c-ink);
+  }
+
+  /*
+   * Which list on the left, how it is ordered on the right. Both controls
+   * shape the band underneath, so they belong together and away from the
+   * region strip, which only ever describes what is being shown.
+   */
+  .views {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 24px;
+    overflow: hidden;
+    border-bottom: var(--divider) solid var(--line);
+  }
+
+  /* Where the ordering chips would be, naming the ordering TODAY fixes. */
+  .note {
+    font-size: 15px;
+    letter-spacing: 2px;
+    white-space: nowrap;
+    color: var(--c-blue);
+  }
+
+  /* The page indicator's lane, which the details band reserves on the NOW view. */
+  .day-band {
+    display: grid;
+    min-height: 0;
+    padding-bottom: 28px;
+  }
+
+  /* Last band on the screen, so there is nothing below to divide it from. */
+  .day-band .empty {
+    border-bottom: 0;
   }
 
   .modes {

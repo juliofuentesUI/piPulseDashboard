@@ -139,8 +139,11 @@
             detail={trends.detail}
             card={trends.card}
             history={trends.history}
+            day={trends.day}
             selectedId={trends.selectedId}
             mode={trends.mode}
+            view={trends.view}
+            onview={(view) => trends.setView(view)}
             onmode={(mode) => trends.setMode(mode)}
             onselect={(id) => trends.select(id)}
             onmenu={() => (menuOpen = true)}

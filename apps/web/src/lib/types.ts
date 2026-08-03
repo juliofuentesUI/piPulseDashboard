@@ -290,6 +290,78 @@ export interface TrendHistory {
   readonly activeMinutes?: number;
 }
 
+// --- The day's record -----------------------------------------------------
+
+/** One trend's showing over a day, counted from stored rows. Mirrors the API. */
+export interface TrendDayEntry {
+  readonly trendKey: string;
+  readonly title: string;
+  /** The largest bucket Google stated that day, verbatim. Absent if it stated none. */
+  readonly peakVolume?: string;
+  /** Best standing by volume within a fetch, 1 being the top. */
+  readonly peakRank: number;
+  readonly timesObserved: number;
+  readonly firstSeenAt: string;
+  readonly lastSeenAt: string;
+  /** First to last sighting. A span, never a claim of continuous presence. */
+  readonly activeMinutes: number;
+}
+
+/** A calendar day of stored trends, as the API ranked them. */
+export interface TrendDay {
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly timezone: string;
+  readonly entries: readonly TrendDayEntry[];
+  readonly trendCount: number;
+  readonly fetchCount: number;
+}
+
+/** One rendered row of the TODAY list. */
+export interface TrendDayRowView {
+  /** Stable key for the each-block. */
+  readonly key: string;
+  readonly rank: string;
+  readonly title: string;
+  /** Google's biggest bucket that day, compacted: "20K+". Empty if unstated. */
+  readonly volume: string;
+  /** How long it stayed on the feed, e.g. "53M". Empty when never measurable. */
+  readonly duration: string;
+  /**
+   * Where the trend sat in the day, as percentages of midnight-to-now: the
+   * offset of its first sighting and the width of its run.
+   *
+   * This is a time axis, not a quantity — deliberately, and it replaced a
+   * volume bar. Ranking by peak volume selects the day's biggest buckets, so
+   * the ten rows routinely hold only two distinct values; on a log scale over
+   * that range every row draws either full or at the 12% floor, which renders a
+   * twofold difference as an eightfold one. The run is the honest thing to draw
+   * here, and it is the one the screen's second question asks about.
+   */
+  readonly spanStart: number;
+  readonly spanWidth: number;
+}
+
+/**
+ * The TODAY view: the day so far, from this Pi's own record.
+ *
+ * `window` and `scope` exist so the screen can never overstate what it holds —
+ * a day two hours old says so, and the row count is reported against how many
+ * trends were actually seen rather than implying ten is all there were.
+ */
+export interface TrendDayView {
+  /** The day's start on the wall clock, e.g. "SINCE 12:00 AM". */
+  readonly window: string;
+  /** What the day holds, e.g. "160 TRENDS · 41 FETCHES". */
+  readonly scope: string;
+  /** Left end of the run axis, e.g. "12:00 AM". Empty when there is no day. */
+  readonly axisStart: string;
+  /** Right end of it. Always the present moment. */
+  readonly axisEnd: string;
+  /** Ranked best first. Empty when the day has recorded nothing yet. */
+  readonly rows: readonly TrendDayRowView[];
+}
+
 /** Sparkline geometry in design pixels, ready for the SVG to draw. */
 export interface SparklineView {
   readonly width: number;

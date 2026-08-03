@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 
 import { config } from './config.js';
 import { TtlCache } from './cache.js';
-import { TrendHistoryStore } from './history.js';
+import { startOfLocalDay, TrendHistoryStore } from './history.js';
 import { GoogleTrendingRssProvider, type TrendProvider } from './trends.js';
 import type { ApiErrorBody, TrendingSearch, TrendsSnapshot, WeatherSnapshot } from './types.js';
 import { fetchWeather } from './weather.js';
@@ -153,6 +153,47 @@ app.get('/api/trends/history', async (request, reply) => {
     return history.historyFor(key, Date.now());
   } catch (error) {
     request.log.error({ err: error }, 'Trend history lookup failed');
+    const body: ApiErrorBody = {
+      error: 'history_unavailable',
+      message: 'Could not read trend history.',
+    };
+    return reply.code(503).send(body);
+  }
+});
+
+/**
+ * How many of the day's trends the TODAY view has room for: all ten of a
+ * fetch, in two columns of five. The live list deliberately shows five, because
+ * its hidden rows are the least interesting under whichever ordering is active;
+ * a day's record has no such excuse, and the room exists here.
+ */
+const DAY_ENTRY_LIMIT = 10;
+
+app.get('/api/trends/today', async (request, reply) => {
+  if (history === null) {
+    const body: ApiErrorBody = {
+      error: 'history_unavailable',
+      message: 'Trend history storage is not available.',
+    };
+    return reply.code(503).send(body);
+  }
+
+  try {
+    /*
+     * The day is drawn on the dashboard's own wall clock, not UTC. Rows are
+     * stored in UTC and San Jose is seven hours behind it, so a UTC boundary
+     * would roll the list over in the late afternoon and call it a new day.
+     */
+    const now = Date.now();
+    reply.header('cache-control', 'no-cache');
+    return history.dayDigest({
+      sinceMs: startOfLocalDay(now, config.location.timezone),
+      untilMs: now,
+      timezone: config.location.timezone,
+      limit: DAY_ENTRY_LIMIT,
+    });
+  } catch (error) {
+    request.log.error({ err: error }, 'Trend day digest failed');
     const body: ApiErrorBody = {
       error: 'history_unavailable',
       message: 'Could not read trend history.',

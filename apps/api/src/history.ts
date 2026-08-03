@@ -16,6 +16,8 @@ import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import type {
+  TrendDay,
+  TrendDayEntry,
   TrendHistory,
   TrendHistoryPoint,
   TrendingSearch,
@@ -155,23 +157,10 @@ export class TrendHistoryStore {
       observed_at: string;
     }[];
 
-    const byFetch = new Map<string, { key: string; volume: number }[]>();
-    for (const row of rows) {
-      const fetch = byFetch.get(row.observed_at) ?? [];
-      fetch.push({ key: row.trend_key, volume: volumeOf(row.approximate_volume) });
-      byFetch.set(row.observed_at, fetch);
-    }
-
     const points: TrendHistoryPoint[] = [];
-    for (const [at, fetch] of byFetch) {
-      // Ties share the better rank, so two trends both on 500+ are both #3
-      // rather than one being arbitrarily called worse than the other.
-      const sorted = [...fetch].sort((a, b) => b.volume - a.volume);
-      const index = sorted.findIndex((entry) => entry.key === trendKey);
-      if (index === -1) continue;
-
-      const volume = sorted[index]?.volume ?? 0;
-      const rank = sorted.findIndex((entry) => entry.volume === volume) + 1;
+    for (const [at, ranks] of ranksByFetch(rows)) {
+      const rank = ranks.get(trendKey);
+      if (rank === undefined) continue;
       points.push({ at, rank });
     }
 
@@ -192,9 +181,246 @@ export class TrendHistoryStore {
     };
   }
 
+  /**
+   * One calendar day of stored trends, ranked by an explicit local rule.
+   *
+   * Nothing here is fetched or inferred: the window is arithmetic on a clock,
+   * the ranking is arithmetic on rows, and the only figure Google contributed
+   * is the volume bucket it published at the time. A trend the feed never
+   * stated a volume for still appears, ranked below every trend that has one,
+   * rather than being dropped or given a number we made up.
+   *
+   * The ordering is the plan's, in full, and every step of it is a stored
+   * quantity: peak volume bucket, then best rank reached, then fetches seen
+   * in, then how long it stayed. `trend_key` breaks any remaining tie so the
+   * same stored rows always produce the same list — "reproducible from stored
+   * data" has to mean literally reproducible, including the order.
+   */
+  dayDigest(window: {
+    readonly sinceMs: number;
+    readonly untilMs: number;
+    /** Carried through to the response; the boundary itself is the caller's. */
+    readonly timezone: string;
+    readonly limit: number;
+  }): TrendDay {
+    const since = new Date(window.sinceMs).toISOString();
+    const until = new Date(window.untilMs).toISOString();
+
+    const rows = this.#db
+      .prepare(
+        `SELECT trend_key, title, approximate_volume, observed_at
+         FROM trend_snapshots
+         WHERE observed_at >= ? AND observed_at <= ?
+         ORDER BY observed_at ASC`,
+      )
+      .all(since, until) as {
+      trend_key: string;
+      title: string;
+      approximate_volume: string | null;
+      observed_at: string;
+    }[];
+
+    const ranked = ranksByFetch(rows);
+
+    /*
+     * Rows arrive oldest first, so "first" fields are written once and "last"
+     * fields are overwritten on every pass — which is what makes the title the
+     * most recent wording rather than whichever came first.
+     */
+    const byKey = new Map<
+      string,
+      {
+        title: string;
+        peakVolume: string | null;
+        peakValue: number;
+        peakRank: number;
+        timesObserved: number;
+        firstSeenAt: string;
+        lastSeenAt: string;
+      }
+    >();
+
+    for (const row of rows) {
+      const value = volumeOf(row.approximate_volume);
+      const rank = ranked.get(row.observed_at)?.get(row.trend_key);
+      const seen = byKey.get(row.trend_key);
+
+      if (seen === undefined) {
+        byKey.set(row.trend_key, {
+          title: row.title,
+          peakVolume: row.approximate_volume,
+          peakValue: value,
+          peakRank: rank ?? RANK_SPACE,
+          timesObserved: 1,
+          firstSeenAt: row.observed_at,
+          lastSeenAt: row.observed_at,
+        });
+        continue;
+      }
+
+      seen.title = row.title;
+      seen.timesObserved += 1;
+      seen.lastSeenAt = row.observed_at;
+      if (value > seen.peakValue) {
+        seen.peakValue = value;
+        seen.peakVolume = row.approximate_volume;
+      }
+      if (rank !== undefined && rank < seen.peakRank) seen.peakRank = rank;
+    }
+
+    const entries: TrendDayEntry[] = [...byKey].map(([trendKey, seen]) => ({
+      trendKey,
+      title: seen.title,
+      ...(seen.peakVolume === null ? {} : { peakVolume: seen.peakVolume }),
+      peakRank: seen.peakRank,
+      timesObserved: seen.timesObserved,
+      firstSeenAt: seen.firstSeenAt,
+      lastSeenAt: seen.lastSeenAt,
+      activeMinutes: Math.max(
+        0,
+        Math.round((Date.parse(seen.lastSeenAt) - Date.parse(seen.firstSeenAt)) / 60_000),
+      ),
+    }));
+
+    entries.sort(
+      (a, b) =>
+        volumeOf(b.peakVolume) - volumeOf(a.peakVolume) ||
+        a.peakRank - b.peakRank ||
+        b.timesObserved - a.timesObserved ||
+        b.activeMinutes - a.activeMinutes ||
+        a.trendKey.localeCompare(b.trendKey),
+    );
+
+    return {
+      startsAt: since,
+      endsAt: until,
+      timezone: window.timezone,
+      entries: entries.slice(0, window.limit),
+      trendCount: byKey.size,
+      fetchCount: ranked.size,
+    };
+  }
+
   close(): void {
     this.#db.close();
   }
+}
+
+/**
+ * The length of the list Google returns, and so the worst rank there is.
+ *
+ * Used as the fallback when a row somehow has no computed rank, which keeps an
+ * unrankable trend at the bottom instead of accidentally at the top — `0` would
+ * sort as the best position on a scale where 1 is best.
+ */
+const RANK_SPACE = 10;
+
+/**
+ * Volume standing within each fetch: `observed_at` → `trend_key` → rank.
+ *
+ * Ranking is relative, so it has to be computed across a whole fetch rather
+ * than one trend's rows — the others are what this one is ranked against.
+ * Ties share the better rank, so two trends both on 500+ are both #3 rather
+ * than one being arbitrarily called worse than the other.
+ *
+ * Both the graph and the day digest read their ranks from here. That is the
+ * point of it being one function: the tie rule is a documented promise, and
+ * two copies of it would drift apart without ever failing a build.
+ */
+function ranksByFetch(
+  rows: readonly {
+    trend_key: string;
+    approximate_volume: string | null;
+    observed_at: string;
+  }[],
+): Map<string, Map<string, number>> {
+  const byFetch = new Map<string, { key: string; volume: number }[]>();
+  for (const row of rows) {
+    const fetch = byFetch.get(row.observed_at) ?? [];
+    fetch.push({ key: row.trend_key, volume: volumeOf(row.approximate_volume) });
+    byFetch.set(row.observed_at, fetch);
+  }
+
+  const ranked = new Map<string, Map<string, number>>();
+  for (const [at, fetch] of byFetch) {
+    const sorted = [...fetch].sort((a, b) => b.volume - a.volume);
+    const ranks = new Map<string, number>();
+    for (const entry of sorted) {
+      ranks.set(entry.key, sorted.findIndex((other) => other.volume === entry.volume) + 1);
+    }
+    ranked.set(at, ranks);
+  }
+  return ranked;
+}
+
+/**
+ * The instant a calendar day began on the wall clock of `timeZone`.
+ *
+ * The screen's day has to be the viewer's day: rows are stored in UTC, and in
+ * San Jose that is seven or eight hours ahead, so a UTC day boundary would roll
+ * the list over in the afternoon. `Intl` is the only thing in Node that knows
+ * when a zone's offset changed, and it costs no dependency.
+ *
+ * Two passes, and the second one is not redundant. The offset is read *at the
+ * given moment*, which on a DST changeover day is not the offset that was in
+ * force at midnight — subtracting the wrong one lands an hour off. Applying it
+ * once gets close enough to re-read the offset actually in force there, and the
+ * second pass uses that. US transitions happen at 2 a.m., so local midnight
+ * always exists and is never ambiguous.
+ */
+export function startOfLocalDay(nowMs: number, timeZone: string): number {
+  const parts = zonedParts(nowMs, timeZone);
+  const midnightAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day);
+
+  const approximate = midnightAsUtc - offsetAt(nowMs, timeZone);
+  return midnightAsUtc - offsetAt(approximate, timeZone);
+}
+
+/** Wall-clock fields as that zone reads them at a given instant. */
+function zonedParts(
+  atMs: number,
+  timeZone: string,
+): { year: number; month: number; day: number; hour: number; minute: number; second: number } {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
+  const found: Record<string, number> = {};
+  for (const part of formatter.formatToParts(new Date(atMs))) {
+    if (part.type !== 'literal') found[part.type] = Number(part.value);
+  }
+
+  return {
+    year: found['year'] ?? 1970,
+    month: found['month'] ?? 1,
+    day: found['day'] ?? 1,
+    // Some ICU builds render midnight as hour 24 under hour12: false.
+    hour: (found['hour'] ?? 0) % 24,
+    minute: found['minute'] ?? 0,
+    second: found['second'] ?? 0,
+  };
+}
+
+/** How far ahead of UTC the zone was at that instant, in milliseconds. */
+function offsetAt(atMs: number, timeZone: string): number {
+  const parts = zonedParts(atMs, timeZone);
+  const asUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+  );
+  // The stored instant carries milliseconds the formatter does not report.
+  return asUtc - Math.floor(atMs / 1000) * 1000;
 }
 
 /**
