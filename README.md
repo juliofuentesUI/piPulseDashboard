@@ -798,11 +798,68 @@ closes it, because the thing that changed is behind the panel.
   To go fully pixel, drop a `.woff2` into `apps/web/public/fonts/` and add a matching
   `@font-face` named `Pixel Operator` — the font stack in `app.css` already looks for it.
 
+## Deploying to the Raspberry Pi
+
+```bash
+git clone https://github.com/juliofuentesUI/piPulseDashboard.git
+cd piPulseDashboard
+./scripts/pi-setup.sh          # once
+./scripts/pi-start.sh          # every time
+```
+
+`pi-setup.sh` installs Node 24 from NodeSource if the machine has something older
+(**apt's is 18, which cannot build this**), runs `npm ci`, builds both workspaces, and then
+proves SQLite works by opening a throwaway database in the data directory and reading a row
+back. That last step is the one worth having: it separates "Node is too old" from "this SD
+card is full or mounted read-only", which otherwise present identically as a dashboard with
+no history.
+
+It asks before installing Node. Pass `--yes` to skip the prompt, or `--skip-node` to leave
+the installation alone.
+
+`pi-start.sh` deliberately does no installing and no building — it is the thing that runs
+at boot, so it verifies what it needs and fails loudly rather than quietly rebuilding a
+wall display. It serves the built front end on **5173** and Fastify on **3000**; point the
+Pi's browser at `http://localhost:5173`.
+
+**`npm ci` installs dev dependencies on purpose.** The built front end is served by
+`vite preview`, so Vite has to be there. Do not prune them.
+
+### Moving the history across
+
+The Pi starts with no history, so every graph reads `NO HISTORY RECORDED YET` until it has
+been running for a while. To carry an existing record over, export it on the machine that
+has one:
+
+```bash
+node scripts/history-db.mjs export     # → apps/api/data/trends-seed.db
+scp apps/api/data/trends-seed.db pi@raspberrypi.local:~/
+```
+
+and import it during setup:
+
+```bash
+./scripts/pi-setup.sh --seed ~/trends-seed.db
+```
+
+**Do not copy `trends.db` yourself.** The database runs in WAL mode, so recent writes sit
+in a `trends.db-wal` sidecar until a checkpoint folds them in — on this machine the main
+file was 20 KB while its WAL held 622 KB, so a plain `scp` of `trends.db` would have
+carried a fraction of the data and looked like it worked. `export` is `VACUUM INTO`, which
+reads the WAL as well and writes one consistent file with no sidecars.
+
+Importing onto a Pi that already has history **refuses** unless you pass `--force`, and
+prints what it was about to replace first.
+
+`scripts/history-db.mjs` also answers `stats <file>`, which is the quickest way to find out
+whether a database has anything in it.
+
 ## Requirements
 
 - Node.js 24 or newer. Search Pulse stores its history in `node:sqlite`, which Node 22
   has only behind `--experimental-sqlite`.
 - No Docker, no API key, and no dependency for the database — SQLite is built into Node,
   which keeps a native module and its compile step off the Raspberry Pi.
+- Nothing in the dependency tree compiles, so there is no native build on ARM.
 - Browser automation is optional and downloads ~300 MB on first use. Skip it and
   everything else still works.

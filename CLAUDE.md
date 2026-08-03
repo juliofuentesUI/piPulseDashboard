@@ -124,6 +124,11 @@ remote access work. Those are not the problem. The one thing the repo needs is
 
 ## Raspberry Pi deploys
 
+`./scripts/pi-setup.sh` once, then `./scripts/pi-start.sh`. Setup handles Node, `npm ci`,
+the build, and a real SQLite write-and-read-back check; start only verifies and launches,
+because it is what runs at boot. `README.md` covers both, including moving an existing
+history across with `scripts/history-db.mjs`.
+
 Install **Node 24+** from NodeSource. The version in apt is 18, which is too old for Vite
 and fails during install.
 

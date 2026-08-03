@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Pixel-art handheld-console weather dashboard for a 720x720 HyperPixel Square Touch on Raspberry Pi 5",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "workspaces": [
     "apps/api",

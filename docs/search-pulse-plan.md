@@ -15,8 +15,15 @@ Lines marked **AMENDED** record where the plan met reality and reality won.
 | 3 | SQLite history and rank graph | Done — 2026-08-02 |
 | — | Ordering fix: `SURGING` / `BIGGEST` — see the AMENDED section at the end | Done — 2026-08-02 |
 | 3.5 | Full-screen trend card | Done — 2026-08-03 |
-| 4 | Daily history view | **Next** |
+| — | Raspberry Pi deploy scripts | Done — 2026-08-03 |
+| 4 | Daily history view | **Deferred until after the Pi deploy** |
 | 5 | Reliability and polish | Not started |
+
+**Phase 4 is deferred on purpose, at the user's request, 2026-08-03.** Deploy the current
+version to the Pi first and let it run. Phase 4 is only as good as the history behind it,
+and at the time of the decision that was 230 rows over 3.7 hours — a day view designed and
+tested against a third of an afternoon would be designed against the wrong shape of data.
+Waiting costs nothing and the record accumulates on its own.
 
 **Each phase is merged and usable before the next one starts.** Finishing the current
 phase is the whole job; do not roll ahead into the next to "complete the feature".

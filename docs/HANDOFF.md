@@ -14,13 +14,24 @@ being true.
 | 3 | SQLite history, rank graph, movement labels | Done |
 | — | Ordering fix: SURGING / BIGGEST modes | Done |
 | 3.5 | Full-screen trend card: image + 3 headlines | Done |
-| 4 | Daily history view (`TODAY`) | **Next** |
+| — | Raspberry Pi deploy scripts | Done |
+| 4 | Daily history view (`TODAY`) | **Deferred — deploy first** |
 | 5 | Reliability and polish | Not started |
 
 All commits pushed, working tree clean. Nothing is parked on a branch.
 
-**Start with Phase 4** — read "What Phase 4 needs to know before starting" below before
-you touch it. The promise it can honestly make is narrower than its name suggests.
+**Do not start Phase 4.** The user deferred it on 2026-08-03 to get the current version
+onto the Pi first, and that ordering is right on its own merits: Phase 4 is only as good as
+the history behind it, and there were 230 rows over 3.7 hours when the call was made. Let
+the Pi accumulate a real record before designing a day view against it. Read "What Phase 4
+needs to know before starting" below when it does come round — the promise it can honestly
+make is narrower than its name suggests.
+
+**Deploying is `./scripts/pi-setup.sh` then `./scripts/pi-start.sh`**, both documented in
+`README.md`. Setup proves SQLite can actually write where the history lives, which is what
+separates "Node is too old" from "this SD card is read-only" — the two look identical from
+the screen. History moves across with `node scripts/history-db.mjs export`; never copy
+`trends.db` by hand, because WAL mode leaves most of the data in a sidecar.
 
 ## Read these, in this order
 
