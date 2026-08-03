@@ -135,7 +135,31 @@ What the script adds around that command is timing and cleanup, not options:
   still reachable from another device.
 - **`--no-browser`** serves without opening anything — for SSH, or reading it from a phone.
 
-Launching at boot is **not** automated, by choice. The script is run by hand.
+### Opening it automatically
+
+```bash
+./scripts/pi-setup.sh --autostart      # on, and exit
+./scripts/pi-setup.sh --no-autostart   # off, and exit
+```
+
+Writes `~/.config/autostart/pipulse.desktop`, so the dashboard opens when the desktop
+session loads: plug the Pi in and it comes up. Neither flag installs or builds anything —
+turning autostart on should not drag a rebuild along with it.
+
+**A desktop autostart entry rather than a systemd unit**, because the script opens Chromium
+and needs a screen to open a window on. systemd would start it before the desktop exists
+and leave you wiring up display variables by hand.
+
+It relies on the Pi booting straight to the desktop, which is the default and needs no
+setting up — if plugging it in lands you at the desktop without typing a password, you
+already have it.
+
+There is no terminal behind an autostarted run, so output goes to `~/pipulse.log`. Read
+that first if the dashboard ever does not appear. The log is truncated on each launch
+rather than appended, because it carries everything Chromium says and the whole disk is an
+SD card.
+
+`Alt+F4` still closes it, and still stops the servers with it.
 
 ## Project layout
 

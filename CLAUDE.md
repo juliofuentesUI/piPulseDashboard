@@ -135,8 +135,11 @@ for the port, and opens Chromium in kiosk mode on it; `--no-browser` serves only
 `README.md` covers both, including moving an existing history across with
 `scripts/history-db.mjs`.
 
-**The user launches it by hand.** Boot autostart was offered and declined — do not add a
-systemd unit or an `~/.config/autostart/` entry unless they ask.
+`./scripts/pi-setup.sh --autostart` opens the dashboard when the desktop session loads;
+`--no-autostart` undoes it. Both do only that and exit. It writes an
+`~/.config/autostart/` entry, **not a systemd unit** — the script opens Chromium and needs
+a screen to open a window on, which systemd starts too early to provide. Booting straight
+to the desktop is the default and needs no raspi-config change.
 
 Install **Node 24+** from NodeSource. The version in apt is 18, which is too old for Vite
 and fails during install.

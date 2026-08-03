@@ -11,10 +11,13 @@
 # history lives. Safe to run again — every step is idempotent.
 #
 # Options:
-#   --seed FILE   Import a history database exported from another machine
-#   --force       Let --seed replace an existing history (it refuses otherwise)
-#   --yes         Do not ask before installing Node from NodeSource
-#   --skip-node   Leave the Node installation alone whatever version it is
+#   --seed FILE     Import a history database exported from another machine
+#   --force         Let --seed replace an existing history (it refuses otherwise)
+#   --yes           Do not ask before installing Node from NodeSource
+#   --skip-node     Leave the Node installation alone whatever version it is
+#   --autostart     Open the dashboard automatically when the desktop loads,
+#                   then exit. Does not install or build anything.
+#   --no-autostart  Undo that, then exit.
 #
 set -euo pipefail
 
@@ -53,6 +56,68 @@ usage() {
 
 # --- Arguments ------------------------------------------------------------
 
+# --- Autostart ------------------------------------------------------------
+
+# A desktop autostart entry, not a systemd unit. The script opens Chromium, so
+# it needs a screen to open a window on — systemd would start it before the
+# desktop exists and leave you wiring up display variables by hand. This runs
+# when the desktop session comes up, which is the moment that matters.
+#
+# It assumes the Pi already boots straight to the desktop. If plugging it in
+# lands you at the desktop without typing a password, it does.
+AUTOSTART_FILE="$HOME/.config/autostart/pipulse.desktop"
+AUTOSTART_LOG="$HOME/pipulse.log"
+
+install_autostart() {
+  # `Exec` is one double-quoted argument per the Desktop Entry spec, which is
+  # what lets the path contain spaces. Only " ` $ and \ would need escaping,
+  # and a path holding one of those is beyond what this is willing to guess at.
+  case "$ROOT" in
+    *['"$`\']*) die "the repository path contains a character the autostart entry cannot quote: $ROOT" ;;
+  esac
+
+  mkdir -p "$(dirname "$AUTOSTART_FILE")"
+
+  # Truncating rather than appending. One launch per boot, and the log carries
+  # everything Chromium says, so appending would grow without limit on a
+  # machine whose whole disk is an SD card.
+  cat > "$AUTOSTART_FILE" <<EOF
+[Desktop Entry]
+Type=Application
+Name=piPulse Dashboard
+Comment=Weather and Google Trends on a 720x720 panel
+Exec=/bin/bash -c "exec $ROOT/scripts/pi-start.sh > $AUTOSTART_LOG 2>&1"
+Terminal=false
+X-GNOME-Autostart-enabled=true
+EOF
+
+  step "Autostart installed"
+  note "wrote $AUTOSTART_FILE"
+  cat <<EOF
+    The dashboard now opens by itself when the desktop loads. Plug the Pi in
+    and it comes up; nothing to type.
+
+    There is no terminal behind it, so anything it prints goes to
+        $AUTOSTART_LOG
+    Read that first if it ever does not appear.
+
+    Alt+F4 still closes it, and still stops the servers with it.
+    Undo this with:  ./scripts/pi-setup.sh --no-autostart
+EOF
+}
+
+remove_autostart() {
+  if [ -f "$AUTOSTART_FILE" ]; then
+    rm -f "$AUTOSTART_FILE"
+    step "Autostart removed"
+    note "deleted $AUTOSTART_FILE"
+    note "the dashboard no longer opens on its own; run ./scripts/pi-start.sh yourself"
+  else
+    step "Autostart was not installed"
+    note "nothing at $AUTOSTART_FILE"
+  fi
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --seed)      SEED="${2:-}"; [ -n "$SEED" ] || die "--seed needs a file path"; shift 2 ;;
@@ -60,6 +125,10 @@ while [ $# -gt 0 ]; do
     --force)     FORCE=1; shift ;;
     --yes|-y)    ASSUME_YES=1; shift ;;
     --skip-node) SKIP_NODE=1; shift ;;
+    # Both do their one job and stop. Turning autostart on should not drag a
+    # reinstall and a rebuild along with it.
+    --autostart)    install_autostart; exit 0 ;;
+    --no-autostart) remove_autostart; exit 0 ;;
     -h|--help)   usage; exit 0 ;;
     *)           die "unknown option: $1" ;;
   esac
