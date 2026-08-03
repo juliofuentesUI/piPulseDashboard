@@ -1,13 +1,16 @@
 <script lang="ts">
+  import { SCREENS, type Screen } from '../screen.svelte';
   import { THEMES, type Theme } from '../theme.svelte';
 
   interface Props {
     current: Theme;
+    screen: Screen;
     onselect: (theme: Theme) => void;
+    onscreen: (screen: Screen) => void;
     onclose: () => void;
   }
 
-  let { current, onselect, onclose }: Props = $props();
+  let { current, screen, onselect, onscreen, onclose }: Props = $props();
 
   let dialog: HTMLDivElement | undefined = $state();
 
@@ -49,6 +52,25 @@
 
     <div class="body">
       <!-- Further option groups go here as sibling <section class="group"> blocks. -->
+      <section class="group">
+        <h3 class="group-heading">SCREEN</h3>
+        <ul class="options">
+          {#each SCREENS as option (option.id)}
+            <li>
+              <button
+                class="option"
+                class:active={option.id === screen.id}
+                type="button"
+                aria-pressed={option.id === screen.id}
+                onclick={() => onscreen(option)}
+              >
+                <span class="name">{option.name}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </section>
+
       <section class="group">
         <h3 class="group-heading">THEME</h3>
         <ul class="options">
@@ -140,6 +162,23 @@
     gap: 24px;
     padding: 20px;
     overflow-y: auto;
+  }
+
+  /*
+   * Two groups overflow the panel, and the platform scrollbar is the one
+   * rounded, shaded object in a flat design. Squared off and in palette it
+   * still shows there is more below, which a hidden one would not.
+   */
+  .body::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .body::-webkit-scrollbar-track {
+    background: var(--c-bg);
+  }
+
+  .body::-webkit-scrollbar-thumb {
+    background: var(--c-blue);
   }
 
   .group-heading {

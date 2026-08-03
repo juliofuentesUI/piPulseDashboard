@@ -59,6 +59,9 @@ export type WeatherCondition =
 /** The two look-ahead columns on the dashboard, beside the current reading. */
 export type ForecastPeriod = 'midday' | 'evening';
 
+/** The three time-of-day columns of the 7-day table. */
+export type DayPeriod = 'morning' | 'midday' | 'evening';
+
 /** A single hourly forecast the dashboard renders as one column. */
 export interface ForecastPoint {
   readonly period: ForecastPeriod;
@@ -73,6 +76,41 @@ export interface ForecastPoint {
   readonly weatherCode: number;
   readonly isDay: boolean;
   /** Percent, 0-100, for this hour specifically. */
+  readonly precipitationProbability: number;
+}
+
+/**
+ * One cell of the 7-day table: a single hourly reading, at a fixed local hour.
+ *
+ * Deliberately thinner than `ForecastPoint` — a table cell is an icon and a
+ * number, so it carries no per-hour rain figure. The row's own
+ * `precipitationProbability` covers the whole day instead.
+ */
+export interface DayPeriodPoint {
+  readonly period: DayPeriod;
+  /** ISO 8601 with the location's UTC offset, e.g. "2026-08-04T09:00:00-07:00". */
+  readonly time: string;
+  /** Whole degrees Fahrenheit. */
+  readonly temperature: number;
+  readonly condition: string;
+  readonly conditionKey: WeatherCondition;
+  readonly weatherCode: number;
+  readonly isDay: boolean;
+}
+
+/** One row of the 7-day table. */
+export interface DayForecast {
+  /** Local calendar date, "YYYY-MM-DD". */
+  readonly date: string;
+  /** Days ahead of the current local date: 0 = today. */
+  readonly dayOffset: number;
+  /**
+   * Morning, midday and evening in display order. An entry is null when the
+   * hourly series cannot supply that hour — today's row loses the periods that
+   * have already gone by, which is why the table has to tolerate holes.
+   */
+  readonly periods: readonly (DayPeriodPoint | null)[];
+  /** Percent, 0-100: the day's highest hourly probability. */
   readonly precipitationProbability: number;
 }
 
@@ -105,6 +143,13 @@ export interface WeatherSnapshot {
    * period is omitted if the hourly series cannot supply it.
    */
   readonly forecast: readonly ForecastPoint[];
+  /**
+   * Seven rows for the 7-day table, starting with today. Independent of
+   * `forecast` above: that one rolls a period forward to tomorrow once it has
+   * passed, which is right for a three-column "what's next" strip and wrong for
+   * a table whose rows are dated.
+   */
+  readonly week: readonly DayForecast[];
   /** ISO 8601 with the location's UTC offset, e.g. "2026-07-30T01:00:00-07:00". */
   readonly updatedAt: string;
 }

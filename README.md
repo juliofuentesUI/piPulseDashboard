@@ -148,11 +148,12 @@ piPulseDashboard/
 │       │       ├── api.ts        typed client for /api/weather
 │       │       ├── dashboard.svelte.ts   state, timers, refresh policy
 │       │       ├── theme.svelte.ts       palettes and the hot swap
+│       │       ├── screen.svelte.ts      which of the two layouts is showing
 │       │       ├── types.ts      transport types vs. view types
 │       │       ├── view.ts       snapshot → view model, time formatting
-│       │       ├── components/   WeatherDashboard, StatusHeader, TitleBar,
-│       │       │                 ForecastColumn, MetricPanel, …
-│       │       └── weather-icons/  eleven original pixel-art sprites,
+│       │       ├── components/   WeatherDashboard, WeekDashboard, ForecastTable,
+│       │       │                 StatusHeader, TitleBar, FooterBar, …
+│       │       └── weather-icons/  thirteen original pixel-art sprites,
 │       │                           plus the sprite/outline helpers
 │       ├── index.html
 │       ├── package.json
@@ -206,9 +207,32 @@ piPulseDashboard/
       "precipitationProbability": 0
     }
   ],
+  "week": [
+    {
+      "date": "2026-08-02",
+      "dayOffset": 0,
+      "periods": [
+        {
+          "period": "morning",
+          "time": "2026-08-02T09:00:00-07:00",
+          "temperature": 69,
+          "condition": "CLEAR",
+          "conditionKey": "clear",
+          "weatherCode": 0,
+          "isDay": true
+        },
+        { "period": "midday", "time": "2026-08-02T13:00:00-07:00", "temperature": 87 },
+        { "period": "evening", "time": "2026-08-02T19:00:00-07:00", "temperature": 80 }
+      ],
+      "precipitationProbability": 0
+    }
+  ],
   "updatedAt": "2026-08-01T18:28:14-07:00"
 }
 ```
+
+The last two `periods` entries above are abbreviated; every entry carries the same
+fields as the first.
 
 Temperatures are whole degrees Fahrenheit and wind is MPH. `conditionKey` and `isDay`
 are what the client uses to pick a sprite; `weatherCode` is the raw WMO code, kept so
@@ -233,9 +257,29 @@ already gone by**, compared at hour granularity:
 - At 18:28, midday can only be satisfied by tomorrow, so `dayOffset` is `1` and the
   column renders `TMR 1:00 PM`. Evening is still ahead, so it stays today.
 
-That is why the upstream request asks for two days of hourly data. A period is omitted
-from the array if the hourly series cannot supply it; the client draws an empty column
-rather than collapsing the grid.
+A period is omitted from the array if the hourly series cannot supply it; the client
+draws an empty column rather than collapsing the grid.
+
+### The week
+
+`week` is seven rows for the 7-day screen, starting with today, each holding the three
+hours that screen's columns show — 09:00, 13:00 and 19:00 local, in display order.
+
+It is deliberately **not** derived from `forecast`. The two answer different questions:
+
+- `forecast` rolls a period forward to tomorrow once it has passed, because a
+  three-column "what's next" strip should never show an hour that is behind you.
+- `week` rows are dated, so today's row keeps its morning and midday cells all evening.
+  The hourly series still carries them — it starts at local midnight — and a hole
+  punched in the first row would read as missing data rather than as elapsed time.
+
+A `periods` entry is `null` where the series genuinely has no reading; the table renders
+that cell as `--`. The row's `precipitationProbability` is the day's maximum, which is
+what the table's four-dot meter and percentage both come from.
+
+Both fields are served from **one** upstream request: `forecast_days=7` returns 168
+hourly entries, which is every hour of all seven days, so the whole screen costs no extra
+API traffic.
 
 ### `GET /api/health`
 
@@ -271,8 +315,11 @@ Every value has a working default, so a `.env` file is optional. Copy `.env.exam
 
 ## Layout
 
-Four bands inside a thick outer frame, all at fixed pixel heights because the panel is
-always exactly 720 × 720:
+Two screens, chosen in settings and remembered in `localStorage`. Both are four bands
+inside the thick outer frame, all at fixed pixel heights because the panel is always
+exactly 720 × 720.
+
+**`WEATHER NOW`** (`WeatherDashboard.svelte`) — the default:
 
 | Band | Height | Contents |
 | --- | --- | --- |
@@ -284,16 +331,41 @@ always exactly 720 × 720:
 Each forecast column uses fixed grid track heights, so the three share a baseline even
 when one condition label wraps and its neighbours do not.
 
+**`7-DAY FORECAST`** (`WeekDashboard.svelte`):
+
+| Band | Height | Contents |
+| --- | --- | --- |
+| Status | 64 px | Date, location, live clock |
+| Title | 96 px | `7-DAY FORECAST`, and the 3 × 3 menu grid |
+| Table | fills | 46 px heading row, then seven equal day rows |
+| Footer | 60 px | Raspberry Pi wordmark, last-updated time, refresh |
+
+The table's five columns are `96px repeat(3, 1fr) 116px` — weekday, the three hours,
+then rain chance. It is a real `<table>` so a screen reader announces "WED, 1:00 PM, 20
+degrees" rather than a bare number; `thead` and `tbody` are `display: contents` so the
+rows join the table's own grid.
+
+Every row carries its own bottom border, the last one included — that edge is what
+divides the table from the footer. Exempting `:last-child` does not work here: under
+`display: contents` each row is the last child of its own `thead` or `tbody`, so the
+rule would strip the *heading's* divider and leave the final row's in place.
+
+The midday column is tinted with `color-mix(in srgb, var(--c-sky) 22%, transparent)`, so
+the accent stays a tint of the active theme rather than a sixth hard-coded colour.
+
 ## Controls
 
 The reference design has no visible buttons, so both controls are hidden in plain sight:
 
 - **Tap the status bar** (the date/clock row) to force a refresh. It is a 700 × 72
   target, which is hard to miss on a touchscreen.
-- **Tap the 3 × 2 menu grid** beside the title to open settings. Dismiss with the
-  close button, a tap outside the panel, or `Escape`.
+- **Tap the menu grid** beside the title to open settings. Dismiss with the close
+  button, a tap outside the panel, or `Escape`.
 
 Keyboard focus draws a visible outline on both, since neither looks like a control.
+
+The 7-day screen adds one visible control: a refresh glyph in the footer band, which the
+reference art draws there. It does the same thing as tapping the status bar.
 
 ## Themes
 
@@ -329,7 +401,7 @@ sprites read as line art without a single sprite being redrawn.
 ## Settings
 
 `SettingsModal.svelte` is the panel behind the menu grid. It is built as a stack of
-option groups, of which theme selection is the first:
+option groups — screen first, then theme:
 
 ```svelte
 <section class="group">
@@ -339,8 +411,11 @@ option groups, of which theme selection is the first:
 ```
 
 Add another group as a sibling `<section class="group">`. Spacing comes from the grid
-`gap` on the container, so nothing else needs touching. Picking a theme applies it
-immediately and leaves the panel open, so the change can be seen happening.
+`gap` on the container, so nothing else needs touching.
+
+The two groups differ in what they do to the panel afterwards, on purpose. Picking a
+**theme** leaves it open, so the change can be seen happening. Picking a **screen**
+closes it, because the thing that changed is behind the panel.
 
 ## Front-end behaviour
 
@@ -368,6 +443,13 @@ immediately and leaves the panel open, so the change can be seen happening.
   is therefore described once, and the border colour is a theme token like everything
   else. Composite sprites call `outlined()` per element, back to front, so a cloud drawn
   over a sun carries its own border across the join.
+- Gaps in a curve are cut with `without()`, which trims rows against a box rather than
+  discarding whole rects. Filtering instead only drops a run that *starts* inside the
+  box, which leaves the overhang behind — that is the difference between the refresh
+  glyph reading as two arrows and reading as a "no entry" sign.
+- The Raspberry Pi mark in the footer is redrawn in theme tokens rather than its real red
+  and green. Every other sprite follows the palette, and a logo keeping its own colours
+  would be the one thing that stops looking right under Amber CRT or DMG Green.
 - The layout is authored at a fixed 720 × 720 and scaled with a single transform, so it
   is pixel-exact on the HyperPixel and never reflows or produces a scrollbar on a
   desktop browser.

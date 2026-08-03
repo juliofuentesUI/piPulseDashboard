@@ -19,6 +19,9 @@ export type WeatherCondition =
 
 export type ForecastPeriod = 'midday' | 'evening';
 
+/** The three time-of-day columns of the 7-day table. */
+export type DayPeriod = 'morning' | 'midday' | 'evening';
+
 export interface ForecastPoint {
   readonly period: ForecastPeriod;
   readonly time: string;
@@ -29,6 +32,28 @@ export interface ForecastPoint {
   readonly conditionKey: WeatherCondition;
   readonly weatherCode: number;
   readonly isDay: boolean;
+  readonly precipitationProbability: number;
+}
+
+/** One cell of the 7-day table. */
+export interface DayPeriodPoint {
+  readonly period: DayPeriod;
+  readonly time: string;
+  readonly temperature: number;
+  readonly condition: string;
+  readonly conditionKey: WeatherCondition;
+  readonly weatherCode: number;
+  readonly isDay: boolean;
+}
+
+/** One row of the 7-day table. */
+export interface DayForecast {
+  /** Local calendar date, "YYYY-MM-DD". */
+  readonly date: string;
+  /** Days ahead of today: 0 = today. */
+  readonly dayOffset: number;
+  /** Morning, midday, evening in display order; null where the series has a hole. */
+  readonly periods: readonly (DayPeriodPoint | null)[];
   readonly precipitationProbability: number;
 }
 
@@ -45,6 +70,8 @@ export interface WeatherSnapshot {
   readonly precipitationProbability: number;
   readonly windSpeed: number;
   readonly forecast: readonly ForecastPoint[];
+  /** Seven rows for the 7-day table, starting with today. */
+  readonly week: readonly DayForecast[];
   readonly updatedAt: string;
 }
 
@@ -91,6 +118,37 @@ export interface DashboardView {
   readonly columns: readonly ColumnView[];
   /** Exactly two: rain chance, wind. */
   readonly metrics: readonly MetricView[];
+  /** The 7-day table, rendered by the other screen from the same snapshot. */
+  readonly week: WeekView;
+}
+
+/** One icon-and-temperature cell of the 7-day table. */
+export interface DayCellView {
+  /** Null when the period has no reading, so the cell renders empty. */
+  readonly icon: WeatherIconKey | null;
+  /** Bare number, or "--". The cell adds the degree sign. */
+  readonly temperature: string;
+}
+
+/** One row of the 7-day table. */
+export interface DayRowView {
+  /** Stable key for the each-block: the row's local date. */
+  readonly key: string;
+  /** MON, TUE, ... */
+  readonly weekday: string;
+  /** Exactly three: morning, midday, evening. */
+  readonly cells: readonly DayCellView[];
+  /** Bare number; the cell adds the percent sign. */
+  readonly rain: string;
+  /** How many of the four dots are filled, 0-4. */
+  readonly rainDots: number;
+}
+
+export interface WeekView {
+  /** Column headings for the three periods, e.g. "9:00 AM". */
+  readonly headings: readonly string[];
+  /** Seven rows, starting with today. */
+  readonly rows: readonly DayRowView[];
 }
 
 // --- Errors ---------------------------------------------------------------

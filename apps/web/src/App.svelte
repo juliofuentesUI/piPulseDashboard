@@ -5,7 +5,9 @@
   import LoadingScreen from './lib/components/LoadingScreen.svelte';
   import SettingsModal from './lib/components/SettingsModal.svelte';
   import WeatherDashboard from './lib/components/WeatherDashboard.svelte';
+  import WeekDashboard from './lib/components/WeekDashboard.svelte';
   import { Dashboard } from './lib/dashboard.svelte';
+  import { ScreenStore, type Screen } from './lib/screen.svelte';
   import { ThemeStore, type Theme } from './lib/theme.svelte';
 
   /** The HyperPixel Square panel. Everything below is authored at this size. */
@@ -13,6 +15,7 @@
 
   const dashboard = new Dashboard();
   const themes = new ThemeStore();
+  const screens = new ScreenStore();
 
   /**
    * On the Pi this resolves to exactly 1. On a desktop browser it scales the
@@ -27,6 +30,12 @@
 
   /** The menu stays open on pick, so the new palette can be seen taking effect. */
   const pickTheme = (theme: Theme): void => themes.select(theme);
+
+  /** Unlike a theme, the layout is hidden behind the menu — so close it to reveal it. */
+  const pickScreen = (screen: Screen): void => {
+    screens.select(screen);
+    menuOpen = false;
+  };
 
   onMount(() => {
     const fit = (): void => {
@@ -55,6 +64,17 @@
           busy={dashboard.isRefreshing}
           onretry={refresh}
         />
+      {:else if screens.current.id === 'week'}
+        <WeekDashboard
+          {view}
+          date={dashboard.date}
+          clock={dashboard.clock}
+          updated={dashboard.updated}
+          busy={dashboard.isRefreshing}
+          notice={dashboard.notice}
+          onrefresh={refresh}
+          onmenu={() => (menuOpen = true)}
+        />
       {:else}
         <WeatherDashboard
           {view}
@@ -69,7 +89,9 @@
       {#if menuOpen}
         <SettingsModal
           current={themes.current}
+          screen={screens.current}
           onselect={pickTheme}
+          onscreen={pickScreen}
           onclose={() => (menuOpen = false)}
         />
       {/if}

@@ -48,6 +48,13 @@ export class Dashboard {
   clock = $derived(formatClock(this.#now));
   date = $derived(formatDate(this.#now));
 
+  /** Wall-clock time of the last successful fetch, for the 7-day screen's footer. */
+  updated = $derived(
+    this.#snapshot === null
+      ? '--:--'
+      : formatClock(new Date(this.#snapshot.updatedAt)),
+  );
+
   #stale = $derived(
     this.#snapshot !== null &&
       this.#now.getTime() - new Date(this.#snapshot.updatedAt).getTime() >

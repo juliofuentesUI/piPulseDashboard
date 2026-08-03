@@ -61,6 +61,34 @@ export function dome(cx: number, cy: number, r: number, c: string): Rect[] {
 }
 
 /**
+ * An annulus: a disc with a smaller one taken out of its middle, which leaves
+ * one run per row across the solid caps and two through the hole.
+ */
+export function ring(
+  cx: number,
+  cy: number,
+  r: number,
+  thickness: number,
+  c: string,
+): Rect[] {
+  const rects: Rect[] = [];
+  for (let y = Math.ceil(cy - r); y < cy + r; y += 1) {
+    const outer = spanAt(cx, cy, r, y);
+    if (outer === null) continue;
+
+    const hole = spanAt(cx, cy, r - thickness, y);
+    if (hole === null) {
+      rects.push(rect(outer.x0, y, outer.x1 - outer.x0, 1, c));
+      continue;
+    }
+
+    if (hole.x0 > outer.x0) rects.push(rect(outer.x0, y, hole.x0 - outer.x0, 1, c));
+    if (outer.x1 > hole.x1) rects.push(rect(hole.x1, y, outer.x1 - hole.x1, 1, c));
+  }
+  return rects;
+}
+
+/**
  * A disc with a second, offset disc subtracted from its right-hand side —
  * i.e. a crescent moon. Doing the set difference here avoids SVG masks, which
  * anti-alias and would soften the pixel edges.
@@ -87,6 +115,46 @@ export function crescent(
     if (x1 > outer.x0) rects.push(rect(outer.x0, y, x1 - outer.x0, 1, c));
   }
   return rects;
+}
+
+export interface Box {
+  readonly x0: number;
+  readonly y0: number;
+  /** Exclusive. */
+  readonly x1: number;
+  /** Exclusive. */
+  readonly y1: number;
+}
+
+/**
+ * Everything outside `hole`, cutting rows rather than discarding them: a run
+ * that straddles the edge comes back trimmed, and one that spans the hole comes
+ * back as its two ends.
+ *
+ * Filtering whole rects instead only ever drops a run that *starts* inside the
+ * box, which leaves the overhang behind and turns a gap in a curve into a
+ * ragged chord. Assumes the 1px-tall rows every generator here emits.
+ */
+export function without(rects: readonly Rect[], hole: Box): Rect[] {
+  const kept: Rect[] = [];
+
+  for (const r of rects) {
+    if (r.y < hole.y0 || r.y >= hole.y1) {
+      kept.push(r);
+      continue;
+    }
+
+    const from = Math.max(r.x, hole.x0);
+    const to = Math.min(r.x + r.w, hole.x1);
+    if (from >= to) {
+      kept.push(r);
+      continue;
+    }
+
+    if (r.x < from) kept.push(rect(r.x, r.y, from - r.x, r.h, r.c));
+    if (r.x + r.w > to) kept.push(rect(to, r.y, r.x + r.w - to, r.h, r.c));
+  }
+  return kept;
 }
 
 // --- Outlining ------------------------------------------------------------

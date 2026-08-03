@@ -1,5 +1,8 @@
 import type { LocationConfig } from './config.js';
 import type {
+  DayForecast,
+  DayPeriod,
+  DayPeriodPoint,
   ForecastPeriod,
   ForecastPoint,
   OpenMeteoResponse,
@@ -10,10 +13,14 @@ import type {
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
 
 /**
- * Two days of hourly data, so an evening reading late at night can roll
- * forward to tomorrow instead of falling off the end of the series.
+ * A week of hourly data. Seven fills the 7-day table starting today, and the
+ * spare days past tomorrow also give the rolling `forecast` strip somewhere to
+ * land when an evening reading late at night rolls forward.
  */
-const FORECAST_DAYS = 2;
+const FORECAST_DAYS = 7;
+
+/** How many rows the 7-day table renders, today included. */
+const WEEK_DAYS = 7;
 
 /** Local hour each dashboard column aims at. */
 const PERIOD_HOURS: Readonly<Record<ForecastPeriod, number>> = {
@@ -22,6 +29,15 @@ const PERIOD_HOURS: Readonly<Record<ForecastPeriod, number>> = {
 };
 
 const PERIODS: readonly ForecastPeriod[] = ['midday', 'evening'];
+
+/** Local hour each column of the 7-day table aims at. */
+const DAY_PERIOD_HOURS: Readonly<Record<DayPeriod, number>> = {
+  morning: 9,
+  midday: 13,
+  evening: 19,
+};
+
+const DAY_PERIODS: readonly DayPeriod[] = ['morning', 'midday', 'evening'];
 
 /** How far ahead the single rain number looks. */
 const RAIN_WINDOW_HOURS = 12;
@@ -106,6 +122,7 @@ export function normalize(
     precipitationProbability: upcomingPrecipitationProbability(raw),
     windSpeed: Math.round(raw.current.wind_speed_10m),
     forecast: buildForecast(raw),
+    week: buildWeek(raw),
     updatedAt: toOffsetIso(Date.now(), raw.utc_offset_seconds),
   };
 }
@@ -172,6 +189,71 @@ function selectHour(raw: OpenMeteoResponse, hour: number): number {
     if (stamp >= currentHour) return i;
   }
   return -1;
+}
+
+// --- The 7-day table ------------------------------------------------------
+
+/**
+ * One row per local date, each carrying the three fixed hours the table's
+ * columns show.
+ *
+ * Rows are dated rather than relative, so today's row keeps its morning and
+ * midday cells after those hours have gone by. The hourly series still holds
+ * them — it starts at local midnight — and a hole punched in the first row
+ * would read as missing data rather than as elapsed time.
+ */
+function buildWeek(raw: OpenMeteoResponse): DayForecast[] {
+  const today = raw.current.time.slice(0, 10);
+  const byTime = new Map<string, number>();
+  for (let i = 0; i < raw.hourly.time.length; i += 1) {
+    const stamp = raw.hourly.time[i];
+    if (stamp !== undefined) byTime.set(stamp, i);
+  }
+
+  const rows: DayForecast[] = [];
+  for (let day = 0; day < raw.daily.time.length && rows.length < WEEK_DAYS; day += 1) {
+    const date = raw.daily.time[day];
+    // Guards against a provider that ever starts the series before today.
+    if (date === undefined || date < today) continue;
+
+    rows.push({
+      date,
+      dayOffset: daysBetween(today, date),
+      periods: DAY_PERIODS.map((period) => dayPoint(raw, byTime, date, period)),
+      precipitationProbability: clamp(
+        Math.round(raw.daily.precipitation_probability_max[day] ?? 0),
+        0,
+        100,
+      ),
+    });
+  }
+  return rows;
+}
+
+function dayPoint(
+  raw: OpenMeteoResponse,
+  byTime: ReadonlyMap<string, number>,
+  date: string,
+  period: DayPeriod,
+): DayPeriodPoint | null {
+  const hour = String(DAY_PERIOD_HOURS[period]).padStart(2, '0');
+  const index = byTime.get(`${date}T${hour}:00`);
+  if (index === undefined) return null;
+
+  const temperature = raw.hourly.temperature_2m[index];
+  const code = raw.hourly.weather_code[index];
+  if (temperature === undefined || code === undefined) return null;
+
+  const { key, label } = describeWeatherCode(code);
+  return {
+    period,
+    time: `${date}T${hour}:00:00${offsetSuffix(raw.utc_offset_seconds)}`,
+    temperature: Math.round(temperature),
+    condition: label,
+    conditionKey: key,
+    weatherCode: code,
+    isDay: raw.hourly.is_day[index] === 1,
+  };
 }
 
 /** Whole days between the date halves of two local ISO timestamps. */
@@ -328,6 +410,7 @@ function assertOpenMeteoResponse(value: unknown): asserts value is OpenMeteoResp
   const daily = value['daily'];
   if (
     !isRecord(daily) ||
+    !isArrayOf(daily['time'], (item): item is string => typeof item === 'string') ||
     !isArrayOf(daily['temperature_2m_max'], isNumber) ||
     !isArrayOf(daily['temperature_2m_min'], isNumber) ||
     !isArrayOf(
