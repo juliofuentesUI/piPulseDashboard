@@ -6,9 +6,6 @@ display on a Raspberry Pi 5.
 It shows the weather for San Jose, California — now, midday and evening — in a
 pixel-art neo-brutalist interface, full-screen, with no scrolling.
 
-> `docs/screenshot.png` predates the current design and is no longer linked here.
-> Replace it with a fresh capture and add the image back when convenient.
-
 ## Getting started
 
 ```bash
