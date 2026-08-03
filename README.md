@@ -3,8 +3,8 @@
 A Game Boy Advance-inspired weather dashboard for a **720 × 720 HyperPixel Square Touch**
 display on a Raspberry Pi 5.
 
-It shows the weather for San Jose, California — now, midday and evening — in a
-pixel-art neo-brutalist interface, full-screen, with no scrolling.
+It shows the weather for San Jose, California — now, midday and evening, plus a 7-day
+forecast — in a pixel-art neo-brutalist interface, full-screen, with no scrolling.
 
 ## Getting started
 

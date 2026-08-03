@@ -6,8 +6,8 @@ before changing anything structural.
 
 ## Scope
 
-This is a first demo, deliberately small: current weather for San Jose on one fixed-size
-screen, done well. Do not overbuild it.
+This is a first demo, deliberately small: the weather for San Jose on two fixed-size
+screens — current conditions and a 7-day forecast — done well. Do not overbuild it.
 
 Prefer plain CSS and hand-rolled helpers over new dependencies. The pixel sprites and the
 runtime payload validation are hand-written on purpose, not for lack of a library.
