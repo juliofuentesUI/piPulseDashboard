@@ -166,6 +166,13 @@ export type DashboardPhase = 'loading' | 'ready' | 'error';
 
 // --- Search Pulse ---------------------------------------------------------
 
+/** One article the feed associates with a trend. News about it, not a search. */
+export interface TrendNewsItem {
+  readonly title: string;
+  readonly source?: string;
+  readonly url?: string;
+}
+
 /**
  * Mirrors the API's `TrendingSearch`. Optional fields are absent whenever the
  * official feed did not state them, and are never filled in downstream.
@@ -177,6 +184,14 @@ export interface TrendingSearch {
   readonly publishedAt?: string;
   readonly relatedQueries: readonly string[];
   readonly sourceUrl?: string;
+  readonly imageUrl?: string;
+  readonly imageSource?: string;
+  /**
+   * Optional here where the API declares it required, on purpose: an API that
+   * predates this field should cost the card its headlines, not cost the whole
+   * screen its list by failing payload validation.
+   */
+  readonly news?: readonly TrendNewsItem[];
 }
 
 export interface TrendsSnapshot {
@@ -213,6 +228,46 @@ export interface TrendDetailView {
   readonly age: string;
   /** Google first reported it under 30 minutes ago. */
   readonly isNew: boolean;
+}
+
+/**
+ * One headline on the trend card, ready to render.
+ *
+ * Quoted and attributed, never condensed. `host` is the article's domain shown
+ * as plain text — the link is deliberately not tappable, because a tap on a
+ * wall-mounted kiosk navigates away from the dashboard with no way back.
+ */
+export interface TrendHeadlineView {
+  /** Stable key for the each-block: the headline's position in the feed. */
+  readonly key: string;
+  /** The headline, exactly as Google worded it. Never uppercased. */
+  readonly text: string;
+  /** The outlet, e.g. "REUTERS". Empty when the feed named none. */
+  readonly source: string;
+  /** The article's domain, e.g. "wkrc.com". Empty when the feed named none. */
+  readonly host: string;
+}
+
+/**
+ * The full-screen card for one trend: what the feed says the search is *about*.
+ *
+ * Every field is either something the feed stated or empty. A trend with no
+ * picture and no headlines renders without them rather than with a placeholder.
+ */
+export interface TrendCardView {
+  readonly title: string;
+  /** Google's bucket, compacted. Empty when the feed stated none. */
+  readonly volume: string;
+  /** The row's short form, e.g. "2H AGO". Empty when unstated. */
+  readonly age: string;
+  /** Google first reported it under 30 minutes ago. */
+  readonly isNew: boolean;
+  /** The feed's thumbnail, on Google's image CDN. Empty when it named none. */
+  readonly imageUrl: string;
+  /** The outlet that picture came from. Empty when unstated. */
+  readonly imageSource: string;
+  /** Every headline the feed carried, in its order. Never trimmed to one. */
+  readonly headlines: readonly TrendHeadlineView[];
 }
 
 /** One stored observation of where a trend sat. Mirrors the API. */

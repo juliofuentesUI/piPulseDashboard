@@ -157,10 +157,11 @@ piPulseDashboard/
 │       │       ├── screen.svelte.ts      which of the two weather layouts is showing
 │       │       ├── types.ts      transport types vs. view types
 │       │       ├── view.ts       snapshot → view model, time formatting
-│       │       ├── trend-view.ts trend rows, log bar scale, volume formatting
+│       │       ├── trend-view.ts trend rows, log bar scale, volume formatting,
+│       │       │                 the card's quoted headlines
 │       │       ├── components/   WeatherDashboard, WeekDashboard, ForecastTable,
-│       │       │                 SearchPulse, TrendRow, Sparkline, PageDots,
-│       │       │                 StatusHeader, TitleBar, FooterBar, …
+│       │       │                 SearchPulse, TrendRow, TrendCard, Sparkline,
+│       │       │                 PageDots, StatusHeader, TitleBar, FooterBar, …
 │       │       └── weather-icons/  thirteen original pixel-art sprites,
 │       │                           plus the sprite/outline helpers
 │       ├── index.html
@@ -300,7 +301,16 @@ API traffic.
       "title": "does sheepstealer die",
       "approximateVolume": "20000+",
       "publishedAt": "2026-08-03T01:50:00.000Z",
-      "relatedQueries": []
+      "relatedQueries": [],
+      "imageUrl": "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9Gc…",
+      "imageSource": "Reuters",
+      "news": [
+        {
+          "title": "House of the Dragon season 3: what to know before the premiere",
+          "source": "Reuters",
+          "url": "https://www.reuters.com/…"
+        }
+      ]
     }
   ],
   "updatedAt": "2026-08-03T03:43:30.440Z"
@@ -325,6 +335,19 @@ gap in the code. The feed gives each item a set of `ht:news_item` headlines — 
 would put words on the screen nobody searched for. `sourceUrl` is absent for the same
 kind of reason: every item's `<link>` is the URL of the feed itself, so there is nothing
 per-trend to point at.
+
+`news` carries those headlines as what they are: articles, quoted verbatim, each with the
+outlet that published it. Three per item in practice, on every item checked against the
+live feed. The trend card shows **all** of them — a broad query like `artificial
+intelligence news` comes back with three unrelated stories, so promoting the first to "the
+headline" would assert the trend is about something it is only a third about. There is no
+prose to go with them: `<description>` and `ht:news_item_snippet` are empty on every item
+and every article, so nothing on the screen describes a trend in sentences of its own.
+
+`imageUrl` and `imageSource` are the item's `ht:picture` thumbnail and its credit, on
+Google's image CDN. The browser loads it directly; a URL that is not http(s) is dropped by
+the parser rather than passed to an `src`. How Google associates an article or a picture
+with a query is not published, and nothing here describes a mechanism for it.
 
 `id` is the title lowercased, trimmed, with inner whitespace collapsed. It recognises the
 same search written with different spacing, and deliberately does no more than that —
@@ -486,7 +509,7 @@ the accent stays a tint of the active theme rather than a sixth hard-coded colou
 | Title | 96 px | `SEARCH PULSE`, and the 3 × 3 menu grid |
 | Region | 64 px | `UNITED STATES`, and the freshness report |
 | Trends | fills | Five `TrendRow`s, equal height |
-| Details | 148 px | What the feed said about the selected trend |
+| Details | 212 px | What the feed said about the selected trend, and the rank graph |
 
 Title above region is the reverse of the weather screens, which lead with a status strip.
 This screen leads with its name, which is the order the design calls for and the one that
@@ -594,6 +617,67 @@ record of when we first saw anything, so it is measured against the feed's own `
 That is Google's report time: exact, needing no storage, and it does not reset when the
 Pi does. `RISING` and `COOLING` come from the stored rank history and are described under
 `GET /api/trends/history` above.
+
+### The trend card
+
+`TrendCard.svelte`. A title like `PROFESSOR` or `AERODIANA` explains nothing on its own,
+while the feed already carries a picture and three headlines that explain it completely.
+Tapping the details band swaps the list for a card on those; the back control in its
+header returns. Three bands again, to the same 704:
+
+| Band | Height | Contents |
+| --- | --- | --- |
+| Header | 96 px | Back control and the search, the figure and its age |
+| Article | fills | The picture, and every headline the feed carried |
+| Graph | 156 px | The same rank plot, given the width it never had below the list |
+
+**It is a view inside Search Pulse, not a third page.** The carousel stays two pages; a
+horizontal swipe means "change dashboard section" and has to keep meaning only that.
+Everything this section gains is reached by a tap.
+
+**All three headlines are shown, never one.** Sampled against the live feed: four of five
+trends had three headlines about a single event, so any one of them would have done — but
+`artificial intelligence news` returned three *different* stories, and picking the first
+would have asserted the trend was about that story when it was about all three. Where they
+agree you learn the event; where they diverge you learn the query is broad, and the
+divergence is itself the information. They are also not reconciled: `nazca lines` came back
+with one headline saying 11 dead and two saying 13, and the card shows what each outlet
+wrote.
+
+Headlines are the one text on the dashboard that is **not** uppercased. Everywhere else the
+screen writes its own labels; here it quotes a hundred characters of someone else's
+sentence, and capitals would be both harder to read and less faithful. Each carries its
+outlet and the article's domain as plain text — deliberately not a link, because a tap on a
+wall-mounted kiosk navigates away from the dashboard with no way back. A QR code is the
+deferred answer to actually reaching an article.
+
+**The picture is duotoned to the active theme in four lines of CSS.** The image is
+greyscaled and a panel of `--c-sky` is laid over it on `mix-blend-mode: color`, inside
+`isolation: isolate` so the blend stays in the box. It re-tints with the theme for free,
+because the overlay is a theme token.
+
+The token matters more than it looks. The `color` blend hands back the *overlay's* chroma —
+its `max − min` RGB spread — with the photo's luminosity, so a near-neutral overlay
+produces a near-greyscale image whatever the theme is nominally set to. Mean chroma of the
+composited image, measured over a real feed thumbnail:
+
+| overlay | gba-blue | midnight | dmg-green | brutalist | amber |
+| --- | --- | --- | --- | --- | --- |
+| `--c-ink` | 82 | **19** | **36** | 139 | 122 |
+| `--c-sky` | 101 | 93 | 90 | 115 | 86 |
+| `--c-blue` | 112 | 101 | **44** | 135 | 126 |
+
+`sky` is the only one of the three in the mid range in every palette. `ink` collapses on
+`midnight`, whose ink is `#eaf2ff` — near white where every other theme's is dark, which is
+why **any image treatment has to be checked against that theme specifically**.
+
+Chunky pixels are a separate effect and CSS cannot do them at all: `image-rendering:
+pixelated` only engages when the browser upscales, and these arrive at 275 px and are drawn
+smaller, so it never fires. That needs a canvas pass and is deferred; the duotone is what
+took the photo from an obvious foreign object to something in the palette.
+
+A trend whose entry carries no picture, or whose picture fails to load, renders without one
+and the headlines take the full width. Nothing is substituted for it.
 
 ## Controls
 

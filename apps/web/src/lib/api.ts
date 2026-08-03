@@ -213,8 +213,33 @@ function isTrendingSearch(value: unknown): value is TrendingSearch {
     v['relatedQueries'].every((q) => typeof q === 'string') &&
     isOptionalString(v['approximateVolume']) &&
     isOptionalString(v['publishedAt']) &&
-    isOptionalString(v['sourceUrl'])
+    isOptionalString(v['sourceUrl']) &&
+    isOptionalString(v['imageUrl']) &&
+    isOptionalString(v['imageSource']) &&
+    isNewsList(v['news'])
   );
+}
+
+/**
+ * Absent is acceptable, unlike `relatedQueries`.
+ *
+ * An API build that predates the trend card should cost the card its
+ * headlines and nothing more. Requiring the field would turn that into a
+ * malformed payload and take the whole live list down with it.
+ */
+function isNewsList(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!Array.isArray(value)) return false;
+
+  return value.every((item) => {
+    if (typeof item !== 'object' || item === null) return false;
+    const news = item as Record<string, unknown>;
+    return (
+      typeof news['title'] === 'string' &&
+      isOptionalString(news['source']) &&
+      isOptionalString(news['url'])
+    );
+  });
 }
 
 function isOptionalString(value: unknown): boolean {

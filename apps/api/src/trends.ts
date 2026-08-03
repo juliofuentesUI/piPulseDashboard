@@ -6,7 +6,7 @@
  * official API replaces the RSS export, one class changes and nothing else.
  */
 
-import type { TrendingSearch } from './types.js';
+import type { TrendingSearch, TrendNewsItem } from './types.js';
 
 const TRENDING_RSS_URL = 'https://trends.google.com/trending/rss';
 
@@ -67,12 +67,29 @@ export class GoogleTrendingRssProvider implements TrendProvider {
  * The tag names below cannot collide with the ones nested inside an item:
  * `<ht:news_item_title>` does not contain the substring `<title`, and
  * `<ht:news_item>` does not contain `<item`.
+ *
+ * The same care applies to the picture and news tags. `\b` after `ht:picture`
+ * is what keeps it off `<ht:picture_source>` — an underscore is a word
+ * character, so there is no boundary there to match. `<ht:news_item>` is
+ * written with its closing angle bracket for the same reason, so it cannot
+ * swallow `<ht:news_item_title>`; and its closing tag `</ht:news_item>` is
+ * likewise distinct from `</ht:news_item_picture>`, which is what lets the
+ * non-greedy body stop in the right place.
  */
 
 const ITEM_RE = /<item\b[^>]*>([\s\S]*?)<\/item>/g;
 const TITLE_RE = /<title\b[^>]*>([\s\S]*?)<\/title>/;
 const TRAFFIC_RE = /<ht:approx_traffic\b[^>]*>([\s\S]*?)<\/ht:approx_traffic>/;
 const PUBDATE_RE = /<pubDate\b[^>]*>([\s\S]*?)<\/pubDate>/;
+const PICTURE_RE = /<ht:picture\b[^>]*>([\s\S]*?)<\/ht:picture>/;
+const PICTURE_SOURCE_RE =
+  /<ht:picture_source\b[^>]*>([\s\S]*?)<\/ht:picture_source>/;
+
+const NEWS_ITEM_RE = /<ht:news_item>([\s\S]*?)<\/ht:news_item>/g;
+const NEWS_TITLE_RE = /<ht:news_item_title\b[^>]*>([\s\S]*?)<\/ht:news_item_title>/;
+const NEWS_SOURCE_RE =
+  /<ht:news_item_source\b[^>]*>([\s\S]*?)<\/ht:news_item_source>/;
+const NEWS_URL_RE = /<ht:news_item_url\b[^>]*>([\s\S]*?)<\/ht:news_item_url>/;
 
 export function parseTrendingRss(xml: string): readonly TrendingSearch[] {
   const trends: TrendingSearch[] = [];
@@ -110,6 +127,17 @@ export function parseTrendingRss(xml: string): readonly TrendingSearch[] {
        * feed itself rather than a page about that trend, so there is nothing
        * per-trend to point at.
        */
+
+      /*
+       * What the feed *does* carry about the subject matter: a thumbnail and
+       * a handful of headlines. Verified against the live export — present on
+       * 10/10 items, three headlines each, every one with a source and a URL.
+       * `<description>` and `<ht:news_item_snippet>` are empty on every item
+       * and every article, so there is no prose here to show and none is made.
+       */
+      ...optional('imageUrl', httpUrl(text(item, PICTURE_RE))),
+      ...optional('imageSource', text(item, PICTURE_SOURCE_RE)),
+      news: newsItems(item),
     });
   }
 
@@ -130,6 +158,53 @@ export function parseTrendingRss(xml: string): readonly TrendingSearch[] {
  */
 export function trendKey(title: string): string {
   return title.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * Every `<ht:news_item>` in one item, in the order the feed lists them.
+ *
+ * A headline with no text is not an article, so it is dropped rather than
+ * rendered as an empty quote; source and URL are each carried only when
+ * stated. Nothing here trims the list to a single "best" headline — the feed
+ * routinely attaches three unrelated stories to a broad query, and choosing
+ * one would assert the trend is about that one.
+ */
+function newsItems(item: string): TrendNewsItem[] {
+  const news: TrendNewsItem[] = [];
+
+  for (const match of item.matchAll(NEWS_ITEM_RE)) {
+    const entry = match[1];
+    if (entry === undefined) continue;
+
+    const title = text(entry, NEWS_TITLE_RE);
+    if (title === undefined) continue;
+
+    news.push({
+      title,
+      ...optional('source', text(entry, NEWS_SOURCE_RE)),
+      ...optional('url', httpUrl(text(entry, NEWS_URL_RE))),
+    });
+  }
+  return news;
+}
+
+/**
+ * A URL only if it is one, and only over http(s).
+ *
+ * The image URL ends up in an `src` attribute, so a feed that ever carried
+ * something else — a `javascript:` or `data:` value — must not reach the
+ * browser. An unparseable URL is treated like any other field the feed did not
+ * supply: left out.
+ */
+function httpUrl(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? value : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Inner text of the first matching element, decoded and trimmed. */

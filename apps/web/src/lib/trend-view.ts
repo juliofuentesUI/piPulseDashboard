@@ -1,5 +1,6 @@
 import type {
   SparklineView,
+  TrendCardView,
   TrendDetailView,
   TrendHistory,
   TrendHistoryView,
@@ -135,6 +136,59 @@ export function toTrendDetail(trend: TrendingSearch, now: Date): TrendDetailView
     age: known ? relativeTime(trend.publishedAt as string, now) : '',
     isNew: known && now.getTime() - published.getTime() < NEW_WITHIN_MS,
   };
+}
+
+/**
+ * The card view: what the feed says the selected search is *about*.
+ *
+ * Every headline the feed carried is passed through, in the feed's order and
+ * with its own wording. Picking one would be a claim about which story the
+ * trend is really about, and the feed shows why that claim fails — a broad
+ * query like `artificial intelligence news` comes back with three unrelated
+ * stories, so the first one is not the trend, it is a third of it. Where the
+ * three agree you learn the event; where they diverge you learn the query is
+ * broad, and the divergence is itself the information.
+ */
+export function toTrendCard(trend: TrendingSearch, now: Date): TrendCardView {
+  const detail = toTrendDetail(trend, now);
+
+  return {
+    title: detail.title,
+    volume: detail.volume,
+    // The header runs the figure and the age together on one line, so it takes
+    // the row's short form — "2H AGO" rather than the panel's "2 HRS AGO".
+    age: trend.publishedAt === undefined ? '' : shortAgo(trend.publishedAt, now),
+    isNew: detail.isNew,
+    imageUrl: trend.imageUrl ?? '',
+    imageSource: (trend.imageSource ?? '').toUpperCase(),
+    headlines: (trend.news ?? []).map((item, index) => ({
+      key: String(index),
+      // Not uppercased, unlike everything else on this screen. These are
+      // sentences of someone else's prose quoted verbatim, and a hundred
+      // characters of capitals is both harder to read and less faithful.
+      text: item.title,
+      source: (item.source ?? '').toUpperCase(),
+      host: hostOf(item.url),
+    })),
+  };
+}
+
+/**
+ * The domain of an article, e.g. "wkrc.com", with a leading `www.` dropped.
+ *
+ * Shown as text beside the outlet's name rather than made tappable: a tap on a
+ * wall-mounted kiosk navigates away from the dashboard with no way back, and
+ * the full URL is far too long for the card. Empty for anything unparseable,
+ * which is the same treatment every other unstated field gets.
+ */
+export function hostOf(url: string | undefined): string {
+  if (url === undefined) return '';
+
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
 }
 
 const REGION_NAMES: Readonly<Record<string, string>> = {

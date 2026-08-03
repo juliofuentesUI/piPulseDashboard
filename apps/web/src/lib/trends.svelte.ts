@@ -4,6 +4,7 @@ import {
   orderTrends,
   type PulseMode,
   regionName,
+  toTrendCard,
   toTrendDetail,
   toTrendHistoryView,
   toTrendRows,
@@ -103,6 +104,15 @@ export class Trends {
   selectedId = $derived(this.#current?.id ?? '');
   detail = $derived(
     this.#current === null ? null : toTrendDetail(this.#current, this.#now),
+  );
+
+  /**
+   * The same trend the details band is describing, with what the feed says it
+   * is about. Derived rather than captured when the card opens, so a poll that
+   * lands while the card is up refreshes it instead of leaving it stale.
+   */
+  card = $derived(
+    this.#current === null ? null : toTrendCard(this.#current, this.#now),
   );
 
   #history = $state<TrendHistory | null>(null);

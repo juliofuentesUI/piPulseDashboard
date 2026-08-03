@@ -14,8 +14,8 @@ Lines marked **AMENDED** record where the plan met reality and reality won.
 | 2 | Selected-trend details panel | Done — 2026-08-02 |
 | 3 | SQLite history and rank graph | Done — 2026-08-02 |
 | — | Ordering fix: `SURGING` / `BIGGEST` — see the AMENDED section at the end | Done — 2026-08-02 |
-| 3.5 | Full-screen trend card | **Next** |
-| 4 | Daily history view | Not started |
+| 3.5 | Full-screen trend card | Done — 2026-08-03 |
+| 4 | Daily history view | **Next** |
 | 5 | Reliability and polish | Not started |
 
 **Each phase is merged and usable before the next one starts.** Finishing the current
@@ -388,7 +388,7 @@ Acceptance criteria:
 
 ---
 
-## Phase 3.5 — Full-screen trend card
+## Phase 3.5 — Full-screen trend card · **DONE**
 
 Added 2026-08-03, ahead of Phase 4, at the user's request. A trend's title often explains
 nothing on its own — `PROFESSOR`, `XMEN`, `AERODIANA` — while the feed carries a picture
@@ -453,10 +453,32 @@ Greyscale the photo and blend it onto a panel painted in a theme colour:
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--c-ink);
+  background: var(--c-sky);
   mix-blend-mode: color;
 }
 ```
+
+**AMENDED — the overlay is `sky`, not `ink`. Measured while building, 2026-08-03.** As
+written with `var(--c-ink)`, this snippet produces a **flat greyscale image on
+`midnight`** — the exact failure the table below pins on `multiply`, and the reason the
+rule above says to test against that theme.
+
+The maths says it has to. The `color` blend hands back the *overlay's* chroma — its
+`max − min` RGB spread — with the photo's luminosity. Midnight's `ink` is `#eaf2ff`, a
+spread of 21/255, so there is no hue in it to give. Mean chroma of the composited tile
+over a real feed image, 0–255:
+
+| overlay | gba-blue | midnight | dmg-green | brutalist | amber |
+| --- | --- | --- | --- | --- | --- |
+| `ink` *(as first specced)* | 82 | **19** | **36** | 139 | 122 |
+| `sky` | 101 | 93 | 90 | 115 | 86 |
+| `blue` | 112 | 101 | **44** | 135 | 126 |
+
+`sky` is the only token in the mid range in all five palettes. `ink` fails `midnight` and
+is weak on `dmg-green`; `blue` beats it on four and then collapses on `dmg-green`.
+
+The `color` blend mode itself is unchanged — that decision stands. This is the token that
+lets it keep the promise the decision was made on.
 
 Pure CSS, no JavaScript, and it **recolours with the theme** for free because the overlay
 is a theme token — switch to Amber CRT and the photo goes amber.
@@ -490,41 +512,68 @@ If canvas is ever revisited, CORS is not a blocker — verified that
 `encrypted-tbn*.gstatic.com` returns `access-control-allow-origin: *`, so with
 `crossorigin="anonymous"` the canvas is untainted. Images are cached a year.
 
-Open sub-decision either way: this loads images **directly from Google in the browser**,
-the first time the client talks to Google rather than to our API. No technical need to
-proxy; a question of whether that property is worth keeping.
+**Settled: images load directly from Google in the browser.** This is the first time the
+client talks to Google rather than to our API, and Phase 1's "Google is contacted only by
+the backend" was written for the *rate-limited RSS endpoint* — one browser refresh costing
+an upstream fetch is what the backend cache exists to prevent. These are
+`encrypted-tbn*.gstatic.com` CDN thumbnails, cached a year, on a host built to be hit by
+browsers, so that reason does not carry over. A proxy route with a host allowlist is
+roughly thirty lines if the property is ever wanted absolutely.
+
+The URL is validated before it reaches an `src`: `parseTrendingRss` drops anything that is
+not http(s), so a feed that ever carried a `javascript:` or `data:` value would be treated
+like any other field it did not supply.
 
 ### The article link
 
 Show it. The user asked for it and the feed provides `ht:news_item_url` per headline.
 
+**Shown as text, not tappable — decided 2026-08-03.** The card prints the outlet and the
+article's domain, `WKRC · wkrc.com`, which is what the mockup above already draws. Tapping
+a link on a wall-mounted kiosk navigates away from the dashboard with no way back, and the
+panel has no browser chrome to return with.
+
 **QR codes are explicitly deferred** — considered and held off. They would suit a wall
 display, since an article is unreadable on a 720 × 720 panel but scannable to a phone, and
 a QR is black-and-white blocks that fit the aesthetic. The cost is an encoder: a small
-library or ~250 lines of Reed-Solomon. Revisit if reaching articles becomes a real need.
+library or ~250 lines of Reed-Solomon. That, not a tappable link, is the answer if
+reaching articles ever becomes a real need.
 
-Worth remembering: tapping a link on a wall-mounted kiosk navigates away from the
-dashboard. Decide deliberately whether the link is tappable or shown as text.
+### Work this needed — all done
 
-### Work this needs
+- `parseTrendingRss` extracts `ht:picture`, `ht:picture_source`, and each `ht:news_item`'s
+  title, source and URL. The added patterns cannot collide with the nested ones: `\b` after
+  `ht:picture` keeps it off `<ht:picture_source>`, because an underscore is a word
+  character and leaves no boundary there.
+- `TrendingSearch` gained optional `imageUrl` and `imageSource`, plus a `news` array that
+  is empty rather than absent, the way `relatedQueries` is.
+- **Headlines and image are deliberately not stored in `trend_snapshots`.** They describe
+  what a search is about *now*; the card always renders the live trend from
+  `/api/trends/now`, never from history. Storing three headlines and four URLs per trend
+  per fetch would multiply the row size for data nothing reads, and Phase 4 ranks on
+  volume, rank and duration — none of which needs them.
+- The web client's copy of `news` is optional where the API's is required, on purpose: an
+  API build that predates the field should cost the card its headlines, not fail payload
+  validation and take the live list down with it.
 
-The API does not carry any of this yet:
+### Acceptance criteria — all met and verified in the browser
 
-- `parseTrendingRss` must extract `ht:picture`, `ht:picture_source`, and each
-  `ht:news_item`'s title, source and URL.
-- `TrendingSearch` gains optional `imageUrl`, `imageSource`, and a `news` array. Same rule
-  as everything else: absent when the feed does not state it.
-- Decide whether headlines and image belong in `trend_snapshots`. They describe the
-  present rather than history, so probably not — but say so on purpose.
-
-### Acceptance criteria
-
-- Tapping into a trend shows its card; a tap returns to the list.
+- Tapping the details band shows the card; the back control returns to the list.
 - All three headlines appear, quoted verbatim, each with its source named.
-- The image reads as pixel art and recolours with the theme.
+- The image is duotoned into the theme palette and recolours with the theme. Checked in
+  all five.
 - A trend whose feed entry lacks an image or headlines renders without them, not with a
-  placeholder.
+  placeholder — verified by failing the image load.
 - Nothing on the card is summarised, interpreted, or presented as a related search.
+
+**AMENDED — "reads as pixel art" was dropped from the criteria above.** It contradicted the
+amendment three paragraphs up, which established that chunky pixels cannot be done in CSS
+at all and are deferred to a canvas pass. The criterion the shipped treatment is held to is
+the duotone and the theme recolour.
+
+One thing the build confirmed about the three-headline rule, from the live feed: `nazca
+lines` returned three headlines that agreed on the event and **disagreed on the death toll**
+— one said 11, two said 13. They are shown as they were written, and not reconciled.
 
 ---
 

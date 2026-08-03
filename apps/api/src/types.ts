@@ -157,6 +157,23 @@ export interface WeatherSnapshot {
 // --- Trends contract ------------------------------------------------------
 
 /**
+ * One article the feed associates with a trend.
+ *
+ * News *about* the search, never another search. How Google decides which
+ * articles belong to a query is not published, so nothing here describes a
+ * mechanism for it, and nothing downstream may summarise or interpret a
+ * headline — it is quoted verbatim with its outlet named, or it is left out.
+ */
+export interface TrendNewsItem {
+  /** The headline, exactly as the feed words it. */
+  readonly title: string;
+  /** The outlet that published it, e.g. "Reuters". */
+  readonly source?: string;
+  /** The article itself. Absent unless the feed states an http(s) URL. */
+  readonly url?: string;
+}
+
+/**
  * One trending search, carrying only what the official feed actually states.
  *
  * Every optional field is absent rather than guessed when Google does not
@@ -183,6 +200,19 @@ export interface TrendingSearch {
   readonly relatedQueries: readonly string[];
   /** A page about this trend, when the feed names one per item. */
   readonly sourceUrl?: string;
+  /**
+   * The thumbnail the feed picked for this trend, on Google's image CDN.
+   * Absent when the item names none.
+   */
+  readonly imageUrl?: string;
+  /** The outlet that thumbnail came from, e.g. "Reuters". */
+  readonly imageSource?: string;
+  /**
+   * Articles the feed associates with this trend — three per item in practice,
+   * though nothing requires that. Empty when the item carries none, the same
+   * way `relatedQueries` is empty rather than absent.
+   */
+  readonly news: readonly TrendNewsItem[];
 }
 
 export interface TrendsSnapshot {

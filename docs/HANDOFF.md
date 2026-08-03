@@ -13,14 +13,14 @@ being true.
 | 2 | Tap-to-select, trend details panel | Done |
 | 3 | SQLite history, rank graph, movement labels | Done |
 | — | Ordering fix: SURGING / BIGGEST modes | Done |
-| 3.5 | Full-screen trend card: image + 3 headlines | **Next** |
-| 4 | Daily history view (`TODAY`) | After 3.5 |
+| 3.5 | Full-screen trend card: image + 3 headlines | Done |
+| 4 | Daily history view (`TODAY`) | **Next** |
 | 5 | Reliability and polish | Not started |
 
 All commits pushed, working tree clean. Nothing is parked on a branch.
 
-**Start with Phase 3.5** — specified in full in the plan doc, decided with the user on
-2026-08-03. It comes before Phase 4 at their request.
+**Start with Phase 4** — read "What Phase 4 needs to know before starting" below before
+you touch it. The promise it can honestly make is narrower than its name suggests.
 
 ## Read these, in this order
 
@@ -69,10 +69,12 @@ So there is no prose about a trend, but the headlines answer "what is this about
 researchers tells you everything. This is the strongest candidate for filling the hole
 left by `relatedQueries`.
 
-**This is now Phase 3.5** and the decisions are made — see the plan doc for the full spec.
-In short: a full-screen card inside Search Pulse, the image duotoned to the active theme
-in ~4 lines of CSS, all three headlines quoted with their sources, the article link shown,
-QR deferred.
+**This became Phase 3.5, and it is built.** A full-screen card inside Search Pulse, reached
+by tapping the details band and left by the back control in its header; the image duotoned
+to the active theme in ~4 lines of CSS; all three headlines quoted with their sources; the
+article shown as outlet and domain in plain text rather than a tappable link, because a tap
+on a kiosk navigates away with no way back. QR remains the deferred answer for reaching an
+article.
 
 **Showing one headline would have been a bug.** Sampled 2026-08-03: four of five trends had
 three headlines about one event, but `artificial intelligence news` returned three
@@ -92,17 +94,29 @@ everywhere but goes nearly greyscale on `midnight`, defeating the point; the `co
 overlay holds a visible theme hue in all five *and* keeps the photo legible. The user
 picked it from the rendered comparison.
 
+**The overlay token is `sky`, not `ink` — and the first spec had this wrong.** Written with
+`var(--c-ink)` the treatment renders flat grey on `midnight`, which is the very failure
+`multiply` was rejected for. The `color` blend hands back the *overlay's* chroma spread
+(`max − min` of its RGB), and midnight's ink `#eaf2ff` has a spread of 21/255, so there is
+no hue in it to give. Measured over a real feed image, `sky` is the only token in the mid
+range in all five palettes; the numbers are in the plan doc. The blend mode was never the
+problem.
+
 **Test any image treatment against `midnight`.** Its `ink` is near-white while every other
-theme's is dark, so it inverts assumptions the other four share — it is what broke both
-rejected options.
+theme's is dark, so it inverts assumptions the other four share — it broke both rejected
+options *and* the first choice of overlay token. Do not judge a treatment from `gba-blue`.
+
 Chunky pixels are a separate effect that CSS genuinely cannot do — `image-rendering:
 pixelated` only engages when upscaling, and these images are displayed smaller than they
-arrive — so that needs canvas and is deferred.
+arrive — so that needs canvas and is deferred. The plan's acceptance criterion said the
+image should "read as pixel art", which contradicted that; it has been corrected to the
+duotone and the theme recolour, which is what shipped.
 
-Open sub-decision: this loads images directly from Google in the browser, the first time
-the client talks to Google rather than to our API. CORS allows it
-(`access-control-allow-origin: *`); it is a question of whether that property is worth
-keeping.
+Settled: images load **directly from Google in the browser**. Phase 1's "Google is
+contacted only by the backend" was written to protect the rate-limited RSS endpoint, and
+these are `gstatic` CDN thumbnails cached a year, so the reason does not carry over. A
+proxy route with a host allowlist is ~30 lines if that property is ever wanted absolutely.
+The parser drops any URL that is not http(s) before it can reach an `src`.
 
 Headlines may be shown **quoted with attribution only** — never summarised, interpreted, or
 presented as related searches.
@@ -122,8 +136,6 @@ for trends up to a day old; ours shows trends in their first hours. Both are rea
 bounds Phase 4 — see below.
 
 ## What Phase 4 needs to know before starting
-
-(Phase 3.5 comes first — see the plan doc.)
 
 The plan's `TODAY` view is "the day's strongest trends, from stored history". It is
 buildable, but **be precise with the user about what it can say.**
@@ -157,7 +169,11 @@ scrolling on a wall display.
 | Carousel stays two pages | User's rule. New views go *inside* Search Pulse |
 | Trend card shows all three headlines | One headline misrepresents broad queries |
 | Card image tinted by a `color`-blend overlay | Only option holding theme hue on all five themes |
-| Article link shown, QR deferred | QR suits a wall display but needs an encoder |
+| The overlay's colour is `sky` | Measured: the only token with chroma in all five palettes |
+| Article shown as outlet · domain, not a link | A tap on a kiosk navigates away with no way back |
+| Card is entered from the details band | The band already describes the trend; biggest target |
+| Headlines and image not stored in SQLite | They describe the present; the card reads the live list |
+| Card image fetched by the browser, not proxied | The rule protected the rate-limited feed, not a CDN |
 
 ## Gotchas
 

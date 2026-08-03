@@ -3,12 +3,14 @@
   import type { PulseStatus } from '../trends.svelte';
   import type {
     DashboardPhase,
+    TrendCardView,
     TrendDetailView,
     TrendHistoryView,
     TrendRowView,
   } from '../types';
   import Sparkline from './Sparkline.svelte';
   import TitleBar from './TitleBar.svelte';
+  import TrendCard from './TrendCard.svelte';
   import TrendRow from './TrendRow.svelte';
 
   interface Props {
@@ -17,6 +19,7 @@
     status: PulseStatus;
     region: string;
     detail: TrendDetailView | null;
+    card: TrendCardView | null;
     history: TrendHistoryView | null;
     selectedId: string;
     mode: PulseMode;
@@ -31,6 +34,7 @@
     status,
     region,
     detail,
+    card,
     history,
     selectedId,
     mode,
@@ -43,8 +47,21 @@
   const movement = $derived(
     history === null || history.movement === 'steady' ? null : history.movement,
   );
+
+  /**
+   * Which of this section's views is showing.
+   *
+   * A view *inside* Search Pulse, reached by a tap — never a third page beside
+   * the weather. A horizontal swipe means "change dashboard section" and has to
+   * keep meaning only that, so the card takes over this page rather than
+   * joining the carousel.
+   */
+  let open = $state(false);
 </script>
 
+{#if open && card !== null}
+  <TrendCard {card} {history} onback={() => (open = false)} />
+{:else}
 <div class="pulse">
   <TitleBar title="SEARCH PULSE" size={56} dotRows={3} {onmenu} />
 
@@ -106,6 +123,21 @@
     supply it, so the panel is never padded out with placeholder rows.
   -->
   <div class="details">
+    <!--
+      The whole band opens the card, not a widget inside it — the band is
+      already the thing describing the selected trend, and a finger on a wall
+      display wants the biggest target available. It sits over the text rather
+      than wrapping it so the definition list below stays a definition list.
+    -->
+    {#if detail !== null}
+      <button
+        class="open"
+        type="button"
+        aria-label="Open trend card"
+        onclick={() => (open = true)}
+      ></button>
+    {/if}
+
     <div class="details-head">
       <h2 class="details-heading">TREND DETAILS</h2>
       {#if detail?.isNew}
@@ -113,6 +145,21 @@
       {/if}
       {#if movement !== null}
         <span class="badge movement">{movement === 'rising' ? 'RISING' : 'COOLING'}</span>
+      {/if}
+
+      <!--
+        There is no hover on this panel and no menu, so a view nobody can see
+        is a view nobody knows exists. The button above carries the accessible
+        name; this is the part a finger can see.
+      -->
+      {#if detail !== null}
+        <span class="hint" aria-hidden="true">
+          CARD
+          <svg class="chev" viewBox="0 0 12 12" width="24" height="24" shape-rendering="crispEdges">
+            <polygon points="7,1 7,11 12,6" />
+            <rect x="0" y="5" width="7" height="2" />
+          </svg>
+        </span>
       {/if}
     </div>
 
@@ -188,6 +235,7 @@
     {/if}
   </div>
 </div>
+{/if}
 
 <style>
   /*
@@ -314,6 +362,8 @@
    * enough to run a line of text straight under them.
    */
   .details {
+    /* Anchors the full-band button that opens the card. */
+    position: relative;
     display: grid;
     align-content: center;
     gap: 10px;
@@ -321,10 +371,46 @@
     padding: 0 24px 28px;
   }
 
+  /*
+   * Transparent and the size of the band. No z-index: a positioned element
+   * already hit-tests above the in-flow text beneath it, and staying out of
+   * the z-index ladder keeps the page indicator and the settings overlay —
+   * both later in the document — above it where they belong.
+   */
+  .open {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+
   .details-head {
     display: flex;
     align-items: center;
     gap: 14px;
+  }
+
+  .hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    font-size: 15px;
+    letter-spacing: 3px;
+    color: var(--c-blue);
+  }
+
+  /* Drawn, not typed — the same whole-pixel geometry as the sprites. */
+  .chev {
+    fill: var(--c-blue);
+  }
+
+  .details:active .hint,
+  .details:active .chev {
+    color: var(--c-hot);
+    fill: var(--c-hot);
   }
 
   .details-heading {

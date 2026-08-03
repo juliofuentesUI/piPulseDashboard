@@ -137,6 +137,7 @@
             status={trends.status}
             region={trends.region}
             detail={trends.detail}
+            card={trends.card}
             history={trends.history}
             selectedId={trends.selectedId}
             mode={trends.mode}
