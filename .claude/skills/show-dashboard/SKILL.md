@@ -1,28 +1,22 @@
 ---
 name: show-dashboard
-description: Show the user the running piPulse dashboard - either as a quick inline screenshot or as a published Artifact link they can open on a phone. Use whenever the user asks to see the current state of the app or a particular screen in it - "show me the dashboard", "what does it look like now", "send me a screenshot", "screenshot the settings menu", "how does it look", "send me a link to see it" - and especially when they are away from the machine or on mobile. Also use after finishing a visual change, when reporting the result would be clearer as a picture than a description.
+description: Screenshot the running piPulse dashboard and show it to the user inline. Use whenever the user asks to see the current state of the app or a particular screen in it - "show me the dashboard", "send me a screenshot", "what does it look like now", "screenshot the settings menu", "how does it look" - including when they are on mobile. Also use after finishing a visual change, when a picture reports the result better than a description. Only publish an Artifact instead if the user explicitly asks for one.
 ---
 
 # Show the dashboard
 
-Two ways to do this. Inline is the default; publishing is for when it earns the extra steps.
+**Take the screenshot and show it inline. That is the whole job.**
 
-| Ask | Do this |
-| --- | --- |
-| "how does it look", "did that work", checking a screen or state | **Quick look** - inline screenshot |
-| Iterating on a change, several looks in a row | **Quick look** every time |
-| "send me a link", something to bookmark or come back to | **Published link** |
-| Judging sprite crispness, outlines, pixel alignment | **Published link**, and say to tap 1:1 |
-| "what changed while I was away", an async handoff | **Published link** |
+"Show me a screenshot", "send me a screenshot", "how does it look" - all of these mean take
+the picture and put it in the reply. Inline images render everywhere the user reads this,
+mobile included, and tapping one expands it to nearly full screen width. Do not build
+anything. Do not publish anything. Do not offer to.
 
-Inline renders fine on mobile - verified, not assumed. But it arrives around a quarter of
-the screen width, roughly 0.2 scale, so it answers "is the layout intact" and cannot answer
-"are the sprites crisp".
+Only reach for an Artifact when the user asks for one in so many words - "make me an
+artifact", "publish this", "send me a link", "I want a report". Their words are the trigger,
+never your own judgement that a link might be nicer.
 
-When it is genuinely ambiguous, take the quick look and offer the link in the same reply.
-Do not publish twice for one request.
-
-## Quick look
+## Take the screenshot
 
 **1. Make sure the dashboard is running.**
 
@@ -43,53 +37,55 @@ mcp__playwright__browser_take_screenshot {type: "png", scale: "css"}
 ```
 
 Four seconds is enough for the weather fetch to resolve. Skip navigate and resize if the
-browser is already there from an earlier capture in the same session.
+browser is already in the right place from an earlier capture this session.
 
 **Never pass `filename`** - without it the file is auto-named into the gitignored
 `.playwright-mcp/`; with it the file lands in the repository root as an untracked stray,
 and `--output-dir` does not override that.
 
-720 x 720 is the HyperPixel's real resolution. Capture there even for a quick look, so the
-proportions are honest.
+720 x 720 is the HyperPixel's real resolution. Capture there always, so proportions are
+honest.
 
-**3. Say what changed** in the reply. The picture shows the state; the words should say
-what to notice in it.
+**3. Say what to notice.** The picture carries the state; the words should point at what
+changed or what to look at.
 
-## A specific screen, not the dashboard
+## A specific screen, not the default view
 
-Drive the UI to the state first, then capture as above. Click by accessible name, never by
-pixel coordinate - the layout is fixed but coordinates still rot when the design moves.
+Drive the UI to the state first, then capture. Click by accessible name, never by pixel
+coordinate - the layout is fixed at 720 x 720 but coordinates still rot when the design
+moves.
 
 ```
 mcp__playwright__browser_click {target: "button[aria-label=\"Open settings\"]"}
 ```
 
 `browser_snapshot` lists what is on screen with stable refs when the selector is not
-obvious. Known controls: `Open settings` (the 3x2 dot grid) opens the theme picker,
-which offers GBA Blue, Midnight, DMG Green, Brutalist Mono and Amber CRT.
+obvious. Known controls: `Open settings` (the 3x2 dot grid) opens the theme picker, which
+offers GBA Blue, Midnight, DMG Green, Brutalist Mono and Amber CRT.
 
-Remember the browser keeps its state between calls. Close a dialog, or navigate afresh,
-before capturing the plain dashboard again.
+The browser keeps its state between calls. Close a dialog, or navigate afresh, before
+capturing the plain dashboard again - otherwise the next screenshot still has the dialog in
+it.
 
-## Published link
+## If, and only if, an Artifact was asked for
 
-Steps 1 and 2 above, then:
-
-**3. Build the page.** A shell script cannot call an MCP tool, so the screenshot has to
-come from step 2; this script handles everything after it.
+An Artifact is a published page, so it is worth the extra steps when the deliverable is
+more than a picture: a written report of what changed, several captures compared, a
+summary to read later. For a bare screenshot it is a wrapper around something that already
+worked.
 
 ```bash
 node scripts/build-capture.mjs --png .playwright-mcp/<the-new-file>.png \
   --note "what changed"          # optional, shown as a metadata cell
 ```
 
-It reads the commit, the capture time, and the live reading from the API, then writes
-`.playwright-mcp/capture.html`. It throws rather than emitting a page that is not pure
-ASCII - the publish-time wrapper is not guaranteed to declare a charset, and literal UTF-8
-renders as mojibake.
+That writes `.playwright-mcp/capture.html` - the commit, capture time, and live reading
+from the API, around the PNG as a data URI. It throws rather than emitting a page that is
+not pure ASCII, because the publish-time wrapper is not guaranteed to declare a charset and
+literal UTF-8 renders as mojibake. A strict CSP blocks external requests, so anything the
+page shows has to be inlined.
 
-**4. Publish, keeping the same URL.** The user bookmarks this link, so reuse it rather than
-minting a new one:
+Then publish, reusing the existing URL so a bookmark keeps working:
 
 ```
 Artifact {action: "list"}      -> find the entry titled "piPulse capture"
@@ -100,16 +96,9 @@ Artifact {file_path: ".playwright-mcp/capture.html",
 ```
 
 Omit `url` only if no such entry exists. A conversation that did not itself publish the
-artifact will otherwise mint a new URL and strand the user's bookmark.
+artifact will otherwise mint a new URL and strand the bookmark. Give the user the URL in
+the reply.
 
-**5. Give the user the URL** in the reply. That is the deliverable - not the local path.
-
-## The page
-
-`scripts/build-capture.mjs` owns the markup. It is theme-aware (the dashboard's own
-`gba-blue` and `midnight` palettes, so it follows the reader's device) and carries a
-FIT / 1:1 toggle, because a fit-width view is browser-resampled and cannot be trusted for
-sprite edges while the 1:1 view can.
-
-Change the design by editing the script's `page()` function, never by hand-editing a
-generated `capture.html`.
+For a report rather than a capture, write your own HTML and publish that instead;
+`build-capture.mjs` only knows how to frame a screenshot. Its `page()` function is where
+the capture markup lives - never hand-edit a generated `capture.html`.
