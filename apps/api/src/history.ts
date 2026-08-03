@@ -108,13 +108,19 @@ export class TrendHistoryStore {
   /**
    * Everything the details panel knows about one trend, all of it counted
    * from stored observations.
+   *
+   * The rank reported here is the trend's standing **by volume** among every
+   * trend seen in the same fetch — not the position it held in the feed. The
+   * feed is ordered newest-first, so its position measures how recently the
+   * trend was detected and slides downward on its own as newer ones arrive.
+   * Graphing that would say nothing about the search. Volume is stored for
+   * every row, so the real ranking is recoverable without a schema change.
    */
   historyFor(trendKey: string, nowMs: number): TrendHistory {
     const totals = this.#db
       .prepare(
         `SELECT MIN(observed_at) AS first_seen,
                 MAX(observed_at) AS last_seen,
-                MIN(rank)        AS peak_rank,
                 COUNT(*)         AS times_observed
          FROM trend_snapshots
          WHERE trend_key = ?`,
@@ -122,7 +128,6 @@ export class TrendHistoryStore {
       .get(trendKey) as {
       first_seen: string | null;
       last_seen: string | null;
-      peak_rank: number | null;
       times_observed: number;
     };
 
@@ -130,28 +135,47 @@ export class TrendHistoryStore {
       return { trendKey, points: [], timesObserved: 0, movement: 'steady' };
     }
 
+    /*
+     * Every trend from every fetch in the window, not just this one: the
+     * ranking is relative, so the others are what this one is ranked against.
+     * At ten rows per fetch and a fetch every ten minutes that is ~1,440 rows
+     * for a day, which SQLite reads in well under a millisecond.
+     */
     const since = new Date(nowMs - HISTORY_WINDOW_MS).toISOString();
     const rows = this.#db
       .prepare(
-        `SELECT observed_at, rank
+        `SELECT trend_key, approximate_volume, observed_at
          FROM trend_snapshots
-         WHERE trend_key = ? AND observed_at >= ?
+         WHERE observed_at >= ?
          ORDER BY observed_at ASC`,
       )
-      .all(trendKey, since) as { observed_at: string; rank: number }[];
+      .all(since) as {
+      trend_key: string;
+      approximate_volume: string | null;
+      observed_at: string;
+    }[];
 
-    const points: TrendHistoryPoint[] = rows.map((row) => ({
-      at: row.observed_at,
-      rank: row.rank,
-    }));
+    const byFetch = new Map<string, { key: string; volume: number }[]>();
+    for (const row of rows) {
+      const fetch = byFetch.get(row.observed_at) ?? [];
+      fetch.push({ key: row.trend_key, volume: volumeOf(row.approximate_volume) });
+      byFetch.set(row.observed_at, fetch);
+    }
 
-    const latest = this.#db
-      .prepare(
-        `SELECT rank FROM trend_snapshots
-         WHERE trend_key = ? ORDER BY observed_at DESC LIMIT 1`,
-      )
-      .get(trendKey) as { rank: number } | undefined;
+    const points: TrendHistoryPoint[] = [];
+    for (const [at, fetch] of byFetch) {
+      // Ties share the better rank, so two trends both on 500+ are both #3
+      // rather than one being arbitrarily called worse than the other.
+      const sorted = [...fetch].sort((a, b) => b.volume - a.volume);
+      const index = sorted.findIndex((entry) => entry.key === trendKey);
+      if (index === -1) continue;
 
+      const volume = sorted[index]?.volume ?? 0;
+      const rank = sorted.findIndex((entry) => entry.volume === volume) + 1;
+      points.push({ at, rank });
+    }
+
+    const ranks = points.map((point) => point.rank);
     const firstSeen = Date.parse(totals.first_seen);
     const lastSeen = Date.parse(totals.last_seen ?? totals.first_seen);
 
@@ -160,8 +184,9 @@ export class TrendHistoryStore {
       points,
       timesObserved: totals.times_observed,
       firstSeenAt: totals.first_seen,
-      ...(latest === undefined ? {} : { latestRank: latest.rank }),
-      ...(totals.peak_rank === null ? {} : { peakRank: totals.peak_rank }),
+      ...(ranks.length === 0
+        ? {}
+        : { latestRank: ranks[ranks.length - 1] as number, peakRank: Math.min(...ranks) }),
       activeMinutes: Math.max(0, Math.round((lastSeen - firstSeen) / 60_000)),
       movement: movementOf(points),
     };
@@ -170,6 +195,25 @@ export class TrendHistoryStore {
   close(): void {
     this.#db.close();
   }
+}
+
+/**
+ * The numeric floor of one of Google's buckets: "20000+" is 20000.
+ *
+ * Used only to order trends against each other. It is the bottom of a range,
+ * never a count of searches, and nothing is presented as one.
+ */
+export function volumeOf(raw: string | null | undefined): number {
+  if (raw === null || raw === undefined) return 0;
+
+  const match = /(\d[\d.,]*)\s*([km])?/i.exec(raw);
+  if (match === null) return 0;
+
+  const digits = Number.parseFloat((match[1] ?? '').replace(/,/g, ''));
+  if (!Number.isFinite(digits)) return 0;
+
+  const suffix = match[2]?.toLowerCase();
+  return digits * (suffix === 'k' ? 1_000 : suffix === 'm' ? 1_000_000 : 1);
 }
 
 /**

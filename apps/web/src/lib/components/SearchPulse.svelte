@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { PULSE_MODES, type PulseMode } from '../trend-view';
   import type { PulseStatus } from '../trends.svelte';
   import type {
     DashboardPhase,
@@ -18,6 +19,8 @@
     detail: TrendDetailView | null;
     history: TrendHistoryView | null;
     selectedId: string;
+    mode: PulseMode;
+    onmode: (mode: PulseMode) => void;
     onselect: (id: string) => void;
     onmenu: () => void;
   }
@@ -30,6 +33,8 @@
     detail,
     history,
     selectedId,
+    mode,
+    onmode,
     onselect,
     onmenu,
   }: Props = $props();
@@ -45,6 +50,25 @@
 
   <div class="region">
     <span class="where">{region}</span>
+
+    <!--
+      Both orderings stay visible rather than cycling on tap: on a wall
+      display there is no hover and no menu, so an ordering you cannot see is
+      an ordering nobody knows exists.
+    -->
+    <nav class="modes" aria-label="List ordering">
+      {#each PULSE_MODES as option (option.id)}
+        <button
+          class="mode"
+          class:active={option.id === mode}
+          type="button"
+          aria-pressed={option.id === mode}
+          onclick={() => onmode(option.id)}
+        >
+          {option.name}
+        </button>
+      {/each}
+    </nav>
 
     <span class="status">
       {#if status.live}
@@ -114,9 +138,19 @@
             Ours, not Google's: when this Pi first recorded the trend and how
             many times it has seen it since.
           -->
+          <!--
+            Ours, not Google's: when this Pi first recorded the trend, and on
+            its own row how many fetches it has appeared in — the two together
+            outran the column and clipped.
+          -->
           {#if history !== null && history.firstSeen !== ''}
             <dt>SEEN</dt>
-            <dd>{history.firstSeen} <span class="qualifier">{history.observed}</span></dd>
+            <dd>{history.firstSeen}</dd>
+          {/if}
+
+          {#if history !== null && history.observed !== ''}
+            <dt>FETCHES</dt>
+            <dd>{history.observed}</dd>
           {/if}
         </dl>
 
@@ -189,11 +223,35 @@
   }
 
   .where {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
-    letter-spacing: 3px;
+    letter-spacing: 2px;
     white-space: nowrap;
     color: var(--c-ink);
+  }
+
+  .modes {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+  }
+
+  /* Inverts when active, like every other chosen thing in this design. */
+  .mode {
+    padding: 5px 10px;
+    font: inherit;
+    font-size: 15px;
+    letter-spacing: 2px;
+    color: var(--c-blue);
+    background: var(--c-bg);
+    border: 2px solid var(--c-blue);
+    cursor: pointer;
+  }
+
+  .mode.active {
+    color: var(--c-bg);
+    background: var(--c-ink);
+    border-color: var(--c-ink);
   }
 
   .status {
@@ -212,7 +270,7 @@
   }
 
   .status-text {
-    font-size: 18px;
+    font-size: 16px;
     letter-spacing: 2px;
     white-space: nowrap;
     overflow: hidden;

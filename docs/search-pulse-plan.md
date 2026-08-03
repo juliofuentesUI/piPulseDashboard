@@ -440,6 +440,32 @@ Make Search Pulse dependable enough to run continuously.
 
 ---
 
+## The feed is ordered by recency — AMENDED, 2026-08-02
+
+Checked against the live export after the screen disagreed with `trends.google.com`:
+
+```
+published strictly newest-first?   True
+volume descending (a real rank)?   False
+biggest volume sits at position    6
+feed covers                        2.5 hours
+```
+
+So feed position is **arrival order, not popularity**, and the plan's assumption that
+rank means importance was wrong. Consequences, all now addressed:
+
+- The list offers two orderings, `SURGING` (the feed's own) and `BIGGEST` (by volume).
+- The rank graph plots standing **by volume within each fetch**, recovered from stored
+  volumes without a schema change. Graphing feed position would have made `COOLING`
+  near-inevitable for every trend, since everything slides down as newer ones arrive.
+- `RELEVANCE` is not offered. The export has no such field and Google's ranking is not
+  published; a composite of ours carrying their word would be a claim we cannot support.
+
+The feed's 2.5-hour window also bounds what Phase 4 can promise. Our record will hold
+every trend that *started* in a window, with the volume it had while young — not the
+accumulated totals `trends.google.com` shows for trends up to a day old. It answers "what
+caught fire today", not "what were the day's biggest searches".
+
 ## Explicitly out of scope
 
 Never add any of these to Search Pulse:

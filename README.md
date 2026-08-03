@@ -352,7 +352,16 @@ Everything this Pi has recorded about one trend. `key` is a `TrendingSearch.id`.
 ```
 
 None of this comes from Google. Every figure is counted from observations this machine
-made, which is the point: `peakRank` is the best position it has been seen holding,
+made, which is the point.
+
+**`rank` here is standing by volume among every trend seen in the same fetch — not the
+position the trend held in the feed.** The feed is ordered newest-first, so its position
+slides downward on its own as newer trends arrive; graphing that would say nothing about
+the search, and would make `COOLING` almost inevitable for everything. Volume is stored on
+every row, so the real ranking is recoverable without a schema change. Ties share the
+better rank, so two trends both on `500+` are both `#3`.
+
+`peakRank` is the best position it has been seen holding,
 `timesObserved` how many fetches it appeared in, `activeMinutes` the span from first to
 most recent sighting — a span, not a claim of continuous presence.
 
@@ -496,7 +505,35 @@ branch of it is a fact rather than a mood:
 Fifteen minutes is the backend's ten-minute refresh plus enough slack to absorb one
 missed fetch without crying wolf.
 
-A row is a rank, the search, Google's figure, and a bar. **The bar is logarithmic across
+### Ordering: SURGING and BIGGEST
+
+**The feed is ordered newest-detected-first, not by popularity.** Verified against the
+live export: `published strictly newest-first` is true, `volume descending` is false, and
+the largest trend routinely sits at position six. Treating feed position as a rank is
+therefore wrong, and two chips in the region strip choose what the list means:
+
+| Mode | Order | #1 is |
+| --- | --- | --- |
+| `SURGING` | the feed's own | the most recently detected |
+| `BIGGEST` | by Google's volume figure | the largest of the current batch |
+
+The choice is remembered in `localStorage`, like the theme and the weather layout.
+
+Google's own **relevance** ordering is deliberately absent: the RSS export has no such
+field and their ranking is not published, so a composite of our own carrying Google's
+word for it would be a claim we cannot support.
+
+The sort is stable and the input arrives newest-first, so trends sharing a volume bucket
+keep recency order within it.
+
+**The feed only covers about 2.5 hours.** It holds ten items and a new trend arrives every
+ten to twenty minutes, so a search stays visible for a couple of hours and then drops out
+— our stored history shows exactly that, trends drifting from position 1 to 10 and gone.
+This is why the panel's figures are small next to `trends.google.com`: that page shows
+accumulated totals for trends up to a day old, while this one shows trends in their first
+hours. Both are real; they answer different questions.
+
+A row is a rank, the search, Google's figure, how long ago Google reported it, and a bar. **The bar is logarithmic across
 the list's own range** — smallest bucket present to largest — and that range matters as
 much as the log does. Linear is hopeless when a list runs 200+ against 20000+: the top
 trend pins the scale and flattens the rest to stubs. But log against a fixed origin fails

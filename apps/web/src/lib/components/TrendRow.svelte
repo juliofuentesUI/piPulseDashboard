@@ -6,7 +6,7 @@
     onselect: (id: string) => void;
   }
 
-  let { id, rank, title, volume, bar, selected, onselect }: Props = $props();
+  let { id, rank, title, volume, age, bar, selected, onselect }: Props = $props();
 </script>
 
 <li class="row" class:selected>
@@ -25,9 +25,14 @@
     <span class="body">
       <span class="line">
         <span class="title">{title}</span>
-        {#if volume !== ''}
-          <span class="volume">{volume}</span>
-        {/if}
+        <span class="figures">
+          {#if volume !== ''}
+            <span class="volume">{volume}</span>
+          {/if}
+          {#if age !== ''}
+            <span class="age">{age}</span>
+          {/if}
+        </span>
       </span>
 
       <!--
@@ -113,12 +118,29 @@
     color: var(--c-ink);
   }
 
-  .volume {
+  /*
+   * Volume and age travel together on the right. Both are Google's: how big
+   * the search is, and how long ago it said so.
+   */
+  .figures {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
     flex: 0 0 auto;
+  }
+
+  .volume {
     font-size: 20px;
     font-weight: 700;
     letter-spacing: 1px;
     color: var(--c-hot);
+  }
+
+  .age {
+    font-size: 15px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    color: var(--c-blue);
   }
 
   .track {
@@ -150,6 +172,10 @@
 
   .row.selected .volume {
     color: var(--c-warm);
+  }
+
+  .row.selected .age {
+    color: var(--c-sky);
   }
 
   /* The track's own border would vanish into the row, so it inverts too. */

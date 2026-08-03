@@ -1,5 +1,8 @@
 import { requestTrendHistory, requestTrends, TrendsRequestError } from './api';
+import { readSetting, writeSetting } from './storage';
 import {
+  orderTrends,
+  type PulseMode,
   regionName,
   toTrendDetail,
   toTrendHistoryView,
@@ -27,6 +30,13 @@ const POLL_INTERVAL_MS = 60 * 1000;
  * missed upstream fetch without crying wolf.
  */
 const STALE_AFTER_MS = 15 * 60 * 1000;
+
+const MODE_KEY = 'pipulse:pulse-mode';
+
+/** The ordering last chosen on this device; the feed's own order by default. */
+function storedMode(): PulseMode {
+  return readSetting(MODE_KEY) === 'biggest' ? 'biggest' : 'surging';
+}
 
 /** The one-line freshness report in the region strip. */
 export interface PulseStatus {
@@ -63,12 +73,23 @@ export class Trends {
    */
   #chosen = $state<string | null>(null);
 
-  rows = $derived(this.#snapshot === null ? [] : toTrendRows(this.#snapshot.trends));
+  /**
+   * Remembered like the theme and the weather layout: the Pi is a wall display
+   * that gets power-cycled, and coming back up in an ordering nobody chose
+   * would read as the dashboard having forgotten itself.
+   */
+  mode = $state<PulseMode>(storedMode());
+
+  #ordered = $derived(
+    this.#snapshot === null ? [] : orderTrends(this.#snapshot.trends, this.mode),
+  );
+
+  rows = $derived(toTrendRows(this.#ordered, this.#now));
   hasData = $derived(this.#snapshot !== null);
   region = $derived(regionName(this.#snapshot?.region));
 
   /** Only what is on screen is selectable, so the band always matches a row. */
-  #visible = $derived(this.#snapshot?.trends.slice(0, VISIBLE_TRENDS) ?? []);
+  #visible = $derived(this.#ordered.slice(0, VISIBLE_TRENDS));
 
   /**
    * Falls back to the top trend, which covers both the first render and the
@@ -101,6 +122,18 @@ export class Trends {
   select(id: string): void {
     this.#chosen = id;
     void this.#loadHistory(id);
+  }
+
+  /**
+   * Re-orders in place. A trend picked by hand keeps being described and just
+   * moves to a different row; when nothing was picked the panel follows the
+   * top of the list, which is a different trend once the ordering changes —
+   * so its history has to be fetched.
+   */
+  setMode(mode: PulseMode): void {
+    this.mode = mode;
+    writeSetting(MODE_KEY, mode);
+    void this.#loadHistory(this.selectedId);
   }
 
   async #loadHistory(key: string): Promise<void> {

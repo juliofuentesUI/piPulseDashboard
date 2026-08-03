@@ -17,7 +17,10 @@ export const VISIBLE_TRENDS = 5;
  */
 const MIN_BAR = 12;
 
-export function toTrendRows(trends: readonly TrendingSearch[]): TrendRowView[] {
+export function toTrendRows(
+  trends: readonly TrendingSearch[],
+  now: Date,
+): TrendRowView[] {
   const shown = trends.slice(0, VISIBLE_TRENDS);
   const values = shown.map((trend) => volumeOf(trend.approximateVolume));
   const stated = values.filter((value) => value > 0);
@@ -29,6 +32,7 @@ export function toTrendRows(trends: readonly TrendingSearch[]): TrendRowView[] {
     rank: String(index + 1),
     title: trend.title.toUpperCase(),
     volume: formatVolume(trend.approximateVolume),
+    age: trend.publishedAt === undefined ? '' : shortAgo(trend.publishedAt, now),
     bar: barWidth(values[index] ?? 0, min, max),
   }));
 }
@@ -254,12 +258,9 @@ export function toTrendHistoryView(
       history.firstSeenAt === undefined ? '' : durationAgo(history.firstSeenAt, now),
     peakRank: history.peakRank === undefined ? '' : `#${history.peakRank}`,
     latestRank: history.latestRank === undefined ? '' : `#${history.latestRank}`,
-    // "5 FETCHES", not "5×". The multiplier read as a quantity of something
-    // rather than a count of times we looked, which is what it is.
-    observed:
-      history.timesObserved === 0
-        ? ''
-        : `${history.timesObserved} ${history.timesObserved === 1 ? 'FETCH' : 'FETCHES'}`,
+    // Bare number: the panel labels this row FETCHES, so repeating the word
+    // in the value only cost the column the room it needed.
+    observed: history.timesObserved === 0 ? '' : String(history.timesObserved),
     movement: history.movement,
   };
 }
@@ -290,6 +291,19 @@ function coarseDuration(minutes: number): string {
   return `${Math.round(minutes / 60)}H`;
 }
 
+/**
+ * "2H AGO", "35M AGO" — the row's version, kept short because it shares a
+ * line with the search term and Google's figure.
+ */
+export function shortAgo(iso: string, now: Date): string {
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return '';
+
+  const minutes = Math.max(0, Math.floor((now.getTime() - then) / 60_000));
+  if (minutes < 60) return `${minutes}M AGO`;
+  return `${Math.floor(minutes / 60)}H AGO`;
+}
+
 /** "45M", "2H 20M", "1D 3H". */
 export function formatDuration(totalMinutes: number): string {
   if (totalMinutes < 60) return `${totalMinutes}M`;
@@ -301,4 +315,38 @@ export function formatDuration(totalMinutes: number): string {
   const days = Math.floor(hours / 24);
   const spare = hours % 24;
   return spare === 0 ? `${days}D` : `${days}D ${spare}H`;
+}
+
+// --- Ordering -------------------------------------------------------------
+
+/**
+ * How the list is ordered. Both are properties the feed genuinely carries;
+ * Google's own "relevance" ordering is not among them, because the RSS export
+ * has no such field and their ranking is not published. Inventing a score and
+ * calling it relevance would put Google's name on our arithmetic.
+ */
+export type PulseMode = 'surging' | 'biggest';
+
+export const PULSE_MODES: readonly { id: PulseMode; name: string }[] = [
+  { id: 'surging', name: 'SURGING' },
+  { id: 'biggest', name: 'BIGGEST' },
+];
+
+/**
+ * `surging` is the feed's own order, which is strictly newest-detected first —
+ * verified against the live feed, where the largest trend routinely sits at
+ * position six. `biggest` re-sorts by Google's volume figure so the number
+ * beside a row means what a rank normally means.
+ *
+ * The sort is stable and the input arrives newest-first, so trends sharing a
+ * volume bucket stay in recency order within it.
+ */
+export function orderTrends(
+  trends: readonly TrendingSearch[],
+  mode: PulseMode,
+): readonly TrendingSearch[] {
+  if (mode === 'surging') return trends;
+  return [...trends].sort(
+    (a, b) => volumeOf(b.approximateVolume) - volumeOf(a.approximateVolume),
+  );
 }

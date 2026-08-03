@@ -139,6 +139,8 @@
             detail={trends.detail}
             history={trends.history}
             selectedId={trends.selectedId}
+            mode={trends.mode}
+            onmode={(mode) => trends.setMode(mode)}
             onselect={(id) => trends.select(id)}
             onmenu={() => (menuOpen = true)}
           />

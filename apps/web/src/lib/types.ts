@@ -193,6 +193,8 @@ export interface TrendRowView {
   readonly title: string;
   /** Google's bucket, compacted for the panel: "20K+". Empty if unstated. */
   readonly volume: string;
+  /** How long ago Google reported it, e.g. "2H AGO". Empty if unstated. */
+  readonly age: string;
   /** Bar width as a percentage, on a log scale. */
   readonly bar: number;
 }

@@ -6,6 +6,8 @@
  * the dashboard having forgotten itself.
  */
 
+import { readSetting, writeSetting } from './storage';
+
 export type ScreenId = 'dashboard' | 'week';
 
 export interface Screen {
@@ -25,7 +27,7 @@ const STORAGE_KEY = 'pipulse:screen';
 
 /** The last screen chosen on this device, or the default. */
 export function storedScreen(): Screen {
-  const id = read(STORAGE_KEY);
+  const id = readSetting(STORAGE_KEY);
   return SCREENS.find((screen) => screen.id === id) ?? DEFAULT_SCREEN;
 }
 
@@ -34,25 +36,6 @@ export class ScreenStore {
 
   select(screen: Screen): void {
     this.current = screen;
-    write(STORAGE_KEY, screen.id);
-  }
-}
-
-// localStorage throws rather than no-ops when storage is blocked, and a Pi
-// kiosk should not lose its dashboard over a preference.
-
-function read(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function write(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Preference is lost on reload; the screen still works.
+    writeSetting(STORAGE_KEY, screen.id);
   }
 }
