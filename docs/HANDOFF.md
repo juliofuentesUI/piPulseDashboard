@@ -15,7 +15,7 @@ being true.
 | — | Ordering fix: SURGING / BIGGEST modes | Done |
 | 3.5 | Full-screen trend card: image + 3 headlines | Done |
 | — | Raspberry Pi deploy scripts | Done |
-| — | `millennium` theme | Built — **awaiting two art files** |
+| — | `millennium` theme, character art included | Done |
 | 4 | Daily history view (`TODAY`) | **Deferred — deploy first** |
 | 5 | Reliability and polish | Not started |
 
@@ -34,10 +34,21 @@ opening the doc:
   than by editing them. That coupling is deliberate and documented — renaming a class like
   `.column` silently drops the gold off one band without failing a build.
 
-Everything is done but **M7: the two character-art PNGs**, which have to come from the
-user; they are conversation attachments, not something the repo can generate. The theme is
-complete and correct without them and shows no error when they are absent. Paths and
-sizing are in `apps/web/public/themes/millennium/README.md`.
+The user supplied fourteen art files. **Do not add art to that folder by copying it in** —
+it arrives as framed gallery tiles at ~2.4 MB each, and `scripts/theme-art.mjs` is what
+turns one into a panel asset (crops the painted frame, keys the black backdrop, trims,
+downsamples; 34 MB → 7.7 MB for the set). Use `--keep-frame --no-key` for anything that
+already has an alpha channel, or the key will eat it.
+
+Two are wired in — Yugi on the weather layouts, Kaiba on Search Pulse — and **twelve are
+placed but deliberately unused.** That is not an oversight: every band on this panel
+already carries data, so adding one is a decision about what leaves the screen. The
+inventory is in `apps/web/public/themes/millennium/README.md`.
+
+**Character art belongs in the title band, not behind the page.** The plan originally
+specified a page-background figure and it was wrong; behind opaque plaques it lands at
+about 2% visible, and brightening it to compensate puts a face under a 64px temperature.
+The title band is the only slack on any of the three layouts.
 
 Working tree clean, everything merged to `main`. Nothing is parked on a branch.
 

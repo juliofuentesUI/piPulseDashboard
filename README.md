@@ -801,11 +801,18 @@ carrying a number stays monospace, which is what keeps the columns aligned.
 reference this was drawn from merges the two weather screens into one; this deliberately
 does not, so the screen picker keeps meaning what it always did.
 
-Two optional PNGs in `apps/web/public/themes/millennium/` put a figure behind each page,
-drawn as the page's own background — above the carved stone, beneath every band, with the
-plaques veiled rather than opaque so a figure reads through them. The theme is complete
-and correct without them: a `url()` that 404s paints nothing. That directory's `README.md`
-covers sizing and the one number that tunes how strongly they show.
+It is also the only theme carrying artwork. A character stands in the **title band**,
+behind the heading and clear of the menu glyph — the one place on all three layouts with
+slack. Behind the page instead, under opaque plaques, a figure lands at roughly 2%
+visible; brightened to compensate it sits under a 64 px temperature. The theme is complete
+without the files: a `url()` that 404s paints nothing.
+
+Art enters `apps/web/public/themes/millennium/` through **`scripts/theme-art.mjs`**, never
+by copying. It arrives as framed gallery tiles at ~2.4 MB each; the script crops the
+painted frame, keys the near-black backdrop to transparency, trims and downsamples, taking
+the supplied set from 34 MB to 7.7 MB. Pass `--keep-frame --no-key` for a piece that
+already has an alpha channel, or the key will eat its dark field. That directory's
+`README.md` is the inventory and says which pieces are in use.
 
 ## Settings
 

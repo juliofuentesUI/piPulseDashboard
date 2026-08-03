@@ -16,7 +16,7 @@ what it says.
 | M4 | `styles/millennium.css` — gold, stone, plaques, cartouches | **Done** |
 | M5 | Verified at 720×720 across all three layouts + the trend card | **Done** |
 | M6 | Verified the other five themes are unchanged | **Done** |
-| M7 | Character art dropped into `public/themes/millennium/` | **Waiting on the two files** |
+| M7 | Character art prepared and placed | **Done** |
 
 ## Objective
 
@@ -113,31 +113,80 @@ the sepia the card now shows.
 | Rain and wind stay blue inside sprites | `blue`/`sky` are bronze labels on the panel and weather inside a sprite. Redefining the properties on the icon container re-resolves them for that subtree only |
 | The umbrella is knocked back to stone grey | It is the only sprite drawn in `ink`; at full parchment it outshouted the temperatures two bands above it |
 | The scrim is overridden to the void colour | It dims with `ink`, which is parchment here — unoverridden it washes the dashboard out in cream instead of dimming it |
-| Plaques are a veil (0.88), not a solid | So the character art behind the page reads through the stonework |
-| Character art is a page *background*, not an element | No free space on a 720×720 display to put a foreground cut-out without covering something. As a background it sits above the stone and below every band with no `z-index` invented for it |
+| Plaques are solid stone | The veil existed to reveal page-background art; that art moved to the title band, so the veil stopped paying for itself |
+| Character art lives in the title band, behind the heading | The only slack on any of the three layouts. Behind the page it was 2% visible; forced brighter it sat under a 64px temperature |
+| Art is processed by a script, not copied | Framed tiles at 2.4 MB each; the panel needs unframed, keyed, small. 34 MB → 7.7 MB |
+| Twelve of fourteen pieces placed but unused | Each would have to displace data to appear. That is a design call, not a file drop |
 
-## The character art — M7
+## The character art — M7 — AMENDED
 
-Two optional PNGs, documented in `apps/web/public/themes/millennium/README.md`:
+Fourteen pieces were supplied, not two, and the placement this plan originally specified
+turned out to be wrong. Both corrections are recorded here because the reasoning is the
+useful part.
 
-| File | Where |
+### The art had to be processed, not copied
+
+Supplied as framed gallery tiles — a square of painting, a painted gold frame, a black
+margin — at ~1250 px and ~2.4 MB each. The theme needs the opposite of all three, and
+14 × 2.4 MB is 34 MB of assets on a Raspberry Pi kiosk.
+
+`scripts/theme-art.mjs` does the conversion, with no dependency: it finds the painted
+frame, crops past it, keys the near-black backdrop to transparency on a luminance ramp,
+trims to what is opaque, and box-downsamples. **34 MB → 7.7 MB.** Two things it learned
+the hard way, both now in the script's comments:
+
+- **The frame walk has to be capped.** Uncapped, "keep going while bright" does not stop
+  at the frame, because subjects touch their frames — Yugi's spikes reach it on three
+  sides. The first run ate 313 px a side and produced a portrait cropped to one eye.
+- **Zero the colour under fully transparent pixels.** Invisible either way, but the
+  backdrop is most of the canvas and deflate can only collapse it once every byte agrees.
+  Worth about 40% of the file.
+
+### The art is in the title band, not behind the page
+
+The original spec put a figure across each page's background under a flat wash. **It does
+not work**, and the reason generalises: every band on every layout is an opaque plaque, so
+a background figure is occluded by the plaque *and* the wash and lands around 2% visible.
+Three attempts, all rendered and looked at:
+
+| Attempt | Result |
 | --- | --- |
-| `weather-figure.png` | Behind the weather page, bled off the bottom-left |
-| `pulse-figure.png` | Behind Search Pulse, bled off the bottom-right |
+| Flat wash 0.84, plaque 0.88 | Invisible. A faint discolouration |
+| Flat wash 0.58, plaque 0.72 | Yugi's face directly behind a 64 px temperature. Muddy art *and* damaged data |
+| Radial vignette confining it to a corner | Legible data, but the figure reads as dirt rather than as a character |
 
-**The theme is complete and correct without them.** A `url()` that 404s paints nothing, so
-an absent file costs one request and shows no error — verified by rendering the theme both
-with placeholder figures and with the directory empty. Nothing about this theme waits on
-an asset.
+The title band is the one place on all three layouts with genuine slack: a heading left, a
+menu glyph right, dead space between. The figure goes there at full opacity, covering
+nothing. **Once the art moved there the plaques went back to solid stone**, which is
+better for legibility than the veil ever was.
 
-Single figures on transparency, roughly 2:3, cropped to stand on the bottom of their own
-canvas. Not full scenes: a busy rectangle behind five trend rows is noise where one
-silhouette is depth. One number tunes how strongly they show — the alpha in the two
-`rgba(21, 15, 10, 0.84)` washes — and it should be judged against Search Pulse, which has
-the most text over the art.
+It sits *behind* the heading (`h1.title` lifted one layer). In front, it ate the final `T`
+of `7-DAY FORECAST` — the longest heading and the one with least room to give. It is also
+held 104 px clear of the right edge, which clears the widest of the two menu-glyph sizes:
+a figure's hand drifting over the only control in the band is worse than a few pixels of
+slack.
 
-The user chose to commit these rather than gitignore them, having been told they are
-third-party character art in a repo that gets pushed.
+In use: `yugi.png` on both weather layouts, `kaiba.png` on Search Pulse. Swapping either
+is a one-line change; the other twelve are prepared identically and listed in
+`apps/web/public/themes/millennium/README.md`.
+
+### Twelve pieces are deliberately unused
+
+Obelisk, Slifer, Exodia, two Puzzles, a Puzzle mark, a corner-ornament sheet, two banners,
+a plaque and two hieroglyph panels. They are placed and documented, not wired in, because
+**each would have to displace something to appear** on a 720 × 720 display whose every band
+already carries data. Adding one is a design decision about what leaves the screen, not a
+matter of dropping in a file. Two specifics worth knowing: `corners.png` is a sheet of four
+and needs slicing, and the panel's own corners are occupied on every layout — date and
+clock at the top, metric icons at the bottom.
+
+**The theme is still complete without any of it.** A `url()` that 404s paints nothing —
+verified by rendering with the directory empty.
+
+The user chose to commit the art rather than gitignore it, having been told it is
+third-party character art in a repo that gets pushed. The originals are not committed;
+what is in the repo is derived and capped at 480 px on the long edge, already larger than
+anything the panel draws.
 
 ## Acceptance criteria
 
@@ -149,7 +198,7 @@ third-party character art in a repo that gets pushed.
 - [x] The settings panel, its scrim and its option list are themed
 - [x] `gba-blue` and `midnight` render exactly as before the `--line` change
 - [x] `npm run typecheck` clean across both workspaces
-- [ ] Character art present and judged at 720 × 720 — **waiting on M7**
+- [x] Character art present, judged at 720 × 720, and clear of the menu control
 
 ## Out of scope
 

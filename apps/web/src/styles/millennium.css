@@ -67,15 +67,9 @@ html[data-theme='millennium'] {
     inset 0 1px 0 rgba(255, 238, 184, 0.16),
     inset 0 -3px 8px rgba(0, 0, 0, 0.55);
 
-  /*
-   * The plaque face is a veil rather than a solid, so the artwork behind the
-   * page ghosts through the stone instead of being buried by it. 0.88 was
-   * picked against the busiest thing that can sit behind it — a full-bleed
-   * figure — and still leaves parchment-on-stone well clear of legible.
-   */
   --m-plaque-fill:
     linear-gradient(180deg, rgba(255, 238, 184, 0.05), rgba(0, 0, 0, 0.22) 62%),
-    rgba(34, 26, 17, 0.88);
+    var(--m-stone);
 }
 
 /*
@@ -138,62 +132,89 @@ html[data-theme='millennium'] .screen {
     inset 0 0 28px rgba(0, 0, 0, 0.7);
 }
 
-/* ----------------------------------------------------------- the character art */
+/* ------------------------------------------------------- the character art */
 
 /*
- * A figure standing behind each page, bleeding off the bottom outer corner —
- * the weather page's to the left, Search Pulse's to the right, so swiping
- * between them changes who is on the panel.
+ * A character standing in the title band, behind the heading, between it and
+ * the menu grid — Yugi on the weather pages, Kaiba on Search Pulse, so swiping
+ * between sections changes who is on the panel.
  *
- * ## Why a background rather than an element
+ * ## Why here, and not behind the page
  *
- * There is no free space on a 720x720 information display, so this cannot be a
- * foreground cut-out without covering something that matters. Painting it as
- * the *page's own background* puts it above the carved stone and below every
- * band, with no `z-index`, no pseudo-element and no stacking context invented
- * for it — the plaques above are veiled rather than solid, so it reads through
- * them as a mural under the stonework.
+ * The first version painted a figure across each page's background, veiled by
+ * a flat wash. It does not work, and the reason is worth keeping: every band on
+ * every layout is an opaque plaque, so a background figure is covered by the
+ * plaque *and* the wash and lands at roughly 2% visible. Lifting the wash to
+ * compensate put Yugi's face directly behind a 64px temperature — muddy art and
+ * damaged data at the same time. A vignette confined him to a corner and turned
+ * him into a smudge.
  *
- * The flat gradient stacked on top is doing the job `opacity` cannot: a
- * background image has no opacity of its own, so a wash of the panel colour
- * over it is how you knock a background back without dimming the text in
- * front of it.
+ * The title band is the one place on all three layouts with genuine slack: a
+ * heading on the left, a menu glyph on the right, and dead space between them.
+ * The figure goes there at full opacity, where it reads as a character rather
+ * than as dirt, and covers nothing — which is also why the plaques went back to
+ * solid stone once the art moved here.
+ *
+ * ## Behind the heading, not beside it
+ *
+ * `h1.title` is lifted a layer so the art passes behind the letterforms.
+ * Sitting in front, the portrait ate the final `T` of `7-DAY FORECAST` — the
+ * longest of the three headings and the one with the least room to give. Behind
+ * it, the heading is whole and the character leans out from the end of the
+ * word, which is what the reference does with the Dark Magician.
+ *
+ * The horizontal mask is what keeps it from reading as a pasted rectangle: it
+ * dissolves into the band at both edges instead of ending.
  *
  * ## When the files are absent
  *
- * A `url()` that 404s paints nothing and the wash paints over nothing, so the
- * theme is complete and correct without these two files — they add a figure to
- * a screen that already works. That is deliberate: nothing about this theme
- * should be waiting on an asset.
- *
- * Expected: PNG with transparency, roughly 2:3 portrait, the figure bled to
- * the bottom edge of its own canvas so it stands on the frame rather than
- * floating above it.
+ * A `url()` that 404s paints nothing, so the theme is complete and correct
+ * without any of this. Swapping in a different character is a one-line change —
+ * `obelisk`, `slifer`, `exodia` and the two Puzzles are sitting in the same
+ * directory, prepared the same way.
  */
-html[data-theme='millennium'] section[aria-label='Weather'],
-html[data-theme='millennium'] section[aria-label='Search Pulse'] {
+html[data-theme='millennium'] .row:has(> .menu) {
+  position: relative;
+}
+
+html[data-theme='millennium'] h1.title {
+  position: relative;
+  z-index: 1;
+}
+
+html[data-theme='millennium'] .row:has(> .menu)::after {
+  content: '';
+  position: absolute;
+
+  /*
+   * Clear of the menu grid, whose width varies by screen: the 3x2 glyph on
+   * WEATHER NOW is 18px dots and 94px wide, the 3x3 on the other two is 14px
+   * dots and 82px. 104 clears the wider one, because a figure's hand drifting
+   * over the only control in the band is worse than a few pixels of slack.
+   */
+  right: 104px;
+  bottom: 0;
+  width: 116px;
+
+  /* Slightly over the band, so the figure is cropped by it rather than boxed. */
+  height: 108%;
+
   background-repeat: no-repeat;
-  background-size:
-    auto 100%,
-    auto 66%;
+  background-position: center bottom;
+  background-size: contain;
+
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 24%, #000 78%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 24%, #000 78%, transparent);
+
+  pointer-events: none;
 }
 
-html[data-theme='millennium'] section[aria-label='Weather'] {
-  background-image:
-    linear-gradient(rgba(21, 15, 10, 0.84), rgba(21, 15, 10, 0.84)),
-    url('/themes/millennium/weather-figure.png');
-  background-position:
-    center,
-    left -30px bottom;
+html[data-theme='millennium'] section[aria-label='Weather'] .row:has(> .menu)::after {
+  background-image: url('/themes/millennium/yugi.png');
 }
 
-html[data-theme='millennium'] section[aria-label='Search Pulse'] {
-  background-image:
-    linear-gradient(rgba(21, 15, 10, 0.84), rgba(21, 15, 10, 0.84)),
-    url('/themes/millennium/pulse-figure.png');
-  background-position:
-    center,
-    right -30px bottom;
+html[data-theme='millennium'] section[aria-label='Search Pulse'] .row:has(> .menu)::after {
+  background-image: url('/themes/millennium/kaiba.png');
 }
 
 /* ---------------------------------------------------------------- headings */
