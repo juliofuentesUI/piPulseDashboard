@@ -11,8 +11,8 @@ Lines marked **AMENDED** record where the plan met reality and reality won.
 | --- | --- | --- |
 | 0 | Carousel shell and placeholder screen | Done — 2026-08-02 |
 | 1 | Live Trending Now list | Done — 2026-08-02 |
-| 2 | Selected-trend details panel | Next |
-| 3 | SQLite history and rank graph | Not started |
+| 2 | Selected-trend details panel | Done — 2026-08-02 |
+| 3 | SQLite history and rank graph | Next |
 | 4 | Daily history view | Not started |
 | 5 | Reliability and polish | Not started |
 
@@ -223,7 +223,7 @@ Acceptance criteria — all met and verified in the browser:
 
 ---
 
-## Phase 2 — Basic SEO and trend details
+## Phase 2 — Basic SEO and trend details · **DONE**
 
 Fill the lower band with deterministic information about the selected trend. This is SEO
 *context*, not SEO research.
@@ -260,14 +260,28 @@ this source. Options when Phase 2 starts, to be decided then:
 
 Simple rules may assign labels such as:
 
-| Label | Rule |
-| --- | --- |
-| `NEW` | First observed less than 30 minutes ago |
-| `ACTIVE` | Appeared in the latest response |
-| `RISING` | Volume bucket or rank increased |
-| `COOLING` | Rank decreased across multiple snapshots |
+| Label | Rule | State |
+| --- | --- | --- |
+| `NEW` | First reported less than 30 minutes ago | Built |
+| `ACTIVE` | Appeared in the latest response | Dropped |
+| `RISING` | Volume bucket or rank increased | Phase 3 |
+| `COOLING` | Rank decreased across multiple snapshots | Phase 3 |
 
 These come from explicit code rules a person can read, never from a model.
+
+**AMENDED — only `NEW` ships in Phase 2, and its rule changed.** The plan measures `NEW`
+from when *we* first observed a trend, but there is no record of that until Phase 3
+stores snapshots. It is measured against the feed's own `pubDate` instead — Google's
+report time, which is exact, needs no storage, and survives a reboot.
+
+`ACTIVE` was dropped rather than deferred. Everything in the list appeared in the latest
+response by definition, so the label would be true of every row at all times: noise, not
+information. It would only start meaning something if the screen also kept showing trends
+that had dropped out, which nothing in the plan asks for.
+
+`RISING` and `COOLING` compare against earlier snapshots, which is Phase 3's job. They
+were not faked from a single in-memory comparison, because a label derived that way would
+silently reset every time the Pi restarted.
 
 ### What Google Trends does not supply
 

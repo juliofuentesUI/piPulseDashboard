@@ -196,3 +196,19 @@ export interface TrendRowView {
   /** Bar width as a percentage, on a log scale. */
   readonly bar: number;
 }
+
+/**
+ * The details band for whichever trend is selected. Every field is either
+ * something the feed stated or empty — there is no placeholder text here.
+ */
+export interface TrendDetailView {
+  readonly title: string;
+  /** Google's bucket, compacted. Empty when the feed stated none. */
+  readonly volume: string;
+  /** Wall clock of the feed's `pubDate`, e.g. "6:50 PM". Empty if unstated. */
+  readonly firstReported: string;
+  /** How long ago that was, e.g. "2 HRS AGO". Empty if unstated. */
+  readonly age: string;
+  /** Google first reported it under 30 minutes ago. */
+  readonly isNew: boolean;
+}

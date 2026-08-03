@@ -438,7 +438,7 @@ the accent stays a tint of the active theme rather than a sixth hard-coded colou
 | Title | 96 px | `SEARCH PULSE`, and the 3 × 3 menu grid |
 | Region | 64 px | `UNITED STATES`, and the freshness report |
 | Trends | fills | Five `TrendRow`s, equal height |
-| Details | 132 px | Metadata for the selected trend — Phase 2 |
+| Details | 148 px | What the feed said about the selected trend |
 
 Title above region is the reverse of the weather screens, which lead with a status strip.
 This screen leads with its name, which is the order the design calls for and the one that
@@ -469,6 +469,30 @@ which is the honest trade for five rows with Google's own number printed beside 
 
 Titles are clipped with an ellipsis rather than wrapped: the band is a fixed height
 divided into five, so a long search term must not push its neighbours out of place.
+
+Tapping a row selects it and the details band describes it; the top trend is selected on
+arrival. The whole row is the target, because on a touchscreen the row is already what a
+finger is aiming at, and the selected one inverts — the same idiom the settings list uses
+for the option in force.
+
+**Selection is held by trend id, not by row index.** The list is replaced every time a
+poll lands and ranks shift between polls, so an index would quietly start describing a
+different search. If the selected trend drops out of the feed entirely, the panel falls
+back to the top trend rather than describing something no longer on screen.
+
+The details band shows only what the feed stated — the search, Google's figure marked
+`APPROX`, and the time it was first reported. **A field with nothing behind it is dropped
+rather than shown with a dash**, so the panel is never padded out with placeholder rows.
+Its bottom padding is the page indicator's lane: unlike the weather screens, whose last
+band has slack for the dots to sit in, this one is dense enough to run a line of text
+straight under them.
+
+One label is ours rather than Google's: `NEW`, when the feed first reported the trend
+under 30 minutes ago. The plan words that rule as "first observed less than 30 minutes
+ago", meaning first observed by us — but until Phase 3 stores snapshots there is no
+record of when we first saw anything, so it is measured against the feed's own `pubDate`.
+That is Google's report time: exact, needing no storage, and it does not reset when the
+Pi does. `RISING` and `COOLING` need real stored history and arrive with it in Phase 3.
 
 ## Controls
 

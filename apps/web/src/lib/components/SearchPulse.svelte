@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { PulseStatus } from '../trends.svelte';
-  import type { DashboardPhase, TrendRowView } from '../types';
+  import type { DashboardPhase, TrendDetailView, TrendRowView } from '../types';
   import TitleBar from './TitleBar.svelte';
   import TrendRow from './TrendRow.svelte';
 
@@ -9,10 +9,14 @@
     rows: readonly TrendRowView[];
     status: PulseStatus;
     region: string;
+    detail: TrendDetailView | null;
+    selectedId: string;
+    onselect: (id: string) => void;
     onmenu: () => void;
   }
 
-  let { phase, rows, status, region, onmenu }: Props = $props();
+  let { phase, rows, status, region, detail, selectedId, onselect, onmenu }: Props =
+    $props();
 </script>
 
 <div class="pulse">
@@ -38,7 +42,7 @@
   {#if rows.length > 0}
     <ol class="trends">
       {#each rows as row (row.id)}
-        <TrendRow {...row} />
+        <TrendRow {...row} selected={row.id === selectedId} {onselect} />
       {/each}
     </ol>
   {:else}
@@ -51,9 +55,37 @@
     </div>
   {/if}
 
+  <!--
+    Whatever the feed stated about the selected trend, and nothing else. Each
+    field disappears rather than showing a dash or a guess when Google did not
+    supply it, so the panel is never padded out with placeholder rows.
+  -->
   <div class="details">
-    <h2 class="details-heading">TREND DETAILS</h2>
-    <p class="details-note">RELATED SEARCHES AND METADATA APPEAR HERE.</p>
+    <div class="details-head">
+      <h2 class="details-heading">TREND DETAILS</h2>
+      {#if detail?.isNew}
+        <span class="badge">NEW</span>
+      {/if}
+    </div>
+
+    {#if detail === null}
+      <p class="details-note">NO TREND SELECTED.</p>
+    {:else}
+      <dl class="facts">
+        <dt>SEARCH</dt>
+        <dd class="search">{detail.title}</dd>
+
+        {#if detail.volume !== ''}
+          <dt>VOLUME</dt>
+          <dd>{detail.volume} <span class="qualifier">APPROX</span></dd>
+        {/if}
+
+        {#if detail.firstReported !== ''}
+          <dt>REPORTED</dt>
+          <dd>{detail.firstReported} <span class="qualifier">{detail.age}</span></dd>
+        {/if}
+      </dl>
+    {/if}
   </div>
 </div>
 
@@ -69,7 +101,7 @@
    */
   .pulse {
     display: grid;
-    grid-template-rows: 96px 64px minmax(0, 1fr) 132px;
+    grid-template-rows: 96px 64px minmax(0, 1fr) 148px;
     width: 100%;
     height: 100%;
   }
@@ -146,25 +178,93 @@
     color: var(--c-blue);
   }
 
+  /*
+   * The bottom padding is the page indicator's lane. Unlike the weather
+   * screens, whose last band has slack the dots can sit in, this one is dense
+   * enough to run a line of text straight under them.
+   */
   .details {
     display: grid;
     align-content: center;
-    gap: 12px;
+    gap: 10px;
     min-height: 0;
-    padding: 0 24px;
+    padding: 0 24px 28px;
+  }
+
+  .details-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
   }
 
   .details-heading {
     margin: 0;
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
     letter-spacing: 4px;
-    color: var(--c-ink);
+    color: var(--c-blue);
+  }
+
+  /*
+   * The one label on the screen we assign ourselves, so it says exactly what
+   * it means: Google first reported this search under 30 minutes ago.
+   */
+  .badge {
+    padding: 2px 8px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--c-bg);
+    background: var(--c-hot);
   }
 
   .details-note {
     margin: 0;
     font-size: 18px;
+    letter-spacing: 2px;
+    color: var(--c-blue);
+  }
+
+  /*
+   * A real definition list: a screen reader announces "search, does
+   * sheepstealer die" rather than two loose strings. `display: grid` on the
+   * list puts the dt/dd pairs into columns.
+   */
+  .facts {
+    display: grid;
+    grid-template-columns: 122px minmax(0, 1fr);
+    align-items: baseline;
+    gap: 4px 14px;
+    margin: 0;
+  }
+
+  .facts dt {
+    font-size: 16px;
+    letter-spacing: 2px;
+    color: var(--c-blue);
+  }
+
+  .facts dd {
+    margin: 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 20px;
+    letter-spacing: 1px;
+    color: var(--c-ink);
+  }
+
+  .search {
+    font-weight: 700;
+  }
+
+  /*
+   * "APPROX" is not decoration. Google's figure is the floor of a bucket, and
+   * the screen has to keep saying so wherever it prints one.
+   */
+  .qualifier {
+    font-size: 15px;
     letter-spacing: 2px;
     color: var(--c-blue);
   }

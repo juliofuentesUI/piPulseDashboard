@@ -1,5 +1,5 @@
 import { requestTrends, TrendsRequestError } from './api';
-import { regionName, toTrendRows } from './trend-view';
+import { regionName, toTrendDetail, toTrendRows, VISIBLE_TRENDS } from './trend-view';
 import type { DashboardFailure, DashboardPhase, TrendsSnapshot } from './types';
 import { relativeTime } from './view';
 
@@ -43,9 +43,39 @@ export class Trends {
   #timer: ReturnType<typeof setInterval> | undefined;
   #controller: AbortController | undefined;
 
+  /**
+   * The trend the details band is describing, by id.
+   *
+   * Held as an id rather than an index because the list is replaced every time
+   * a poll lands: ranks shift, and an index would silently start describing a
+   * different search.
+   */
+  #chosen = $state<string | null>(null);
+
   rows = $derived(this.#snapshot === null ? [] : toTrendRows(this.#snapshot.trends));
   hasData = $derived(this.#snapshot !== null);
   region = $derived(regionName(this.#snapshot?.region));
+
+  /** Only what is on screen is selectable, so the band always matches a row. */
+  #visible = $derived(this.#snapshot?.trends.slice(0, VISIBLE_TRENDS) ?? []);
+
+  /**
+   * Falls back to the top trend, which covers both the first render and the
+   * case where the chosen trend has dropped out of the feed since — a stale
+   * panel describing a search no longer on screen would be worse than moving.
+   */
+  #current = $derived(
+    this.#visible.find((trend) => trend.id === this.#chosen) ?? this.#visible[0] ?? null,
+  );
+
+  selectedId = $derived(this.#current?.id ?? '');
+  detail = $derived(
+    this.#current === null ? null : toTrendDetail(this.#current, this.#now),
+  );
+
+  select(id: string): void {
+    this.#chosen = id;
+  }
 
   #ageMs = $derived(
     this.#snapshot === null

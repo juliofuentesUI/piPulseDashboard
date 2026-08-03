@@ -136,6 +136,9 @@
             rows={trends.rows}
             status={trends.status}
             region={trends.region}
+            detail={trends.detail}
+            selectedId={trends.selectedId}
+            onselect={(id) => trends.select(id)}
             onmenu={() => (menuOpen = true)}
           />
         </section>

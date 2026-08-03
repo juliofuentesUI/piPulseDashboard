@@ -1,4 +1,5 @@
-import type { TrendingSearch, TrendRowView } from './types';
+import type { TrendDetailView, TrendingSearch, TrendRowView } from './types';
+import { formatClock, relativeTime } from './view';
 
 /** How many of the feed's trends the band has room for at 720 x 720. */
 export const VISIBLE_TRENDS = 5;
@@ -99,6 +100,30 @@ function round1(value: number): string {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+/**
+ * How recently Google must have first reported a trend for it to count as new.
+ *
+ * The plan words this rule as "first observed less than 30 minutes ago". Until
+ * Phase 3 stores snapshots there is no record of when *we* first saw a trend,
+ * so it is measured against the feed's own `pubDate` instead: Google's report
+ * time, which is exact, needs no storage, and does not reset when the Pi does.
+ */
+const NEW_WITHIN_MS = 30 * 60 * 1000;
+
+export function toTrendDetail(trend: TrendingSearch, now: Date): TrendDetailView {
+  const published =
+    trend.publishedAt === undefined ? null : new Date(trend.publishedAt);
+  const known = published !== null && !Number.isNaN(published.getTime());
+
+  return {
+    title: trend.title.toUpperCase(),
+    volume: formatVolume(trend.approximateVolume),
+    firstReported: known ? formatClock(published) : '',
+    age: known ? relativeTime(trend.publishedAt as string, now) : '',
+    isNew: known && now.getTime() - published.getTime() < NEW_WITHIN_MS,
+  };
 }
 
 const REGION_NAMES: Readonly<Record<string, string>> = {
