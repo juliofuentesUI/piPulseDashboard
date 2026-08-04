@@ -221,6 +221,75 @@ note "opening a throwaway database in $DATA_DIR and reading a row back"
 node "$ROOT/scripts/history-db.mjs" check "$DATA_DIR"
 good "SQLite is working"
 
+# --- Trend category API key ----------------------------------------------
+#
+# The one secret this project has, and the one thing a git pull cannot deliver:
+# .env is gitignored on purpose, so it is written here, once, and then survives
+# every upgrade for the same reason apps/api/data/ does.
+#
+# Skipping is a supported answer, not a failure. With no key the dashboard runs
+# exactly as it always has — the categoriser is never constructed, nothing is
+# called and no badges are drawn. That is why this asks rather than dies.
+
+step "Checking the trend category API key"
+
+ENV_FILE="$ROOT/.env"
+
+# Same reader pi-start.sh uses, so both agree on what "set" means: last
+# assignment wins, surrounding whitespace ignored, an empty value is not a value.
+env_file_value() {
+  [ -f "$ENV_FILE" ] || return 1
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$ENV_FILE" |
+    tail -n 1 | sed 's/[[:space:]]*$//'
+}
+
+# `[ -r /dev/tty ]` is not the test: the node exists and passes -r even with no
+# controlling terminal, and the open then fails. Actually opening it is the only
+# honest check, and it has to happen in a subshell so a failure is a return code
+# rather than the end of the script.
+tty_readable() { ( : </dev/tty ) 2>/dev/null; }
+
+if [ -n "$(env_file_value OPENAI_API_KEY || true)" ]; then
+  good "OPENAI_API_KEY is already set in .env — leaving it alone"
+elif ! tty_readable; then
+  note "no terminal to ask on, so the key was not set"
+  note "add it later with: echo 'OPENAI_API_KEY=sk-...' >> .env"
+else
+  note "categorising trends needs an OpenAI key. Without one the dashboard runs"
+  note "normally and simply shows no category badges — this is safe to skip."
+  note "it is stored only in .env, which is gitignored and never committed."
+  printf '    paste a key, or press enter to skip: '
+
+  # -s so a key does not stay on screen; a Pi is usually a screen in a room.
+  # || true because a read that hits EOF must not take the whole script down.
+  API_KEY=""
+  read -rs API_KEY </dev/tty || true
+  printf '\n'
+
+  if [ -z "$API_KEY" ]; then
+    note "skipped — no key set, no badges, everything else unaffected"
+    note "add one later with: echo 'OPENAI_API_KEY=sk-...' >> .env"
+  else
+    case "$API_KEY" in
+      sk-*) ;;
+      *) note "warning: that does not start with 'sk-'. Storing it anyway." ;;
+    esac
+
+    # Rewriting rather than appending, so running this twice cannot leave two
+    # assignments in the file. grep rather than sed: a key is arbitrary text and
+    # would need escaping in a substitution, which is a bug waiting to happen.
+    if [ -f "$ENV_FILE" ]; then
+      grep -v '^[[:space:]]*OPENAI_API_KEY[[:space:]]*=' "$ENV_FILE" > "$ENV_FILE.tmp" || true
+      mv "$ENV_FILE.tmp" "$ENV_FILE"
+    fi
+    printf 'OPENAI_API_KEY=%s\n' "$API_KEY" >> "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+    unset API_KEY
+
+    good "key written to .env (readable only by you)"
+  fi
+fi
+
 # --- Optional history import ---------------------------------------------
 
 if [ -n "$SEED" ]; then
