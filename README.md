@@ -666,6 +666,20 @@ moment, and its feed slot. That log is the one place on the dashboard a search
 can be seen *moving*. A row carries a peak and a span, and neither can show a
 trend climbing, falling back, and climbing again.
 
+It carries **the headlines the feed gave that trend**, recorded at the time. All of them, in
+the feed's order, quoted verbatim with the outlet named — the same rule the trend card
+follows, because showing one asserts the trend is about that one story when a broad query
+returns three unrelated ones. Article shown as outlet and domain in plain text, never a
+link: a tap on a wall-mounted kiosk navigates away with no way back.
+
+This reverses Phase 3.5's decision not to store headlines. That was right for the card,
+which only ever shows a trend still on the feed; it is wrong for a day view, because the
+feed drops a trend after a couple of hours and the record would otherwise never be able to
+say what any of its trends were about. **They are stored only when they change** — a trend
+sits in three to six fetches and its headlines rarely move, so writing them every time
+measured at ~79 MB over 90 days against a ~26 MB database. Reads therefore take the most
+recent non-null row, looking outside the day window when necessary.
+
 It also carries **two lines on one time axis**: Google's stated bucket, and standing by
 volume within each fetch. Both, because they answer different questions — a search can hold
 its bucket while sliding down the ranking because bigger things arrived. Observed on

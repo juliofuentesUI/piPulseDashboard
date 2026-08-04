@@ -304,6 +304,8 @@ export interface TrendDayEntry {
   readonly peakVolume?: string;
   /** When Google says it detected the trend. Absent on rows predating the column. */
   readonly reportedAt?: string;
+  /** Headlines as last recorded for this trend. Absent if never stored. */
+  readonly news?: readonly TrendNewsItem[];
   /** Best standing by volume within a fetch, 1 being the top. */
   readonly peakRank: number;
   readonly timesObserved: number;
@@ -432,6 +434,13 @@ export interface TrendDayDetailView {
    */
   readonly volumePlot: SparklineView | null;
   readonly rankPlot: SparklineView | null;
+  /**
+   * What the feed said this search was about, as recorded at the time. Every
+   * headline it carried, in its order — the same rule the trend card follows,
+   * for the same reason: showing one asserts the trend is about that one.
+   * Empty for a trend recorded before headlines were stored.
+   */
+  readonly headlines: readonly TrendHeadlineView[];
   /**
    * Oldest first, over a rolling 24 hours rather than the day — a wider window
    * than the summary above it, deliberately, because it is the trend's real

@@ -281,7 +281,9 @@ or `HELD`.
 | The overlay's colour is `sky` | Measured: the only token with chroma in all five palettes |
 | Article shown as outlet · domain, not a link | A tap on a kiosk navigates away with no way back |
 | Card is entered from the details band | The band already describes the trend; biggest target |
-| Headlines and image not stored in SQLite | They describe the present; the card reads the live list |
+| ~~Headlines not stored in SQLite~~ **reversed 2026-08-04** | A day view has to say what its trends were *about*, and the feed drops them |
+| The image is still not stored | Only headlines were asked for; a CDN URL that may expire is a separate call |
+| Headlines stored only when they change | Measured: every-row would be ~79 MB/90d against a ~26 MB database |
 | Card image fetched by the browser, not proxied | The rule protected the rate-limited feed, not a CDN |
 | `millennium` may break flat design; nothing else may | User's explicit call, scoped to that one theme |
 | The three layouts do not change for a theme | The reference merges the two weather screens; we kept them apart |
@@ -400,6 +402,21 @@ EXISTS` does nothing to a table that already exists, so a new column never reach
 that has been collecting for weeks — and that history is the thing least worth losing.
 `#migrate()` in `history.ts` reads `PRAGMA table_info` and adds what is missing, on every
 start, idempotently. Add to it rather than editing `SCHEMA` alone.
+
+**`news` reverses an earlier decision, on purpose.** Phase 3.5 deliberately did not store
+headlines — "they describe the present; the card reads the live list" — and that was right
+for the card, which only ever shows a trend still on the feed. It is wrong for `TODAY`: the
+feed drops a trend after a couple of hours, so without a stored copy the day view can never
+say what any of its trends were *about*. The old reasoning still holds where it was made.
+
+**Headlines are written only when they change.** A trend sits in three to six fetches and
+its headlines rarely move between them, so storing them on every row is the same ~639 bytes
+repeated — measured at **~79 MB over 90 days** against a database otherwise projected at
+~26 MB. `record()` compares against the last stored set and writes `NULL` when identical.
+Two consequences worth knowing: reads must take the **most recent non-null** row, and that
+lookup has to reach **outside** the day window, because a trend that started last night
+carries its headlines on a yesterday row. `dayDigest` does this after slicing to ten, so it
+is ten small queries rather than one per trend in the day.
 
 **`published_at` is Google's detection time; `first_seen_at` is ours.** They are not
 interchangeable: measured against the live feed, our first sighting runs **13–23 minutes

@@ -149,6 +149,43 @@
         </section>
       {/if}
 
+      <!--
+        What the feed said the search was about, recorded at the time.
+        All of them, in the feed's order: sampled against the live feed, four
+        of five trends returned three headlines about one event while a broad
+        query like `artificial intelligence news` returned three unrelated
+        stories — so picking the first would assert the trend was about that
+        story when it was about a third of it. Where they agree you learn the
+        event; where they diverge you learn the query is broad.
+
+        The article is outlet and domain as plain text, never a link. A tap on
+        a wall-mounted kiosk navigates away with no way back.
+      -->
+      {#if detail.headlines.length > 0}
+        <section class="group">
+          <h3 class="group-heading">WHAT IT WAS ABOUT</h3>
+          <!--
+            Deliberately the trend card's own structure and class names —
+            `figure.quote`, `blockquote.text`, `figcaption.attrib`, `.sep`. The
+            same reasoning as the dialog frame: `millennium` gives `.quote` a
+            plaque, so matching the markup gets it here too. It also inherits
+            the `text-transform: none` the card needs and the reason for it.
+          -->
+          <ul class="headlines">
+            {#each detail.headlines as headline (headline.key)}
+              <li>
+                <figure class="quote">
+                  <blockquote class="text">{headline.text}</blockquote>
+                  {#if headline.source !== '' || headline.host !== ''}
+                    <figcaption class="attrib">{headline.source}{#if headline.source !== '' && headline.host !== ''}<span class="sep">·</span>{/if}{headline.host}</figcaption>
+                  {/if}
+                </figure>
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
+
       <section class="group">
         <!--
           The window is named because it is wider than the summary's. The
@@ -366,6 +403,50 @@
     font-size: 13px;
     letter-spacing: 1px;
     color: var(--c-blue);
+  }
+
+  .headlines {
+    display: grid;
+    gap: 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .quote {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    min-width: 0;
+  }
+
+  /*
+   * `body` sets `text-transform: uppercase` for the whole dashboard, and this
+   * is one of the two places that must undo it. Everywhere else the screen is
+   * writing its own labels; here it is quoting someone else's sentence, and
+   * capitals are both harder to read and less faithful to what Google wrote.
+   */
+  .text {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.25;
+    letter-spacing: 0;
+    text-transform: none;
+    overflow-wrap: anywhere;
+    color: var(--c-ink);
+  }
+
+  .attrib {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 14px;
+    letter-spacing: 2px;
+    color: var(--c-blue);
+  }
+
+  .sep {
+    padding: 0 6px;
   }
 
   /* Monospace figures in columns, which is what the whole table is for. */

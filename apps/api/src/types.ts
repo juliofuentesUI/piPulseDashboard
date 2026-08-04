@@ -301,6 +301,16 @@ export interface TrendDayEntry {
    */
   readonly reportedAt?: string;
   /**
+   * The headlines the feed carried for this trend, as last recorded.
+   *
+   * Stored only when they change, so this may come from a row written before
+   * the day began — which is the point: the feed drops a trend after a couple
+   * of hours, and without a stored copy a day view could never say what any of
+   * its trends were actually about. Quoted verbatim with the outlet named,
+   * never summarised. Absent for trends recorded before the column existed.
+   */
+  readonly news?: readonly TrendNewsItem[];
+  /**
    * Best standing **by volume within a single fetch** it reached that day, so
    * 1 is the top. The same ranking the graph plots, never feed position.
    */

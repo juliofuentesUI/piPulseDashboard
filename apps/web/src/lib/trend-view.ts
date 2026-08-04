@@ -523,6 +523,15 @@ export function toDayDetail(
       entry.reportedAt === undefined ? '' : stamp(new Date(entry.reportedAt)),
     volumePlot: toVolumePlot(history?.points ?? []),
     rankPlot: toRankPlot(history?.points ?? []),
+    // Same treatment the card gives them: every one the feed carried, in its
+    // order, quoted as written. Not uppercased — these are someone else's
+    // sentences, and a hundred characters of capitals is less faithful.
+    headlines: (entry.news ?? []).map((item, index) => ({
+      key: String(index),
+      text: item.title,
+      source: (item.source ?? '').toUpperCase(),
+      host: hostOf(item.url),
+    })),
     // All-time and ours, so it explains why the log can reach back past the
     // day the summary above it describes.
     firstSeen:

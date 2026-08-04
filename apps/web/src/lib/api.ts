@@ -351,7 +351,8 @@ function isTrendDayEntry(value: unknown): value is TrendDayEntry {
     isOptionalString(v['peakVolume']) &&
     // Absent on rows written before the column existed, so an API newer than
     // the database is a normal state rather than a broken response.
-    isOptionalString(v['reportedAt'])
+    isOptionalString(v['reportedAt']) &&
+    isNewsList(v['news'])
   );
 }
 
