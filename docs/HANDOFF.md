@@ -332,6 +332,14 @@ getComputedStyle(el).position;
 file several times in quick succession — batch edits into a single write — and `touch`
 after any branch switch before trusting what you see.
 
+**Nothing is recorded unless the dashboard is on screen.** The backend has no timer; it
+fetches Google on a cache miss, and only the dashboard's 60-second poll ever misses that
+cache. So `pi-start.sh` running with no browser records nothing, and a Pi switched off
+records nothing. Measured on the real Pi 2026-08-04: **30 hours of span, 16 fetches** — two
+and a half hours of actual collecting. Continuous is ~6 fetches an hour. `pi-setup.sh
+--autostart` is the fix, and it must be run *before* `pi-start.sh`, which blocks on the
+browser until it closes.
+
 **The API may not be running.** The previous session left it running as a background
 process, which dies with the session. Run `npm run dev` from the repo root; it starts both
 the Fastify API on 3000 and Vite on 5173.

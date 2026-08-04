@@ -1015,6 +1015,28 @@ closes it, because the thing that changed is behind the panel.
   poll against a 10-minute backend cache is why the browser can refresh freely without
   any of it reaching Google.
 
+### History is only recorded while the dashboard is on screen
+
+**The backend has no timer of its own.** It fetches Google on a cache miss, and the only
+thing that ever misses that cache is the dashboard polling `/api/trends/now`. So a Pi with
+`pi-start.sh` running but no browser open records nothing, and a Pi that is switched off
+records nothing. There is no background collector.
+
+This is easy to miss and looks like a bug in the data. Measured on the real Pi: a database
+spanning **30 hours held only 16 fetches** — about two and a half hours of actual
+collecting, because the dashboard had only been opened for short sessions. Continuous
+running is roughly **six fetches an hour, ~144 a day**.
+
+It matters because `TODAY` can only rank what was recorded. With gaps that wide the view is
+honest but thin, and its heading claims less than it appears to: not "what caught fire
+today" but "what caught fire while the screen happened to be on". The trend and fetch counts
+in the region strip are what disclose it, and they are there for this reason.
+
+`./scripts/pi-setup.sh --autostart` is the fix — the dashboard opens with the desktop
+session and keeps collecting. That flag does only that and exits; it does not build or
+install. Note that `pi-start.sh` **blocks** until the browser closes, so run `--autostart`
+before it, not after.
+
 ## Design notes
 
 - Original pixel art only — no Nintendo logos, game graphics, or Game Boy Advance
