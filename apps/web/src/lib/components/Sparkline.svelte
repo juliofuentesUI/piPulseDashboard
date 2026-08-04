@@ -1,7 +1,12 @@
 <script lang="ts">
   import type { SparklineView } from '../types';
 
-  let { width, height, path, dots }: SparklineView = $props();
+  interface Props extends SparklineView {
+    /** What the line plots, for a screen reader. The record dialog draws two. */
+    label?: string;
+  }
+
+  let { width, height, path, dots, label = 'Rank over time' }: Props = $props();
 </script>
 
 <!--
@@ -18,7 +23,7 @@
   class="spark"
   viewBox="0 0 {width} {height}"
   role="img"
-  aria-label="Rank over time"
+  aria-label={label}
   shape-rendering="crispEdges"
   preserveAspectRatio="none"
 >

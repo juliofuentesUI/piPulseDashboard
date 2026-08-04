@@ -463,6 +463,12 @@ midnight to now, drawn in the dashboard's configured zone.
 }
 ```
 
+`reportedAt` is Google's own detection time, from the feed's `pubDate`, and it is a
+different figure from `firstSeenAt`: ours is whenever the backend next polled, which
+measured **13–23 minutes late** in steady state and hours late after any gap in collection.
+Absent on rows written before the `published_at` column existed — those are not
+back-filled, because we do not know what the feed said then.
+
 **The window is local, and that is not cosmetic.** Rows are stored in UTC and San Jose is
 seven hours behind it, so a UTC boundary would roll the day over in the late afternoon.
 `startOfLocalDay` reads the zone's offset through `Intl`, twice — the offset *now* is not
@@ -659,6 +665,13 @@ search — peak bucket, when it ran, fetches, best rank, first sighting, and the
 moment, and its feed slot. That log is the one place on the dashboard a search
 can be seen *moving*. A row carries a peak and a span, and neither can show a
 trend climbing, falling back, and climbing again.
+
+It also carries **two lines on one time axis**: Google's stated bucket, and standing by
+volume within each fetch. Both, because they answer different questions — a search can hold
+its bucket while sliding down the ranking because bigger things arrived. Observed on
+`ryan zeferjahn`: volume climbed `1K+ → 10K+ → 5K+ → 10K+ → 20K+` while rank sat at `#1`
+from the second observation on. Volume is log-scaled, since Google's buckets are geometric,
+and the axis is labelled with the buckets themselves so it never reads as a search count.
 
 **It is the settings dialog's markup, class name for class name** — `.backdrop`,
 `.scrim`, `.panel`, `.head`, `.heading`, `.close`, `.body`. Themes reach these by

@@ -348,7 +348,10 @@ function isTrendDayEntry(value: unknown): value is TrendDayEntry {
     typeof v['activeMinutes'] === 'number' &&
     // Absent whenever Google stated no bucket, which is the normal case for a
     // trend that never grew — not a malformed payload.
-    isOptionalString(v['peakVolume'])
+    isOptionalString(v['peakVolume']) &&
+    // Absent on rows written before the column existed, so an API newer than
+    // the database is a normal state rather than a broken response.
+    isOptionalString(v['reportedAt'])
   );
 }
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { TrendDayDetailView } from '../types';
+  import Sparkline from './Sparkline.svelte';
 
   interface Props {
     detail: TrendDayDetailView;
@@ -87,11 +88,66 @@
           lists more observations below than the day's fetch count above, and
           without this the two look like they disagree.
         -->
+        <!--
+          Google's clock, then ours, in that order. They answer different
+          questions and the gap between them is real: we meet a trend whenever
+          we next poll, which runs about a quarter of an hour behind in steady
+          state and hours behind after any gap in collection. Absent on trends
+          whose rows all predate the column, rather than filled in.
+        -->
+        {#if detail.reported !== ''}
+          <dt>REPORTED</dt>
+          <dd>{detail.reported} <span class="qualifier">GOOGLE</span></dd>
+        {/if}
+
         {#if detail.firstSeen !== ''}
           <dt>FIRST SEEN</dt>
-          <dd>{detail.firstSeen}</dd>
+          <dd>{detail.firstSeen} <span class="qualifier">OURS</span></dd>
         {/if}
       </dl>
+
+      <!--
+        Two lines on one time axis, because they answer different questions.
+        Volume is how big the search got; rank is how big it was against
+        everything else trending at that moment. A search can hold its bucket
+        while sliding down the ranking because bigger things arrived, and only
+        the pair shows that.
+      -->
+      {#if detail.volumePlot !== null || detail.rankPlot !== null}
+        <section class="group">
+          {#if detail.volumePlot !== null}
+            <h3 class="group-heading">VOLUME <span class="qualifier">APPROX</span></h3>
+            <div class="frame">
+              <div class="gutter">
+                <span>{detail.volumePlot.topLabel}</span>
+                <span>{detail.volumePlot.bottomLabel}</span>
+              </div>
+              <div class="plot">
+                <Sparkline {...detail.volumePlot} label="Volume over time" />
+              </div>
+            </div>
+          {/if}
+
+          {#if detail.rankPlot !== null}
+            <h3 class="group-heading rank-heading">RANK <span class="qualifier">OF TEN</span></h3>
+            <div class="frame">
+              <div class="gutter">
+                <span>{detail.rankPlot.topLabel}</span>
+                <span>{detail.rankPlot.bottomLabel}</span>
+              </div>
+              <div class="plot">
+                <Sparkline {...detail.rankPlot} label="Rank over time" />
+              </div>
+            </div>
+          {/if}
+
+          <!-- Named once: both lines are drawn over the same span. -->
+          <p class="axis">
+            <span>{detail.rankPlot?.startLabel ?? detail.volumePlot?.startLabel ?? ''}</span>
+            <span>{detail.rankPlot?.endLabel ?? detail.volumePlot?.endLabel ?? ''}</span>
+          </p>
+        </section>
+      {/if}
 
       <section class="group">
         <!--
@@ -272,6 +328,43 @@
     margin: 0;
     font-size: 18px;
     letter-spacing: 2px;
+    color: var(--c-blue);
+  }
+
+  /* The second plot's heading needs air the first one already has above it. */
+  .rank-heading {
+    margin-top: 16px;
+  }
+
+  /* Value gutter beside the line, matching the details band's framing. */
+  .frame {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    column-gap: 8px;
+    height: 60px;
+  }
+
+  .gutter {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--c-blue);
+  }
+
+  .plot {
+    min-width: 0;
+  }
+
+  /* One time axis under both lines, because both are drawn over one span. */
+  .axis {
+    display: flex;
+    justify-content: space-between;
+    margin: 6px 0 0 64px;
+    font-size: 13px;
+    letter-spacing: 1px;
     color: var(--c-blue);
   }
 

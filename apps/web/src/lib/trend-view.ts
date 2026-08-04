@@ -7,6 +7,7 @@ import type {
   TrendDayView,
   TrendDetailView,
   TrendHistory,
+  TrendHistoryPoint,
   TrendHistoryView,
   TrendingSearch,
   TrendRowView,
@@ -518,12 +519,136 @@ export function toDayDetail(
     duration: entry.activeMinutes <= 0 ? '' : formatDuration(entry.activeMinutes),
     fetches: String(entry.timesObserved),
     bestRank: `#${entry.peakRank}`,
+    reported:
+      entry.reportedAt === undefined ? '' : stamp(new Date(entry.reportedAt)),
+    volumePlot: toVolumePlot(history?.points ?? []),
+    rankPlot: toRankPlot(history?.points ?? []),
     // All-time and ours, so it explains why the log can reach back past the
     // day the summary above it describes.
     firstSeen:
       history?.firstSeenAt === undefined ? '' : stamp(new Date(history.firstSeenAt)),
     observations,
     loaded: history !== null,
+  };
+}
+
+/*
+ * Both plots in the record dialog, drawn on one shared time axis.
+ *
+ * The axis spans the observations themselves — first sighting to last — not
+ * the day and not a fixed window. This panel is about one search's run, and
+ * that run is often twenty minutes inside a twenty-four hour day; stretched
+ * across the day it would be a dot.
+ */
+const PLOT_WIDTH = 430;
+const PLOT_HEIGHT = 60;
+const PLOT_MARKER = 3;
+
+/** Where an observation sits along the shared axis, in plot units. */
+function plotX(atMs: number, firstMs: number, lastMs: number): number {
+  const span = PLOT_WIDTH - PLOT_MARKER * 2;
+  // A single observation, or several inside one minute, has no span to divide
+  // by. Centred is the honest placement: we know when, not over how long.
+  if (lastMs <= firstMs) return Math.round(PLOT_MARKER + span / 2);
+  return Math.round(PLOT_MARKER + span * ((atMs - firstMs) / (lastMs - firstMs)));
+}
+
+function windowOf(points: readonly TrendHistoryPoint[]): { first: number; last: number } | null {
+  const stamps = points.map((point) => Date.parse(point.at)).filter((at) => !Number.isNaN(at));
+  if (stamps.length === 0) return null;
+  return { first: Math.min(...stamps), last: Math.max(...stamps) };
+}
+
+/**
+ * Google's stated bucket over time, on a log scale.
+ *
+ * Log because the buckets are geometric — 200, 500, 1K, 2K, 5K, 10K, 20K — so
+ * a linear axis would crush every step below the largest into the floor. The
+ * axis is labelled with the actual buckets at each end rather than round
+ * numbers, which is what keeps it readable as a series of Google's ranges and
+ * not as a continuous count of searches.
+ *
+ * Observations where the feed stated no bucket are left out. There is no
+ * figure to plot for them, and putting them at zero would draw a collapse that
+ * never happened.
+ */
+function toVolumePlot(points: readonly TrendHistoryPoint[]): SparklineView | null {
+  const range = windowOf(points);
+  if (range === null) return null;
+
+  const stated = points
+    .map((point) => ({ at: Date.parse(point.at), value: volumeOf(point.volume), raw: point.volume }))
+    .filter((point) => !Number.isNaN(point.at) && point.value > 0);
+  if (stated.length === 0) return null;
+
+  const values = stated.map((point) => point.value);
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const flat = max <= min;
+
+  const dots = stated.map((point) => ({
+    x: plotX(point.at, range.first, range.last),
+    // Flat runs sit on the centre line rather than pinned to an edge, so a
+    // trend that never changed bucket does not read as maxed out or bottomed.
+    y: flat
+      ? Math.round(PLOT_HEIGHT / 2)
+      : Math.round(
+          ((Math.log(max) - Math.log(point.value)) / (Math.log(max) - Math.log(min))) *
+            PLOT_HEIGHT,
+        ),
+  }));
+
+  const biggest = stated.reduce((best, point) => (point.value > best.value ? point : best));
+  const smallest = stated.reduce((least, point) => (point.value < least.value ? point : least));
+
+  return {
+    width: PLOT_WIDTH,
+    height: PLOT_HEIGHT,
+    path: dots.map((dot) => `${dot.x},${dot.y}`).join(' '),
+    dots,
+    topLabel: formatVolume(biggest.raw),
+    bottomLabel: flat ? '' : formatVolume(smallest.raw),
+    windowLabel: '',
+    startLabel: formatClock(new Date(range.first)),
+    endLabel: formatClock(new Date(range.last)),
+  };
+}
+
+/**
+ * Standing by volume within each fetch, over the same axis.
+ *
+ * Not the same question as the volume plot above, which is why both are shown:
+ * volume is how big the search got, rank is how big it was *relative to
+ * everything else trending at that moment*. A search can hold its bucket while
+ * sliding down the ranking because bigger things arrived, and only these two
+ * lines together show that.
+ */
+function toRankPlot(points: readonly TrendHistoryPoint[]): SparklineView | null {
+  const range = windowOf(points);
+  if (range === null) return null;
+
+  const dots = points
+    .map((point) => {
+      const at = Date.parse(point.at);
+      if (Number.isNaN(at)) return null;
+      return {
+        x: plotX(at, range.first, range.last),
+        y: Math.round(((clamp(point.rank, 1, RANK_SPACE) - 1) / (RANK_SPACE - 1)) * PLOT_HEIGHT),
+      };
+    })
+    .filter((dot): dot is { x: number; y: number } => dot !== null);
+  if (dots.length === 0) return null;
+
+  return {
+    width: PLOT_WIDTH,
+    height: PLOT_HEIGHT,
+    path: dots.map((dot) => `${dot.x},${dot.y}`).join(' '),
+    dots,
+    topLabel: '1',
+    bottomLabel: String(RANK_SPACE),
+    windowLabel: '',
+    startLabel: formatClock(new Date(range.first)),
+    endLabel: formatClock(new Date(range.last)),
   };
 }
 

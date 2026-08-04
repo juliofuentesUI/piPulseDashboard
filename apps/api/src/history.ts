@@ -39,7 +39,8 @@ const SCHEMA = `
     rank               INTEGER NOT NULL,
     related_queries    TEXT    NOT NULL,
     first_seen_at      TEXT    NOT NULL,
-    observed_at        TEXT    NOT NULL
+    observed_at        TEXT    NOT NULL,
+    published_at       TEXT
   );
 
   CREATE INDEX IF NOT EXISTS trend_snapshots_key_time
@@ -64,6 +65,30 @@ export class TrendHistoryStore {
     // which matters on a wall display that gets switched off at the socket.
     this.#db.exec('PRAGMA journal_mode = WAL');
     this.#db.exec(SCHEMA);
+    this.#migrate();
+  }
+
+  /**
+   * Brings an existing database up to the schema above, in place.
+   *
+   * `CREATE TABLE IF NOT EXISTS` does nothing to a table that already exists,
+   * so a column added to it later never reaches a Pi that has been collecting
+   * for weeks — and that history is the thing least worth losing. Each step
+   * checks before it acts and is safe to run on every start.
+   *
+   * Rows written before a column existed keep NULL. They are not back-filled:
+   * we do not know what Google said then, and inventing it would put a made-up
+   * figure in the one place the whole screen's honesty rests on.
+   */
+  #migrate(): void {
+    const columns = this.#db.prepare('PRAGMA table_info(trend_snapshots)').all() as {
+      name: string;
+    }[];
+    const present = new Set(columns.map((column) => column.name));
+
+    if (!present.has('published_at')) {
+      this.#db.exec('ALTER TABLE trend_snapshots ADD COLUMN published_at TEXT');
+    }
   }
 
   /**
@@ -82,8 +107,8 @@ export class TrendHistoryStore {
     const insert = this.#db.prepare(`
       INSERT OR IGNORE INTO trend_snapshots
         (trend_key, title, approximate_volume, rank, related_queries,
-         first_seen_at, observed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+         first_seen_at, observed_at, published_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     this.#db.exec('BEGIN');
@@ -98,6 +123,14 @@ export class TrendHistoryStore {
           JSON.stringify(trend.relatedQueries),
           seen?.first ?? observedAt,
           observedAt,
+          /*
+           * Google's own detection time, not ours. It is worth storing beside
+           * `first_seen_at` precisely because the two differ: we meet a trend
+           * whenever we next poll, which in steady state is a quarter of an
+           * hour late and after any gap in collection is hours late. This one
+           * does not move when the machine restarts.
+           */
+          trend.publishedAt ?? null,
         );
       });
       this.#db.exec('COMMIT');
@@ -228,7 +261,7 @@ export class TrendHistoryStore {
 
     const rows = this.#db
       .prepare(
-        `SELECT trend_key, title, approximate_volume, observed_at
+        `SELECT trend_key, title, approximate_volume, observed_at, published_at
          FROM trend_snapshots
          WHERE observed_at >= ? AND observed_at <= ?
          ORDER BY observed_at ASC`,
@@ -238,6 +271,7 @@ export class TrendHistoryStore {
       title: string;
       approximate_volume: string | null;
       observed_at: string;
+      published_at: string | null;
     }[];
 
     const ranked = ranksByFetch(rows);
@@ -257,6 +291,7 @@ export class TrendHistoryStore {
         timesObserved: number;
         firstSeenAt: string;
         lastSeenAt: string;
+        publishedAt: string | null;
       }
     >();
 
@@ -274,6 +309,7 @@ export class TrendHistoryStore {
           timesObserved: 1,
           firstSeenAt: row.observed_at,
           lastSeenAt: row.observed_at,
+          publishedAt: row.published_at,
         });
         continue;
       }
@@ -281,6 +317,10 @@ export class TrendHistoryStore {
       seen.title = row.title;
       seen.timesObserved += 1;
       seen.lastSeenAt = row.observed_at;
+      // Constant per trend in the feed, so the first row that carries one wins
+      // — which also lets a row written before the column existed be filled in
+      // by a later observation of the same trend.
+      seen.publishedAt ??= row.published_at;
       if (value > seen.peakValue) {
         seen.peakValue = value;
         seen.peakVolume = row.approximate_volume;
@@ -292,6 +332,7 @@ export class TrendHistoryStore {
       trendKey,
       title: seen.title,
       ...(seen.peakVolume === null ? {} : { peakVolume: seen.peakVolume }),
+      ...(seen.publishedAt === null ? {} : { reportedAt: seen.publishedAt }),
       peakRank: seen.peakRank,
       timesObserved: seen.timesObserved,
       firstSeenAt: seen.firstSeenAt,

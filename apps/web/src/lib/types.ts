@@ -302,6 +302,8 @@ export interface TrendDayEntry {
   readonly title: string;
   /** The largest bucket Google stated that day, verbatim. Absent if it stated none. */
   readonly peakVolume?: string;
+  /** When Google says it detected the trend. Absent on rows predating the column. */
+  readonly reportedAt?: string;
   /** Best standing by volume within a fetch, 1 being the top. */
   readonly peakRank: number;
   readonly timesObserved: number;
@@ -418,6 +420,18 @@ export interface TrendDayDetailView {
    * which is what explains a log longer than the day's fetch count.
    */
   readonly firstSeen: string;
+  /**
+   * Google's own detection time, e.g. "MON 10:40 PM". Empty for a trend whose
+   * rows all predate the `published_at` column — absent, never guessed at.
+   */
+  readonly reported: string;
+  /**
+   * Volume and rank over the observation window, on one shared time axis.
+   * Either is null when the record cannot support it: no stated buckets, or a
+   * single observation with nothing to draw a line between.
+   */
+  readonly volumePlot: SparklineView | null;
+  readonly rankPlot: SparklineView | null;
   /**
    * Oldest first, over a rolling 24 hours rather than the day — a wider window
    * than the summary above it, deliberately, because it is the trend's real

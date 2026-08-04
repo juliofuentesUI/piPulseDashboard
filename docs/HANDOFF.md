@@ -392,8 +392,22 @@ whenever the laptop sleeps.
 
 The table is **`trend_snapshots`**, one row per trend per fetch: `id`, `trend_key`,
 `title`, `approximate_volume`, `rank` (feed position), `related_queries`, `first_seen_at`,
-`observed_at`. A unique index on `(trend_key, observed_at)` makes a repeated write
-idempotent.
+`observed_at`, `published_at`. A unique index on `(trend_key, observed_at)` makes a
+repeated write idempotent.
+
+**There is a migration step now, and it is the pattern to follow.** `CREATE TABLE IF NOT
+EXISTS` does nothing to a table that already exists, so a new column never reaches a Pi
+that has been collecting for weeks — and that history is the thing least worth losing.
+`#migrate()` in `history.ts` reads `PRAGMA table_info` and adds what is missing, on every
+start, idempotently. Add to it rather than editing `SCHEMA` alone.
+
+**`published_at` is Google's detection time; `first_seen_at` is ours.** They are not
+interchangeable: measured against the live feed, our first sighting runs **13–23 minutes
+late** in steady state, and hours late after any gap in collection, because we meet a trend
+whenever we next poll. Google's `pubDate` also lands on exact ten-minute boundaries — it
+buckets its own detection. Rows written before the column existed keep `NULL` and the
+screen shows no `REPORTED` for them; **they are never back-filled**, because we do not know
+what the feed said then.
 
 **`rank` in the table is feed position.** The volume ranking the graph uses is computed at
 read time in `historyFor`, by grouping the window's rows by `observed_at` and sorting on

@@ -292,6 +292,15 @@ export interface TrendDayEntry {
    */
   readonly peakVolume?: string;
   /**
+   * When *Google* says it detected the trend, from the feed's `pubDate`.
+   *
+   * Different from `firstSeenAt`, which is when this machine next polled and
+   * happened to meet it — measured at 13-23 minutes later in steady state, and
+   * hours later after any gap in collection. Absent on rows written before the
+   * column existed; never back-filled, because we do not know what it said.
+   */
+  readonly reportedAt?: string;
+  /**
    * Best standing **by volume within a single fetch** it reached that day, so
    * 1 is the top. The same ranking the graph plots, never feed position.
    */
