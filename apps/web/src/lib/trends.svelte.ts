@@ -98,6 +98,24 @@ export class Trends {
    */
   view = $state<PulseView>('now');
 
+  /**
+   * Whether the full-screen trend card is showing.
+   *
+   * Held here rather than inside the component because attract mode has to be
+   * able to close it. The card takes over the Search Pulse page, so a tour that
+   * navigated away and came back would otherwise find it still open and show a
+   * card where the list should be.
+   */
+  cardOpen = $state(false);
+
+  openCard(): void {
+    this.cardOpen = true;
+  }
+
+  closeCard(): void {
+    this.cardOpen = false;
+  }
+
   #day = $state<TrendDay | null>(null);
   #dayController: AbortController | undefined;
 

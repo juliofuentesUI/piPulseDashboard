@@ -34,8 +34,25 @@ export function storedScreen(): Screen {
 export class ScreenStore {
   current = $state<Screen>(storedScreen());
 
+  /** A deliberate choice, so it is remembered. */
   select(screen: Screen): void {
     this.current = screen;
     writeSetting(STORAGE_KEY, screen.id);
+  }
+
+  /**
+   * Shows a layout without remembering it.
+   *
+   * Attract mode walks through both weather layouts, and it must not overwrite
+   * the one the user picked while doing so — a tour is not a decision. This is
+   * the same assignment `select` makes, minus the part that persists.
+   */
+  show(screen: Screen): void {
+    this.current = screen;
+  }
+
+  /** Back to whatever was last chosen deliberately. */
+  restore(): void {
+    this.current = storedScreen();
   }
 }

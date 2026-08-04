@@ -101,13 +101,23 @@ was cut into four.)
 
 ## What is left
 
-**Attract mode is specified and not started** — `docs/attract-mode-plan.md`, requested
-2026-08-04. The dashboard drives itself when nobody is touching it: five seconds a screen,
-stops the instant it is touched, resumes a minute after the last input, plus a hidden
-control to start it now. **Three questions have to be settled before any code**, two of
-which change the shape of it: what is in the tour, where the hidden control lives, and what
-an open dialog does to the timer. The user calls it "carousel mode"; the document calls it
-attract mode, because `carousel` already means the two-page scroller everywhere else.
+**Attract mode is built** — `docs/attract-mode-plan.md`, 2026-08-04. The dashboard drives
+itself when nobody is touching it: four full-screen stops, five seconds each, twenty-second
+loop. A touch stops it at once; sixty seconds of quiet resumes it; a **two-second hold on
+the title** starts it now. The user calls it "carousel mode"; code and docs say **attract**,
+because `carousel` already names the two-page scroller everywhere else.
+
+Three things about it are load-bearing and easy to undo by accident:
+
+- **No dialogs, ever.** The tour switches the weather layout *directly* via
+  `ScreenStore.show`, never by opening settings. The user ruled a self-opening dialog out
+  explicitly. `show()` also does not persist, and `onstop` calls `restore()` — otherwise
+  touring would silently overwrite the layout they chose.
+- **Input is detected on `pointerdown`/`keydown`/`wheel`, never `scroll`.** The tour
+  navigates by scrolling, so a scroll listener would read its own first step as a person
+  and switch it off. Do not add a suppression flag; this is the simpler fix.
+- **The trend card's open flag lives in the `Trends` store**, not in `SearchPulse.svelte`,
+  so the tour can close it. A card left open covers the whole page.
 
 It does **not** relax the two-page rule. It drives the navigation that already exists.
 

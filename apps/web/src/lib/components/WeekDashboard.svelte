@@ -15,9 +15,10 @@
     notice: Notice | null;
     onrefresh: () => void;
     onmenu: () => void;
+    onhold?: () => void;
   }
 
-  let { view, date, clock, updated, busy, notice, onrefresh, onmenu }: Props = $props();
+  let { view, date, clock, updated, busy, notice, onrefresh, onmenu, onhold }: Props = $props();
 </script>
 
 <div class="screen">
@@ -28,7 +29,7 @@
     against "WEATHER"'s seven, and the band is 704px wide with the dot grid in
     it. Anything larger wraps or clips.
   -->
-  <TitleBar title="7-DAY FORECAST" size={62} dotRows={3} {onmenu} />
+  <TitleBar title="7-DAY FORECAST" size={62} dotRows={3} {onmenu} {onhold} />
 
   <ForecastTable week={view.week} />
 

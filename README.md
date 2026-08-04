@@ -1037,6 +1037,44 @@ session and keeps collecting. That flag does only that and exits; it does not bu
 install. Note that `pi-start.sh` **blocks** until the browser closes, so run `--autostart`
 before it, not after.
 
+## Attract mode
+
+Left alone, the dashboard drives itself. Four full-screen stops, five seconds each, a
+twenty-second loop:
+
+```
+WEATHER · NOW  →  WEATHER · 7-DAY  →  SEARCH PULSE · NOW  →  SEARCH PULSE · TODAY
+```
+
+- **Any touch stops it at once** and hands the panel back, wherever it had got to.
+- **Sixty seconds without input resumes it**, carrying on through the tour rather than
+  starting over.
+- **A two-second hold on the screen title starts it immediately.** Deliberately hidden: it
+  has no affordance and is not a button, because the mode arrives on its own anyway and
+  this is only for starting it now. Holding the menu grid does nothing.
+
+**No dialog ever opens by itself.** The tour switches between the two weather layouts
+directly rather than through the settings dialog, and visits no modal at all — not the
+trend card, not the trend record. Adding the card later is a change to `ATTRACT_TOUR` in
+`lib/attract.svelte.ts` and nothing else.
+
+**It adds no navigation.** Every stop is somewhere a finger could already reach, and it gets
+there by the same calls a tap makes. The carousel is still two pages.
+
+Three details that are easy to break:
+
+- `ScreenStore.show()` shows a weather layout **without persisting it**, and `restore()`
+  puts the chosen one back when the tour stops. Using `select()` here would quietly
+  overwrite the layout the user picked every time the panel sat idle.
+- Input is detected on `pointerdown`, `keydown` and `wheel` — **never `scroll`**. The tour
+  navigates by scrolling, so a scroll listener would read its own first step as a person
+  touching the panel.
+- While the settings dialog or a trend record is open, the idle countdown **does not run at
+  all**, so nothing resumes underneath an open panel.
+
+Both intervals are constants in `lib/attract.svelte.ts`: `ATTRACT_STEP_MS` and
+`ATTRACT_IDLE_MS`.
+
 ## Design notes
 
 - Original pixel art only — no Nintendo logos, game graphics, or Game Boy Advance

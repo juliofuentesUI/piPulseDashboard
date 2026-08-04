@@ -37,7 +37,12 @@
     onselect: (id: string) => void;
     /** Opens the record for one of the day's trends, by key. */
     onopenday: (key: string) => void;
+    /** Whether the full-screen trend card is showing. Owned by the store. */
+    cardOpen: boolean;
+    onopencard: () => void;
+    onclosecard: () => void;
     onmenu: () => void;
+    onhold?: () => void;
   }
 
   let {
@@ -56,7 +61,11 @@
     onmode,
     onselect,
     onopenday,
+    cardOpen,
+    onopencard,
+    onclosecard,
     onmenu,
+    onhold,
   }: Props = $props();
 
   /** Movement is only worth a badge when the record actually shows one. */
@@ -71,15 +80,18 @@
    * the weather. A horizontal swipe means "change dashboard section" and has to
    * keep meaning only that, so the card takes over this page rather than
    * joining the carousel.
+   *
+   * The open flag lives in the store rather than here, because attract mode has
+   * to be able to close it: a card left open would still be covering this page
+   * when the tour came back round to it.
    */
-  let open = $state(false);
 </script>
 
-{#if open && card !== null}
-  <TrendCard {card} {history} onback={() => (open = false)} />
+{#if cardOpen && card !== null}
+  <TrendCard {card} {history} onback={onclosecard} />
 {:else}
 <div class="pulse" class:today={view === 'today'}>
-  <TitleBar title="SEARCH PULSE" size={56} dotRows={3} {onmenu} />
+  <TitleBar title="SEARCH PULSE" size={56} dotRows={3} {onmenu} {onhold} />
 
   <!--
     What this list is and how fresh it is. TODAY answers both differently: its
@@ -217,7 +229,7 @@
         class="open"
         type="button"
         aria-label="Open trend card"
-        onclick={() => (open = true)}
+        onclick={onopencard}
       ></button>
     {/if}
 

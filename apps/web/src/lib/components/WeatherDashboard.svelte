@@ -13,14 +13,15 @@
     notice: Notice | null;
     onrefresh: () => void;
     onmenu: () => void;
+    onhold?: () => void;
   }
 
-  let { view, date, clock, notice, onrefresh, onmenu }: Props = $props();
+  let { view, date, clock, notice, onrefresh, onmenu, onhold }: Props = $props();
 </script>
 
 <div class="dashboard">
   <StatusHeader {date} {clock} location={view.location} {notice} {onrefresh} />
-  <TitleBar {onmenu} />
+  <TitleBar {onmenu} {onhold} />
 
   <div class="forecast">
     {#each view.columns as column (column.label)}

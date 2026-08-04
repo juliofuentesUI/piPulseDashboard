@@ -10,9 +10,39 @@
      */
     dotRows?: number;
     onmenu: () => void;
+    /** Held for two seconds on the heading. Starts attract mode. */
+    onhold?: () => void;
   }
 
-  let { title = 'WEATHER', size = 100, dotRows = 2, onmenu }: Props = $props();
+  let { title = 'WEATHER', size = 100, dotRows = 2, onmenu, onhold }: Props = $props();
+
+  /**
+   * The hidden control, on the one part of every screen with no other tap
+   * behaviour.
+   *
+   * Two seconds because it must be unreachable by accident on a panel where
+   * every other interaction is a quick tap, and because nothing else on the
+   * dashboard responds to a held finger. It is deliberately undiscoverable: the
+   * mode it starts also arrives on its own after a minute of quiet, so this is
+   * only for starting it *now*, not the only way in.
+   */
+  const HOLD_MS = 2000;
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  function press(): void {
+    if (onhold === undefined) return;
+    cancel();
+    timer = setTimeout(() => {
+      timer = undefined;
+      onhold?.();
+    }, HOLD_MS);
+  }
+
+  function cancel(): void {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = undefined;
+  }
 
   const dots = $derived(Array.from({ length: dotRows * 3 }, (_, i) => i));
 
@@ -21,7 +51,21 @@
 </script>
 
 <div class="row">
-  <h1 class="title" style:--title-size="{size}px">{title}</h1>
+  <!--
+    Not a button: it does nothing on tap, has no discoverable affordance, and
+    announcing one would defeat the point of a hidden control. Pointer events
+    only, so a mouse and a finger behave the same.
+  -->
+  <h1
+    class="title"
+    style:--title-size="{size}px"
+    onpointerdown={press}
+    onpointerup={cancel}
+    onpointercancel={cancel}
+    onpointerleave={cancel}
+  >
+    {title}
+  </h1>
 
   <!--
     The dot grid is decoration in the reference design. Here it opens settings:

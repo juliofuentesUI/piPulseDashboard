@@ -9,8 +9,9 @@
   import SettingsModal from './lib/components/SettingsModal.svelte';
   import WeatherDashboard from './lib/components/WeatherDashboard.svelte';
   import WeekDashboard from './lib/components/WeekDashboard.svelte';
+  import { Attract } from './lib/attract.svelte';
   import { Dashboard } from './lib/dashboard.svelte';
-  import { ScreenStore, type Screen } from './lib/screen.svelte';
+  import { ScreenStore, SCREENS, type Screen } from './lib/screen.svelte';
   import { ThemeStore, type Theme } from './lib/theme.svelte';
   import { Trends } from './lib/trends.svelte';
 
@@ -28,6 +29,31 @@
   const trends = new Trends();
   const themes = new ThemeStore();
   const screens = new ScreenStore();
+
+  /**
+   * Attract mode drives the panel through `goto` and the stores — the same
+   * calls a tap makes — so it adds no navigation of its own.
+   *
+   * `screens.show` rather than `screens.select`: the tour visits both weather
+   * layouts and must not overwrite the one that was chosen. `onstop` puts the
+   * chosen layout back, so handing control to a person restores exactly what
+   * they had.
+   */
+  const attract = new Attract({
+    apply: (stop) => {
+      if (stop.screen !== undefined) {
+        const screen = SCREENS.find((option) => option.id === stop.screen);
+        if (screen !== undefined) screens.show(screen);
+      }
+      if (stop.pulse !== undefined) trends.setView(stop.pulse);
+
+      // A card left open would otherwise still be covering the Search Pulse
+      // page when the tour arrives back at it.
+      trends.closeCard();
+      goto(stop.page);
+    },
+    onstop: () => screens.restore(),
+  });
 
   /**
    * On the Pi this resolves to exactly 1. On a desktop browser it scales the
@@ -72,6 +98,15 @@
     goto(0);
   };
 
+  /**
+   * Any input from a person hands the panel back and restarts the countdown.
+   *
+   * Pointer and key events only, never scroll: the tour navigates *by*
+   * scrolling the carousel, so a scroll listener would read the tour's own
+   * first step as a person touching the panel and switch itself off at once.
+   */
+  const touched = (): void => attract.touched();
+
   onMount(() => {
     const fit = (): void => {
       scale = Math.min(window.innerWidth, window.innerHeight) / DESIGN_SIZE;
@@ -79,14 +114,31 @@
 
     fit();
     window.addEventListener('resize', fit);
+    for (const event of ['pointerdown', 'keydown', 'wheel'] as const) {
+      window.addEventListener(event, touched, { passive: true });
+    }
+
     dashboard.start();
     trends.start();
+    attract.begin();
 
     return () => {
       window.removeEventListener('resize', fit);
+      for (const event of ['pointerdown', 'keydown', 'wheel'] as const) {
+        window.removeEventListener(event, touched);
+      }
       dashboard.stop();
       trends.stop();
+      attract.dispose();
     };
+  });
+
+  /*
+   * While anything modal is up the countdown does not run at all, so the tour
+   * cannot resume underneath it and nothing closes the user's dialog for them.
+   */
+  $effect(() => {
+    attract.suspend(menuOpen || trends.dayTrend !== null);
   });
 </script>
 
@@ -118,6 +170,7 @@
               notice={dashboard.notice}
               onrefresh={refresh}
               onmenu={() => (menuOpen = true)}
+              onhold={() => attract.start()}
             />
           {:else}
             <WeatherDashboard
@@ -127,6 +180,7 @@
               notice={dashboard.notice}
               onrefresh={refresh}
               onmenu={() => (menuOpen = true)}
+              onhold={() => attract.start()}
             />
           {/if}
         </section>
@@ -148,7 +202,11 @@
             onmode={(mode) => trends.setMode(mode)}
             onselect={(id) => trends.select(id)}
             onopenday={(key) => trends.openDayTrend(key)}
+            cardOpen={trends.cardOpen}
+            onopencard={() => trends.openCard()}
+            onclosecard={() => trends.closeCard()}
             onmenu={() => (menuOpen = true)}
+            onhold={() => attract.start()}
           />
         </section>
       </div>
