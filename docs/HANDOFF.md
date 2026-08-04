@@ -1,23 +1,53 @@
-# Handoff — 2026-08-03
+# Handoff — 2026-08-04
 
-Three sessions are folded into this. The first built Search Pulse Phases 0–3.5 and the Pi
+Four sessions are folded into this. The first built Search Pulse Phases 0–3.5 and the Pi
 deploy scripts; the second built the `millennium` theme end to end, including the supplied
-artwork; the third built Phase 4, the `TODAY` view. Read this first, then the documents it
-points at. Delete or rewrite it when it stops being true.
+artwork; the third built Phase 4, the `TODAY` view; the fourth built the trend record,
+stored headlines and reported times, and attract mode. Read this first, then the documents
+it points at. Delete or rewrite it when it stops being true.
 
-**Nothing is in flight.** Working tree clean, no branch parked. The one candidate left in
-the Search Pulse plan is Phase 5; the weather-provider switch is still gated at W0. Picking
-what to do next is a conversation to have with the user, not something to infer from here.
+## Start here — the next session is a new direction
 
-**One thing is genuinely open, and it is not code.** The Pi was deployed on the night of
-2026-08-02/03 and has been collecting since, but **its history has never been read** — the
-numbers below and everything Phase 4 was verified against come from the laptop's database.
-Run `node scripts/history-db.mjs stats` on the Pi to see what it actually holds. Nothing
-depends on the answer; it is worth knowing before trusting the day view's counts.
+**The user is starting the next session to add a new feature, and has not said what it is.**
+Do not infer it from this file, and do not pick up anything below as "the obvious next
+thing" — the open items listed here are genuinely optional and none of them is queued.
+Ask, then read whichever documents the answer points at.
 
-**The Pi is also running a pre-`millennium`, pre-Phase-4 build.** Picking both up is
-`git pull` then `./scripts/pi-setup.sh` and `./scripts/pi-start.sh`. That does **not**
-touch the history: `apps/api/data/` is gitignored and stays where it is.
+Everything in `CLAUDE.md` still applies to whatever it turns out to be. In particular the
+three rules that have shaped every feature so far and are not up for renegotiation without
+the user saying so:
+
+- **The carousel stays two pages.** New views go *inside* a section, reached by a tap or a
+  switch. Attract mode was built under this rule and did not bend it.
+- **Nothing on screen may be inferred, approximated, or filled in.** A field the source did
+  not supply is left out. This is the rule the whole Search Pulse half rests on.
+- **One phase merged and usable before the next starts.**
+
+**Nothing is in flight.** Working tree clean, `main` pushed to `origin` at `bc28f09`, no
+branch parked, no question outstanding.
+
+## The Pi
+
+**It is deployed, on autostart, and collecting continuously** as of 2026-08-04. That last
+part is new and it matters: before autostart it had recorded 16 fetches across 30 hours,
+because **nothing is recorded unless the dashboard is actually on screen** — see Gotchas.
+
+**It is behind again.** It has Phase 4 but not the trend record, the stored headlines, the
+stored reported times, the swipe fix, or attract mode. Bringing it current:
+
+```bash
+git pull && npm run build && sudo reboot
+```
+
+`npm run build` rather than `pi-setup.sh` because no dependency has changed — the build is
+the only part of setup a code change needs. `pi-start.sh` never builds, and will happily
+serve a stale build without saying so.
+
+**Upgrading cannot lose history, and the user has asked about this more than once.** Three
+independent reasons, all verified: `pi-start.sh` never references the database;
+`pi-setup.sh` only deletes it behind `--seed` *and* `--force`, and dies rather than guess;
+and `apps/api/data/` is gitignored so `git pull` cannot touch it. The two schema columns
+added this session arrive through `#migrate()` on first start, in place.
 
 ## Where the work stands
 
@@ -32,7 +62,10 @@ touch the history: `apps/api/data/` is gitignored and stays where it is.
 | — | Raspberry Pi deploy scripts | Done |
 | — | `millennium` theme, M1–M8, artwork included | Done |
 | 4 | Daily history view (`TODAY`) | Done — 2026-08-03 |
-| 5 | Reliability and polish | Not started |
+| 5 | Reliability and polish | Partly done — see below |
+| — | Trend record dialog, opened from a TODAY row | Done — 2026-08-04 |
+| — | Stored headlines and Google's reported time | Done — 2026-08-04 |
+| — | Attract mode, the self-driving display | Done — 2026-08-04 |
 
 ## Phase 4 — the TODAY view
 
@@ -99,52 +132,43 @@ adding one is a decision about what leaves the screen. The inventory, and which 
 is in that directory's `README.md`. (Eighteen files for fourteen pieces: the corner sheet
 was cut into four.)
 
-## What is left
+## What is left — all optional, none queued
 
-**Attract mode is built** — `docs/attract-mode-plan.md`, 2026-08-04. The dashboard drives
-itself when nobody is touching it: four full-screen stops, five seconds each, twenty-second
-loop. A touch stops it at once; sixty seconds of quiet resumes it; a **two-second hold on
-the title** starts it now. The user calls it "carousel mode"; code and docs say **attract**,
-because `carousel` already names the two-page scroller everywhere else.
+**Attract mode is done**, `docs/attract-mode-plan.md`. Four full-screen stops, five seconds
+each; a touch stops it, sixty seconds of quiet resumes it, a `CAROUSEL` switch in settings
+turns it on or off, and a two-second hold on the screen title is a hidden shortcut. Three
+things about it are load-bearing and easy to undo by accident:
 
-Three things about it are load-bearing and easy to undo by accident:
-
-- **No dialogs, ever.** The tour switches the weather layout *directly* via
-  `ScreenStore.show`, never by opening settings. The user ruled a self-opening dialog out
-  explicitly. `show()` also does not persist, and `onstop` calls `restore()` — otherwise
-  touring would silently overwrite the layout they chose.
-- **Input is detected on `pointerdown`/`keydown`/`wheel`, never `scroll`.** The tour
-  navigates by scrolling, so a scroll listener would read its own first step as a person
-  and switch it off. Do not add a suppression flag; this is the simpler fix.
+- **No dialog ever opens by itself.** The tour switches weather layouts through
+  `ScreenStore.show()`, never by opening settings — the user ruled that out explicitly.
+  `show()` deliberately does not persist and `onstop` calls `restore()`, so touring cannot
+  overwrite the layout that was actually chosen.
+- **Input is read from `pointerdown`/`keydown`/`wheel`, never `scroll`.** The tour navigates
+  *by* scrolling, so a scroll listener would read its own first step as a person. Do not
+  replace this with a suppression flag; the flag has to be right at every call site.
 - **The trend card's open flag lives in the `Trends` store**, not in `SearchPulse.svelte`,
   so the tour can close it. A card left open covers the whole page.
 
-It does **not** relax the two-page rule. It drives the navigation that already exists.
+**Phase 5 is partly done.** Built: request timeouts, last-known-good cache,
+duplicate-snapshot protection, schema migration, migration logging, and the swipe
+performance fix. Still open:
 
-**Phase 5, reliability and polish**, is partly done now. Already built: request timeouts,
-last-known-good cache, duplicate-snapshot protection, migration support, and migration
-logging. Still open: exponential retry on a failed fetch, feed-parsing tests (there are
-none at all), a `/api/trends/health` endpoint, burn-in protection, and auto-return to the
-top trend after inactivity.
+- Exponential retry on a failed Google fetch — today it just waits for the next poll
+- **Feed-parsing tests. There are none at all, anywhere in the repo.** This is the largest
+  real gap and the one most likely to matter.
+- `/api/trends/health`
+- Auto-return to the top trend after inactivity — **largely subsumed by attract mode**; do
+  not build it without deciding what is left of it
+- Burn-in protection — **also largely subsumed**, since the panel now moves every five
+  seconds for most of the day. What remains is the idle minute before attract resumes.
 
-**Two of those overlap attract mode and should not be built before it.** Burn-in protection
-is largely what attract mode does — a screen that moves every five seconds needs far less of
-it — and "auto-return after inactivity" is a special case of the same idle timer. Decide
-attract mode first, then see what is left of both.
+**The weather-provider switch is still gated at W0**, `docs/weather-provider-plan.md`.
+Three questions before any code: real billable cost per refresh, whether Google's day/night
+splits can fill the 7-day table's three columns, and demo key versus real key.
 
-**Deploying is `./scripts/pi-setup.sh` then `./scripts/pi-start.sh`**, both documented in
-`README.md`. Setup proves SQLite can actually write where the history lives, which is what
-separates "Node is too old" from "this SD card is read-only" — the two look identical from
-the screen. History moves across with `node scripts/history-db.mjs export`; never copy
-`trends.db` by hand, because WAL mode leaves most of the data in a sidecar.
-
-**A weather-provider switch is planned**, Open-Meteo to Google's Weather API, at the user's
-request on 2026-08-03 because he finds Google noticeably more accurate for San Jose. It has
-its own document, `docs/weather-provider-plan.md`, and it is deliberately **not** in the
-Search Pulse plan — different half of the dashboard, different rules. Three questions have
-to be answered before any code: how many billable calls one refresh really costs, whether
-the 7-day table's three columns can survive Google only offering day/night splits, and demo
-key versus real key. Do not start at Phase W1 without W0.
+**Two small offers the user has not ruled on:** adding the trend card to the attract tour
+(a change to `ATTRACT_TOUR` and nothing else), and storing the feed's image alongside the
+headlines.
 
 ## Read these, in this order
 
@@ -161,7 +185,8 @@ Then, only if the work touches them:
 4. **`docs/millennium-theme-plan.md`** — the theme, and every placement that was tried and
    rejected before the one that shipped.
 5. **`docs/weather-provider-plan.md`** — the Open-Meteo → Google switch, still at W0.
-6. **`docs/attract-mode-plan.md`** — the self-driving display, specified and not started.
+6. **`docs/attract-mode-plan.md`** — the self-driving display, built. Records the three
+   questions the user answered and what the build changed about them.
 
 Per-project memories also load automatically in this directory. They cover Pi deployment,
 git workflow, and two gotchas repeated below.
@@ -410,68 +435,73 @@ the whole table.
 throws "Illegal invocation", which takes down every other request and drops the panel into
 its error screen — it reads exactly like a bug in the change you are testing.
 
+**`tsx watch` went stale twice more this session, both times on an API change**, and both
+times it looked like the change had not worked — a migration that appeared not to run, and
+an endpoint serving old data. `touch apps/api/src/*.ts` and wait a few seconds. This is now
+five occurrences; treat "my API change did nothing" as a stale watcher until proven
+otherwise.
+
+**Measure the thing, not the proxy.** Chasing the millennium swipe lag with `requestAnimationFrame`
+timing produced 16.6ms on both themes, because rAF is vsync-locked and paint happens after
+it — the measurement could not see the cost at all. What did work was counting the expensive
+paint declarations per theme (millennium: 14 box-shadows, 9 `border-image`s, 15 gradients,
+2 filters; flat themes: zero of any) and fixing the mechanism. **The lag itself was never
+reproduced on this laptop, only on the Pi.** Say so when that happens rather than implying a
+fix was verified.
+
+**A four-stop loop makes a two-sample test lie.** Testing "is it still touring?" by comparing
+the screen before and five seconds later reported *false* — two advances around a four-stop
+tour can land back where it started. Sample the whole loop and count distinct states.
+
 **Do not deliver screenshots with `SendUserFile`.** They arrive on the user's phone as
 broken cards. Let the `browser_take_screenshot` tool result be the image and say in the
 reply which capture shows what.
 
 ## The data
 
-SQLite at `apps/api/data/trends.db`, gitignored, WAL mode. As of this handoff: **600 rows,
-60 fetches, 177 distinct trends, ~17.9 hours of history** (2026-08-03 04:43Z → 22:37Z),
-~2 MB on disk with the WAL. Roughly 1,440 rows/day, ~26 MB for 90 days.
+SQLite at `apps/api/data/trends.db`, gitignored, WAL mode. **The laptop's** database as of
+this handoff: 1,800 rows, 474 distinct trends, 180 fetches, spanning 2026-08-03 04:43Z →
+2026-08-04 18:39Z. Of those rows 670 carry `published_at` and 238 carry `news`, because both
+columns arrived mid-session and older rows are never back-filled.
 
-**That is the laptop's record, and it is the one Phase 4 was built and verified against.**
-It was enough — 167 trends over 43 fetches within a single local day, which is the shape
-the day view actually consumes. The Pi has been collecting since the night of
-2026-08-02/03 and **its database has never been read**; `node scripts/history-db.mjs stats`
-on the Pi is the way to see it. Expect a longer, unbroken record than this one, which stops
-whenever the laptop sleeps.
+**The Pi's is the one that matters now**, and it is smaller and gappier — 160 rows over 30
+hours when it was last read, because it only collected while the dashboard was on screen.
+Since autostart it should be accumulating ~144 fetches a day. Read it with
+`node scripts/history-db.mjs stats` on the Pi.
 
-The table is **`trend_snapshots`**, one row per trend per fetch: `id`, `trend_key`,
-`title`, `approximate_volume`, `rank` (feed position), `related_queries`, `first_seen_at`,
-`observed_at`, `published_at`. A unique index on `(trend_key, observed_at)` makes a
+The table is **`trend_snapshots`**, one row per trend per fetch: `id`, `trend_key`, `title`,
+`approximate_volume`, `rank` (feed position), `related_queries`, `first_seen_at`,
+`observed_at`, `published_at`, `news`. A unique index on `(trend_key, observed_at)` makes a
 repeated write idempotent.
 
-**There is a migration step now, and it is the pattern to follow.** `CREATE TABLE IF NOT
-EXISTS` does nothing to a table that already exists, so a new column never reaches a Pi
-that has been collecting for weeks — and that history is the thing least worth losing.
-`#migrate()` in `history.ts` reads `PRAGMA table_info` and adds what is missing, on every
-start, idempotently. Add to it rather than editing `SCHEMA` alone.
+**There is a migration step, and it is the pattern to follow.** `CREATE TABLE IF NOT EXISTS`
+does nothing to a table that already exists, so a new column never reaches a Pi that has
+been collecting for weeks. `#migrate()` in `history.ts` reads `PRAGMA table_info`, adds what
+is missing, returns what it added, and throws `SchemaMigrationError` on failure so the log
+can separate "the schema would not upgrade" from "the disk will not take a write". `ADD
+COLUMN` is metadata-only in SQLite, so it is instant at any table size. Add to the
+`additions` list rather than editing `SCHEMA` alone. Verified against a database built with
+the original schema: first open reported both columns, second reported none, existing rows
+survived.
 
-**`news` reverses an earlier decision, on purpose.** Phase 3.5 deliberately did not store
-headlines — "they describe the present; the card reads the live list" — and that was right
-for the card, which only ever shows a trend still on the feed. It is wrong for `TODAY`: the
-feed drops a trend after a couple of hours, so without a stored copy the day view can never
-say what any of its trends were *about*. The old reasoning still holds where it was made.
+**`published_at` is Google's detection time; `first_seen_at` is ours.** Measured against the
+live feed, our first sighting runs **13–23 minutes late** in steady state and hours late
+after any gap. Google's `pubDate` lands on exact ten-minute boundaries — it buckets its own
+detection.
 
-**Headlines are written only when they change.** A trend sits in three to six fetches and
-its headlines rarely move between them, so storing them on every row is the same ~639 bytes
-repeated — measured at **~79 MB over 90 days** against a database otherwise projected at
-~26 MB. `record()` compares against the last stored set and writes `NULL` when identical.
-Two consequences worth knowing: reads must take the **most recent non-null** row, and that
-lookup has to reach **outside** the day window, because a trend that started last night
-carries its headlines on a yesterday row. `dayDigest` does this after slicing to ten, so it
-is ten small queries rather than one per trend in the day.
+**`news` is written only when it changes.** A trend sits in three to six fetches and its
+headlines rarely move, so storing them every time measured at ~79 MB over 90 days against a
+database otherwise projected at ~26 MB. Two consequences: reads must take the **most recent
+non-null** row, and that lookup has to reach **outside** the day window, because a trend that
+started last night carries its headlines on a yesterday row. Observed working: of six trends
+present in two consecutive fetches, five were skipped as unchanged and one was rewritten
+because a CBS headline had genuinely been replaced by an NBC one.
 
-**`published_at` is Google's detection time; `first_seen_at` is ours.** They are not
-interchangeable: measured against the live feed, our first sighting runs **13–23 minutes
-late** in steady state, and hours late after any gap in collection, because we meet a trend
-whenever we next poll. Google's `pubDate` also lands on exact ten-minute boundaries — it
-buckets its own detection. Rows written before the column existed keep `NULL` and the
-screen shows no `REPORTED` for them; **they are never back-filled**, because we do not know
-what the feed said then.
-
-**`rank` in the table is feed position.** The volume ranking the graph uses is computed at
-read time in `historyFor`, by grouping the window's rows by `observed_at` and sorting on
-parsed volume. That was deliberate — it avoided a migration and keeps both orderings
-recoverable from what is already stored.
+**`rank` in the table is feed position.** The volume ranking the graph and the day digest use
+is computed at read time by `ranksByFetch`, which both share so the tie rule exists once.
 
 Endpoints: `/api/health`, `/api/weather`, `/api/trends/now`, `/api/trends/history?key=`,
 `/api/trends/today`.
-
-`/api/trends/today` takes no parameters — the window is always local midnight to now — and
-caps its list at ten while reporting the day's true `trendCount` alongside it, so ten rows
-out of a hundred and sixty read as a top ten rather than as the whole day.
 
 ## How the user works
 
