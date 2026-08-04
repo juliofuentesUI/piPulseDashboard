@@ -38,9 +38,8 @@ because **nothing is recorded unless the dashboard is actually on screen** — s
 So it also has the trend record, the stored headlines and reported times, and the swipe
 fix — and both schema columns are in its database, added in place by `#migrate()`.
 
-The one thing worth checking, because it landed after the attract-mode commit: **open
-settings and look for a `CAROUSEL` section** between `SCREEN` and `THEME`. If it is not
-there, the Pi is one commit behind and needs `bc28f09`.
+The `CAROUSEL` switch in settings is there too, confirmed on the panel — so the Pi is level
+with `main` as of the end of this session. Nothing to deploy.
 
 Future upgrades are:
 
