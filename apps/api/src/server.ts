@@ -295,6 +295,10 @@ app.get('/api/trends/now', async (request, reply) => {
       region: config.trends.region,
       trends: withCategories,
       updatedAt: new Date(result.storedAt).toISOString(),
+      categories: {
+        state: categoriser === null ? 'off' : categoriesHalted ? 'halted' : 'ready',
+        pending: withCategories.filter((trend) => trend.category === undefined).length,
+      },
     };
     return snapshot;
   } catch (error) {

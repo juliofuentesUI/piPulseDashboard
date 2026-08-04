@@ -117,7 +117,28 @@ cd "$ROOT"
 
 step "Starting the dashboard"
 note "node on the built API, and 'vite preview' on the built front end"
-npm start &
+
+# Under --autostart there is no terminal, so everything the servers say has been
+# going nowhere. That is fine until something is wrong, at which point the one
+# machine that knows why is the one you cannot easily type into — which is how a
+# rejected API key presented as the dashboard being "inconsistent" rather than
+# as the single line the API logged and threw away.
+#
+# One previous run is kept. A wall display runs for weeks, and an unbounded log
+# on an SD card is its own outage.
+readonly LOG="$ROOT/pipulse.log"
+[ -f "$LOG" ] && mv -f "$LOG" "$LOG.1"
+note "logging to $LOG (previous run kept as pipulse.log.1)"
+
+# `tee` so a run started from a terminal still prints to it, and process
+# substitution rather than a pipe so `$!` stays the *npm* process.
+#
+# This matters more than it looks. Through a pipe `$!` is tee's pid, and
+# kill_tree below walks children — of tee, which has none. The whole server
+# tree would be orphaned on exit, which is the orphaned-vite-holding-5173
+# failure this file already warns about twenty lines up, reintroduced by a
+# logging change.
+npm start > >(tee "$LOG") 2>&1 &
 SERVERS_PID=$!
 
 wait_for_web() {

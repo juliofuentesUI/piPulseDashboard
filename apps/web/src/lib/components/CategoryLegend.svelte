@@ -3,10 +3,12 @@
   import CategoryBadge from './CategoryBadge.svelte';
 
   interface Props {
+    /** Why badges are missing, or empty when nothing is wrong. */
+    warning: string;
     onclose: () => void;
   }
 
-  let { onclose }: Props = $props();
+  let { warning, onclose }: Props = $props();
 
   let dialog: HTMLDivElement | undefined = $state();
 
@@ -82,9 +84,21 @@
         {/each}
       </ul>
 
-      <p class="note">
-        A TREND WITH NO BADGE COULD NOT BE PLACED FROM ITS HEADLINES.
-      </p>
+      <!--
+        The closing note is only true when categorising is actually running.
+        With no key every trend is unbadged, and telling someone the headlines
+        were unclear would send them looking in the wrong place entirely.
+      -->
+      {#if warning === ''}
+        <p class="note">
+          A TREND WITH NO BADGE COULD NOT BE PLACED FROM ITS HEADLINES.
+        </p>
+      {:else}
+        <p class="note alert">
+          {warning} — NO TRENDS ARE BEING CATEGORISED. SET OPENAI_API_KEY IN .ENV
+          ON THIS MACHINE AND RESTART.
+        </p>
+      {/if}
     </div>
   </div>
 </div>
@@ -173,6 +187,10 @@
     letter-spacing: 2px;
     line-height: 1.4;
     color: var(--c-blue);
+  }
+
+  .alert {
+    color: var(--c-hot);
   }
 
   .rows {

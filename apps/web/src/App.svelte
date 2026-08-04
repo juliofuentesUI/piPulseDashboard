@@ -234,6 +234,7 @@
             selectedId={trends.selectedId}
             mode={trends.mode}
             badge={badges.current}
+            categoryWarning={trends.categoryWarning}
             view={trends.view}
             onview={(view) => trends.setView(view)}
             onmode={(mode) => trends.setMode(mode)}
@@ -276,7 +277,10 @@
       {/if}
 
       {#if legendOpen}
-        <CategoryLegend onclose={() => (legendOpen = false)} />
+        <CategoryLegend
+          warning={trends.categoryWarning}
+          onclose={() => (legendOpen = false)}
+        />
       {/if}
     </div>
   </div>

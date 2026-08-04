@@ -240,6 +240,27 @@ export interface TrendingSearch {
   readonly category?: TrendCategory;
 }
 
+/**
+ * Whether categorising is working, so the panel can say why there are no
+ * badges instead of leaving it to be guessed.
+ *
+ * Four states look identical from across a room — no key configured, the key
+ * rejected, a batch still in flight, and everything fine on trends that are
+ * simply new. Only one of those is healthy, and on a wall display with no
+ * keyboard there was previously no way to tell them apart. That was reported
+ * as the feature being "inconsistent", which is exactly what it looks like.
+ */
+export interface TrendCategoriesStatus {
+  /**
+   * `off`    — no key, or explicitly disabled. Nothing is ever called.
+   * `halted` — the account was rejected; stopped until restart.
+   * `ready`  — working. `pending` may still be non-zero while a batch runs.
+   */
+  readonly state: 'off' | 'halted' | 'ready';
+  /** Trends in this list with no category yet. Zero when everything is badged. */
+  readonly pending: number;
+}
+
 export interface TrendsSnapshot {
   /** Google region code the list was fetched for, e.g. "US". */
   readonly region: string;
@@ -252,6 +273,8 @@ export interface TrendsSnapshot {
    * from cache.
    */
   readonly updatedAt: string;
+  /** Why there are or are not badges. Never absent; see the type. */
+  readonly categories: TrendCategoriesStatus;
 }
 
 /** One stored observation: where a trend sat at one moment. */

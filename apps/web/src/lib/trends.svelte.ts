@@ -208,6 +208,22 @@ export class Trends {
 
   rows = $derived(toTrendRows(this.#ordered, this.#now));
   hasData = $derived(this.#snapshot !== null);
+
+  /**
+   * Why the badges are missing, or empty when nothing is wrong.
+   *
+   * Silence when healthy is the whole design: a wall display should not carry a
+   * permanent label about a feature that is working. It speaks only in the two
+   * states a person has to act on, and both name the action rather than the
+   * internal state — "halted" is our word for it, "KEY REJECTED" is what you
+   * would go and fix.
+   */
+  categoryWarning = $derived.by(() => {
+    const state = this.#snapshot?.categories?.state;
+    if (state === 'off') return 'NO API KEY';
+    if (state === 'halted') return 'KEY REJECTED';
+    return '';
+  });
   region = $derived(regionName(this.#snapshot?.region));
 
   /** Only what is on screen is selectable, so the band always matches a row. */

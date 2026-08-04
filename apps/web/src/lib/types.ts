@@ -203,11 +203,24 @@ export interface TrendingSearch {
   readonly category?: string;
 }
 
+/**
+ * Why there are or are not badges. Mirrors the API.
+ *
+ * Optional here where the API declares it required, like `news`: an API that
+ * predates this field should cost the strip its marker, not cost the whole
+ * screen its list by failing payload validation.
+ */
+export interface TrendCategoriesStatus {
+  readonly state: 'off' | 'halted' | 'ready';
+  readonly pending: number;
+}
+
 export interface TrendsSnapshot {
   readonly region: string;
   readonly trends: readonly TrendingSearch[];
   /** When the list was retrieved from Google, not when we last polled the API. */
   readonly updatedAt: string;
+  readonly categories?: TrendCategoriesStatus;
 }
 
 /** One rendered row of the trend list. */

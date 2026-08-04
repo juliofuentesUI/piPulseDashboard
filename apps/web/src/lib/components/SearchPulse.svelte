@@ -35,6 +35,8 @@
     view: PulseView;
     /** How the category badge draws itself, from settings. */
     badge: BadgeStyle;
+    /** Why badges are missing, or empty when nothing is wrong. */
+    categoryWarning: string;
     onview: (view: PulseView) => void;
     onmode: (mode: PulseMode) => void;
     onselect: (id: string) => void;
@@ -61,6 +63,7 @@
     mode,
     view,
     badge,
+    categoryWarning,
     onview,
     onmode,
     onselect,
@@ -103,6 +106,17 @@
   -->
   <div class="region">
     <span class="where">{region}</span>
+
+    <!--
+      Only ever drawn when something is actually wrong. Four different causes
+      of "no badges" used to look identical from across the room, and the only
+      way to tell them apart was a terminal on a machine with no keyboard —
+      which is how a rejected API key was reported as the feature being
+      inconsistent.
+    -->
+    {#if categoryWarning !== ''}
+      <span class="warn">{categoryWarning}</span>
+    {/if}
 
     {#if view === 'today'}
       <span class="status-text">{day?.window ?? ''}</span>
@@ -382,6 +396,22 @@
     padding: 0 24px;
     overflow: hidden;
     border-bottom: var(--divider) solid var(--line);
+  }
+
+  /*
+   * Deliberately loud. It is the one thing on this screen that means "go and
+   * do something", and it appears so rarely that it should not be missable
+   * when it does. `hot` is the same token the NEW badge and the live lamp use.
+   */
+  .warn {
+    flex: 0 0 auto;
+    padding: 2px 8px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    white-space: nowrap;
+    color: var(--c-bg);
+    background: var(--c-hot);
   }
 
   .where {
