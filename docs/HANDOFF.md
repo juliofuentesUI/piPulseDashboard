@@ -32,16 +32,24 @@ branch parked, no question outstanding.
 part is new and it matters: before autostart it had recorded 16 fetches across 30 hours,
 because **nothing is recorded unless the dashboard is actually on screen** — see Gotchas.
 
-**It is behind again.** It has Phase 4 but not the trend record, the stored headlines, the
-stored reported times, the swipe fix, or attract mode. Bringing it current:
+**It is up to date and running attract mode**, confirmed working by the user on 2026-08-04.
+So it also has the trend record, the stored headlines and reported times, and the swipe
+fix — and both schema columns are in its database, added in place by `#migrate()`.
+
+The one thing worth checking, because it landed after the attract-mode commit: **open
+settings and look for a `CAROUSEL` section** between `SCREEN` and `THEME`. If it is not
+there, the Pi is one commit behind and needs `bc28f09`.
+
+Future upgrades are:
 
 ```bash
 git pull && npm run build && sudo reboot
 ```
 
-`npm run build` rather than `pi-setup.sh` because no dependency has changed — the build is
-the only part of setup a code change needs. `pi-start.sh` never builds, and will happily
-serve a stale build without saying so.
+`npm run build` rather than `pi-setup.sh`, because no dependency has changed and the build
+is the only part of setup a code change needs. **`pi-start.sh` never builds**, and will
+happily serve a stale build without saying so — that is the trap on this path, not the
+database.
 
 **Upgrading cannot lose history, and the user has asked about this more than once.** Three
 independent reasons, all verified: `pi-start.sh` never references the database;
@@ -464,9 +472,10 @@ this handoff: 1,800 rows, 474 distinct trends, 180 fetches, spanning 2026-08-03 
 2026-08-04 18:39Z. Of those rows 670 carry `published_at` and 238 carry `news`, because both
 columns arrived mid-session and older rows are never back-filled.
 
-**The Pi's is the one that matters now**, and it is smaller and gappier — 160 rows over 30
-hours when it was last read, because it only collected while the dashboard was on screen.
-Since autostart it should be accumulating ~144 fetches a day. Read it with
+**The Pi's is the one that matters now.** When it was last read it held 160 rows over 30
+hours — thin and gappy, because it only collected while the dashboard was on screen. It has
+been autostarting since, so it should now be accumulating ~144 fetches a day and its record
+should look nothing like that. **Read it before trusting any figure here:**
 `node scripts/history-db.mjs stats` on the Pi.
 
 The table is **`trend_snapshots`**, one row per trend per fetch: `id`, `trend_key`, `title`,
