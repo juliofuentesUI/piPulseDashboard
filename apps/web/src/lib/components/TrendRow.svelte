@@ -1,12 +1,20 @@
 <script lang="ts">
+  import type { BadgeStyle } from '../badge.svelte';
+  import { DEMO_NOW } from '../category-demo';
   import type { TrendRowView } from '../types';
+  import CategoryBadge from './CategoryBadge.svelte';
 
   interface Props extends TrendRowView {
     selected: boolean;
+    badge: BadgeStyle;
     onselect: (id: string) => void;
   }
 
-  let { id, rank, title, volume, age, bar, selected, onselect }: Props = $props();
+  let { id, rank, title, volume, age, bar, selected, badge, onselect }: Props = $props();
+
+  // TEMPORARY — categories are still assigned by row position. Real ones arrive
+  // with the API contract in C5. See lib/category-demo.ts.
+  const demoCategory = $derived(DEMO_NOW[Number(rank) - 1] ?? 'sport');
 </script>
 
 <li class="row" class:selected>
@@ -24,6 +32,10 @@
 
     <span class="body">
       <span class="line">
+        <CategoryBadge
+          category={demoCategory}
+          variant={badge === 'glyph' ? 'plain' : 'abbrev'}
+        />
         <span class="title">{title}</span>
         <span class="figures">
           {#if volume !== ''}
@@ -99,7 +111,7 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 14px;
+    gap: 8px;
     min-width: 0;
   }
 
@@ -108,7 +120,15 @@
    * the bar out of the row: the band is a fixed height with five rows in it,
    * and every row has to keep its place.
    */
+  /*
+   * `flex: 1` and not just `min-width: 0`. With three items on a
+   * space-between line the title is sized to its content and pushed to the
+   * middle, which centres every search term on the panel — a regression the
+   * badge introduced by turning two items into three. Filling the free space
+   * puts the text back against the badge where it belongs.
+   */
   .title {
+    flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;
@@ -122,11 +142,17 @@
    * Volume and age travel together on the right. Both are Google's: how big
    * the search is, and how long ago it said so.
    */
+  /*
+   * The flex gap dropped to 8px so the badge sits tight against the title it
+   * qualifies; this restores the wider separation the figures had, so the badge
+   * reads as belonging to the title rather than floating between the two.
+   */
   .figures {
     display: flex;
     align-items: baseline;
     gap: 10px;
     flex: 0 0 auto;
+    margin-left: 6px;
   }
 
   .volume {
@@ -175,6 +201,19 @@
   }
 
   .row.selected .age {
+    color: var(--c-sky);
+  }
+
+  /*
+   * The badge has to cross the inversion like every other mark on the row.
+   * Drawn plain it is `--c-blue`, which sits on the panel but disappears into
+   * an inked selected row — `sky` is the token that stays visible against both,
+   * which is the same reason `.age` uses it here.
+   *
+   * `:global` because the badge is its own component and Svelte's scoping stops
+   * at the boundary. The selected state lives on the row, so the rule has to.
+   */
+  .row.selected :global(.badge.plain) {
     color: var(--c-sky);
   }
 

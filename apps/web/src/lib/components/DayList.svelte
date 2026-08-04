@@ -1,8 +1,12 @@
 <script lang="ts">
+  import type { BadgeStyle } from '../badge.svelte';
+  import { DEMO_TODAY } from '../category-demo';
   import type { TrendDayRowView } from '../types';
+  import CategoryBadge from './CategoryBadge.svelte';
 
   interface Props {
     rows: readonly TrendDayRowView[];
+    badge: BadgeStyle;
     /** Ends of the run axis every row is drawn against. */
     axisStart: string;
     axisEnd: string;
@@ -11,7 +15,7 @@
     onopen: (key: string) => void;
   }
 
-  let { rows, axisStart, axisEnd, marks, onopen }: Props = $props();
+  let { rows, badge, axisStart, axisEnd, marks, onopen }: Props = $props();
 </script>
 
 <!--
@@ -31,7 +35,14 @@
       <span class="rank">{row.rank}</span>
 
       <span class="body">
-        <span class="title">{row.title}</span>
+        <!-- TEMPORARY category assignment — real ones arrive in C5. -->
+        <span class="head">
+          <CategoryBadge
+            category={DEMO_TODAY[Number(row.rank) - 1] ?? 'sport'}
+            variant={badge === 'glyph' ? 'plain' : 'abbrev'}
+          />
+          <span class="title">{row.title}</span>
+        </span>
 
         <!--
           Both figures are qualified where they sit, because both are easy to
@@ -181,6 +192,22 @@
   .body {
     display: grid;
     gap: 5px;
+    min-width: 0;
+  }
+
+  /*
+   * Badge and title share a line. `min-width: 0` has to be here as well as on
+   * the title, or the flex item refuses to shrink and the badge is pushed out
+   * of the 264px body by a long search term.
+   *
+   * NOTE: `.head` is one of the class names `millennium.css` already targets on
+   * other components. It is fine here only because that sheet scopes its rule to
+   * a different ancestor — checked, not assumed. See CLAUDE.md.
+   */
+  .head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     min-width: 0;
   }
 

@@ -5,6 +5,7 @@
     type PulseMode,
     type PulseView,
   } from '../trend-view';
+  import type { BadgeStyle } from '../badge.svelte';
   import type { PulseStatus } from '../trends.svelte';
   import type {
     DashboardPhase,
@@ -32,6 +33,8 @@
     selectedId: string;
     mode: PulseMode;
     view: PulseView;
+    /** How the category badge draws itself, from settings. */
+    badge: BadgeStyle;
     onview: (view: PulseView) => void;
     onmode: (mode: PulseMode) => void;
     onselect: (id: string) => void;
@@ -57,6 +60,7 @@
     selectedId,
     mode,
     view,
+    badge,
     onview,
     onmode,
     onselect,
@@ -181,6 +185,7 @@
       {:else}
         <DayList
           rows={day.rows}
+          {badge}
           axisStart={day.axisStart}
           axisEnd={day.axisEnd}
           marks={day.marks}
@@ -199,7 +204,7 @@
   {#if rows.length > 0}
     <ol class="trends">
       {#each rows as row (row.id)}
-        <TrendRow {...row} selected={row.id === selectedId} {onselect} />
+        <TrendRow {...row} selected={row.id === selectedId} {badge} {onselect} />
       {/each}
     </ol>
   {:else}

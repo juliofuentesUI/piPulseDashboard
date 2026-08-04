@@ -5,11 +5,13 @@
   import ErrorScreen from './lib/components/ErrorScreen.svelte';
   import LoadingScreen from './lib/components/LoadingScreen.svelte';
   import PageDots from './lib/components/PageDots.svelte';
+  import CategoryLegend from './lib/components/CategoryLegend.svelte';
   import SearchPulse from './lib/components/SearchPulse.svelte';
   import SettingsModal from './lib/components/SettingsModal.svelte';
   import WeatherDashboard from './lib/components/WeatherDashboard.svelte';
   import WeekDashboard from './lib/components/WeekDashboard.svelte';
   import { Attract } from './lib/attract.svelte';
+  import { BadgeStore, type BadgeStyle } from './lib/badge.svelte';
   import { Dashboard } from './lib/dashboard.svelte';
   import { ScreenStore, SCREENS, type Screen } from './lib/screen.svelte';
   import { ThemeStore, type Theme } from './lib/theme.svelte';
@@ -28,6 +30,7 @@
   const dashboard = new Dashboard();
   const trends = new Trends();
   const themes = new ThemeStore();
+  const badges = new BadgeStore();
   const screens = new ScreenStore();
 
   /**
@@ -62,6 +65,7 @@
    */
   let scale = $state(1);
   let menuOpen = $state(false);
+  let legendOpen = $state(false);
 
   let carousel: HTMLDivElement | undefined = $state();
   let page = $state(0);
@@ -110,6 +114,27 @@
   };
 
   /**
+   * Deliberately leaves the dialog open, unlike the screen picker.
+   *
+   * The two badge styles are a close call and the way anyone settles it is by
+   * flipping between them a few times. Closing the panel on every pick would
+   * make that four taps a comparison instead of one.
+   */
+  const pickBadge = (style: BadgeStyle): void => badges.select(style);
+
+  /**
+   * The legend replaces the settings dialog rather than stacking on it.
+   *
+   * Two dialogs on a 720px panel leave the lower one as a rim of frame around
+   * the upper, which reads as a rendering fault rather than as depth. Closing
+   * on the way out also means Escape does the obvious thing from either.
+   */
+  const openLegend = (): void => {
+    menuOpen = false;
+    legendOpen = true;
+  };
+
+  /**
    * Any input from a person hands the panel back and restarts the countdown.
    *
    * Pointer and key events only, never scroll: the tour navigates *by*
@@ -149,7 +174,7 @@
    * cannot resume underneath it and nothing closes the user's dialog for them.
    */
   $effect(() => {
-    attract.suspend(menuOpen || trends.dayTrend !== null);
+    attract.suspend(menuOpen || legendOpen || trends.dayTrend !== null);
   });
 </script>
 
@@ -208,6 +233,7 @@
             day={trends.day}
             selectedId={trends.selectedId}
             mode={trends.mode}
+            badge={badges.current}
             view={trends.view}
             onview={(view) => trends.setView(view)}
             onmode={(mode) => trends.setMode(mode)}
@@ -239,11 +265,18 @@
           current={themes.current}
           screen={screens.current}
           carousel={attract.enabled}
+          badge={badges.current}
           onselect={pickTheme}
           onscreen={pickScreen}
           oncarousel={pickCarousel}
+          onbadge={pickBadge}
+          onlegend={openLegend}
           onclose={() => (menuOpen = false)}
         />
+      {/if}
+
+      {#if legendOpen}
+        <CategoryLegend onclose={() => (legendOpen = false)} />
       {/if}
     </div>
   </div>

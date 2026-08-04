@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { BADGE_STYLES, type BadgeStyle } from '../badge.svelte';
   import { SCREENS, type Screen } from '../screen.svelte';
   import { THEMES, type Theme } from '../theme.svelte';
 
@@ -7,14 +8,29 @@
     screen: Screen;
     /** Whether the panel is allowed to drive itself when left alone. */
     carousel: boolean;
+    /** How the Search Pulse category badge draws itself. */
+    badge: BadgeStyle;
     onselect: (theme: Theme) => void;
     onscreen: (screen: Screen) => void;
     oncarousel: (on: boolean) => void;
+    onbadge: (style: BadgeStyle) => void;
+    /** Opens the legend. Closes this dialog first; see the markup. */
+    onlegend: () => void;
     onclose: () => void;
   }
 
-  let { current, screen, carousel, onselect, onscreen, oncarousel, onclose }: Props =
-    $props();
+  let {
+    current,
+    screen,
+    carousel,
+    badge,
+    onselect,
+    onscreen,
+    oncarousel,
+    onbadge,
+    onlegend,
+    onclose,
+  }: Props = $props();
 
   /**
    * Two options rather than a switch, because every other choice on this panel
@@ -113,6 +129,40 @@
               </button>
             </li>
           {/each}
+        </ul>
+      </section>
+
+      <!--
+        The category badge on Search Pulse. Two marks for the same thing, and
+        which one reads better genuinely depends on how far away you are
+        standing — so it is a preference rather than a decision we make once.
+
+        LEGEND sits in this group rather than its own because it explains these
+        two marks and nothing else. It closes this dialog on the way, so the two
+        panels never stack: a dialog over a dialog on a 720px panel leaves the
+        lower one as a sliver of frame, which reads as a rendering fault.
+      -->
+      <section class="group">
+        <h3 class="group-heading">BADGES</h3>
+        <ul class="options">
+          {#each BADGE_STYLES as option (option.id)}
+            <li>
+              <button
+                class="option"
+                class:active={option.id === badge}
+                type="button"
+                aria-pressed={option.id === badge}
+                onclick={() => onbadge(option.id)}
+              >
+                <span class="name">{option.name}</span>
+              </button>
+            </li>
+          {/each}
+          <li>
+            <button class="option" type="button" onclick={onlegend}>
+              <span class="name">LEGEND</span>
+            </button>
+          </li>
         </ul>
       </section>
 
