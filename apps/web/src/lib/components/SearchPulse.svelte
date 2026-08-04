@@ -35,6 +35,8 @@
     onview: (view: PulseView) => void;
     onmode: (mode: PulseMode) => void;
     onselect: (id: string) => void;
+    /** Opens the record for one of the day's trends, by key. */
+    onopenday: (key: string) => void;
     onmenu: () => void;
   }
 
@@ -53,6 +55,7 @@
     onview,
     onmode,
     onselect,
+    onopenday,
     onmenu,
   }: Props = $props();
 
@@ -169,6 +172,7 @@
           axisStart={day.axisStart}
           axisEnd={day.axisEnd}
           marks={day.marks}
+          onopen={onopenday}
         />
       {/if}
     </div>

@@ -235,6 +235,17 @@ export interface TrendHistoryPoint {
   readonly at: string;
   /** 1 is the top of the list. */
   readonly rank: number;
+  /**
+   * Google's bucket as stated at *this* observation, verbatim — "20000+".
+   * Absent when the feed stated none for it then.
+   *
+   * Every fetch is stored as its own row, so this is the figure at that
+   * moment rather than the trend's largest. Reading them in order is the only
+   * way to see a search climb, and the only way to see it fall back.
+   */
+  readonly volume?: string;
+  /** Position in the feed at that moment. Arrival order, never popularity. */
+  readonly feedRank?: number;
 }
 
 /**

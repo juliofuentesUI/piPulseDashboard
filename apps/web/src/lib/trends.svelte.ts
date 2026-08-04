@@ -10,6 +10,7 @@ import {
   type PulseMode,
   type PulseView,
   regionName,
+  toDayDetail,
   toDayView,
   toTrendCard,
   toTrendDetail,
@@ -102,6 +103,64 @@ export class Trends {
 
   /** Null until the day's record has actually arrived, so the view can say so. */
   day = $derived(this.#day === null ? null : toDayView(this.#day));
+
+  /**
+   * Which of the day's trends has its panel open, by key. Held as a key rather
+   * than an entry for the same reason the live list holds one: the day is
+   * re-read on every poll, and an index would start describing a different
+   * search the moment a new fetch reordered the ten.
+   */
+  #openDayKey = $state<string | null>(null);
+  #dayHistory = $state<TrendHistory | null>(null);
+  #dayHistoryController: AbortController | undefined;
+
+  /**
+   * Kept apart from the live list's `history`, which belongs to whatever the
+   * details band has selected. Sharing one would make opening a day trend
+   * silently redraw the rank graph on the page underneath.
+   */
+  dayTrend = $derived.by(() => {
+    if (this.#openDayKey === null || this.#day === null) return null;
+
+    const entry = this.#day.entries.find((row) => row.trendKey === this.#openDayKey);
+    if (entry === undefined) return null;
+
+    const history =
+      this.#dayHistory !== null && this.#dayHistory.trendKey === this.#openDayKey
+        ? this.#dayHistory
+        : null;
+    return toDayDetail(entry, history, this.#day.startsAt);
+  });
+
+  openDayTrend(key: string): void {
+    this.#openDayKey = key;
+    this.#dayHistory = null;
+    void this.#loadDayHistory(key);
+  }
+
+  closeDayTrend(): void {
+    this.#openDayKey = null;
+    this.#dayHistoryController?.abort();
+    this.#dayHistory = null;
+  }
+
+  async #loadDayHistory(key: string): Promise<void> {
+    const controller = new AbortController();
+    this.#dayHistoryController?.abort();
+    this.#dayHistoryController = controller;
+
+    try {
+      this.#dayHistory = await requestTrendHistory(key, controller.signal);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      /*
+       * Resolved empty rather than left null. Null means "still reading", and
+       * a panel that says so forever is a lie about what it is doing — the
+       * summary above the list came from the day digest and is already right.
+       */
+      this.#dayHistory = { trendKey: key, points: [], timesObserved: 0, movement: 'steady' };
+    }
+  }
 
   #ordered = $derived(
     this.#snapshot === null ? [] : orderTrends(this.#snapshot.trends, this.mode),
@@ -257,6 +316,7 @@ export class Trends {
     this.#controller?.abort();
     this.#historyController?.abort();
     this.#dayController?.abort();
+    this.#dayHistoryController?.abort();
   }
 
   async refresh(): Promise<void> {

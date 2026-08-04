@@ -2,6 +2,8 @@ import type {
   SparklineView,
   TrendCardView,
   TrendDay,
+  TrendDayDetailView,
+  TrendDayEntry,
   TrendDayView,
   TrendDetailView,
   TrendHistory,
@@ -448,6 +450,93 @@ export function toDayView(day: TrendDay): TrendDayView {
       };
     }),
   };
+}
+
+/**
+ * One of the day's trends, opened out.
+ *
+ * The summary fields come from the day entry, which is already ranked; the
+ * observations come from the history lookup, which is the same endpoint the
+ * rank graph uses. Nothing is recomputed differently here — this panel exists
+ * to *show* the stored rows, not to derive anything new from them.
+ *
+ * `rose` marks an observation whose bucket is larger than the one before it.
+ * It is a comparison between two stored figures and nothing more: it says
+ * Google's stated bucket went up between two fetches, never why.
+ */
+export function toDayDetail(
+  entry: TrendDayEntry,
+  history: TrendHistory | null,
+  dayStartsAt: string,
+): TrendDayDetailView {
+  const first = new Date(entry.firstSeenAt);
+  const last = new Date(entry.lastSeenAt);
+  const dated = !Number.isNaN(first.getTime()) && !Number.isNaN(last.getTime());
+
+  /*
+   * The two halves of this panel cover different windows and it has to say so.
+   * The summary is the day digest, which counts from local midnight; the
+   * observations come from the history endpoint, which returns a rolling 24
+   * hours. A trend that started last night therefore lists more rows than the
+   * day's fetch count — which is worth showing, because it is the trend's real
+   * arc, but reads as a contradiction unless both scopes are labelled and the
+   * rows from before midnight are marked.
+   */
+  const midnight = Date.parse(dayStartsAt);
+
+  let previous = 0;
+  const observations = (history?.points ?? []).map((point) => {
+    const value = volumeOf(point.volume);
+    const rose = previous > 0 && value > previous;
+    if (value > 0) previous = value;
+
+    const at = new Date(point.at);
+    const known = !Number.isNaN(at.getTime());
+    const earlier = known && !Number.isNaN(midnight) && at.getTime() < midnight;
+
+    return {
+      key: point.at,
+      // Without the weekday on the earlier rows the column runs "11:03 PM"
+      // then "12:04 AM" and reads as time going backwards.
+      time: !known
+        ? ''
+        : earlier
+          ? `${weekdayOf(at)} ${formatClock(at)}`
+          : formatClock(at),
+      volume: formatVolume(point.volume),
+      slot: point.feedRank === undefined ? '' : String(point.feedRank),
+      rose,
+    };
+  });
+
+  return {
+    title: entry.title.toUpperCase(),
+    volume: formatVolume(entry.peakVolume),
+    ran: dated ? `${formatClock(first)} → ${formatClock(last)}` : '',
+    // A trend caught in a single fetch has no span, and "0M" would claim we
+    // measured one. The observation count below already says it was seen once.
+    duration: entry.activeMinutes <= 0 ? '' : formatDuration(entry.activeMinutes),
+    fetches: String(entry.timesObserved),
+    bestRank: `#${entry.peakRank}`,
+    // All-time and ours, so it explains why the log can reach back past the
+    // day the summary above it describes.
+    firstSeen:
+      history?.firstSeenAt === undefined ? '' : stamp(new Date(history.firstSeenAt)),
+    observations,
+    loaded: history !== null,
+  };
+}
+
+const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const;
+
+function weekdayOf(at: Date): string {
+  return WEEKDAYS[at.getDay()] ?? '';
+}
+
+/** "MON 11:03 PM", for a moment that may not be today. */
+function stamp(at: Date): string {
+  if (Number.isNaN(at.getTime())) return '';
+  return `${weekdayOf(at)} ${formatClock(at)}`;
 }
 
 /** Narrowest a run is drawn, as a percentage of the day. One sighting shows. */

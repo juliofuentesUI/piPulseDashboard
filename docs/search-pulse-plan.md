@@ -645,6 +645,26 @@ UNITED STATES        SINCE 12:00 AM      167 TRENDS · 43 FETCHES
 
 No written summary is generated. The records speak for themselves.
 
+### The trend record dialog — added 2026-08-04
+
+Tapping one of the ten opens everything stored about it, ending in **every
+observation**: each fetch's time, Google's figure then, and the feed slot. This
+is the only place a search can be watched moving rather than summarised.
+
+Two things about it are load-bearing:
+
+- **It reuses the settings dialog's class names exactly**, so `millennium`'s
+  hieroglyph `.panel` frame and gold heading apply with no new theme rules. That
+  is the intended way to add a dialog here — the theme file targets class names
+  by contract, so a bespoke structure would have needed its own copy of the art.
+  The user asked for the frame specifically; matching the markup is what gave it.
+- **Its summary and its log cover different windows**, because the day digest
+  counts from local midnight and the history endpoint returns a rolling 24
+  hours. Shipped labelled rather than trimmed — the wider window is the trend's
+  real arc — so `FETCHES` reads `TODAY`, the log is headed `LAST 24H`, and rows
+  before midnight carry a weekday. Unlabelled it looked like the panel
+  contradicted itself, and the times read as running backwards.
+
 ### The tiebreaks measure Google's listing, not attention — AMENDED 2026-08-03
 
 Found while explaining the screen, and it is not obvious from the code. **Rules 3 and 4 —

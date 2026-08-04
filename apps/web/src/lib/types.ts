@@ -274,6 +274,10 @@ export interface TrendCardView {
 export interface TrendHistoryPoint {
   readonly at: string;
   readonly rank: number;
+  /** Google's bucket at *this* observation, not the trend's largest. */
+  readonly volume?: string;
+  /** Feed position at that moment. Arrival order, never popularity. */
+  readonly feedRank?: number;
 }
 
 export type TrendMovement = 'rising' | 'cooling' | 'steady';
@@ -371,6 +375,57 @@ export interface TrendDayView {
   readonly marks: readonly number[];
   /** Ranked best first. Empty when the day has recorded nothing yet. */
   readonly rows: readonly TrendDayRowView[];
+}
+
+/** One stored observation, as the day modal lists it. */
+export interface TrendObservationView {
+  /** Stable key for the each-block: the observation's instant. */
+  readonly key: string;
+  /** Wall clock of that fetch, e.g. "12:05 AM". */
+  readonly time: string;
+  /** Google's bucket then, compacted: "10K+". Empty when it stated none. */
+  readonly volume: string;
+  /** Feed position then, e.g. "8". Empty when unknown. */
+  readonly slot: string;
+  /** True where this observation's bucket is larger than the one before it. */
+  readonly rose: boolean;
+}
+
+/**
+ * Everything the record holds about one of the day's trends.
+ *
+ * Opened from a TODAY row. Every field is counted from stored observations,
+ * and the observation list is the raw rows themselves — which is the point of
+ * the panel. The row above it can only show a peak and a span; the arc between
+ * them, including a search falling back before climbing again, exists nowhere
+ * else on the dashboard.
+ */
+export interface TrendDayDetailView {
+  readonly title: string;
+  /** Largest bucket that day, compacted. Empty when the feed stated none. */
+  readonly volume: string;
+  /** First sighting to last, e.g. "12:05 AM → 12:15 AM". */
+  readonly ran: string;
+  /** How long that was, e.g. "10M". Empty for a single sighting. */
+  readonly duration: string;
+  /** Fetches *within the day*, which is the window the summary describes. */
+  readonly fetches: string;
+  /** Best standing by volume within a fetch, e.g. "#1". */
+  readonly bestRank: string;
+  /**
+   * When this machine first recorded the trend, ever — e.g. "SUN 11:03 PM".
+   * Carries a weekday because it is often before the day being summarised,
+   * which is what explains a log longer than the day's fetch count.
+   */
+  readonly firstSeen: string;
+  /**
+   * Oldest first, over a rolling 24 hours rather than the day — a wider window
+   * than the summary above it, deliberately, because it is the trend's real
+   * arc. Rows from before local midnight carry a weekday.
+   */
+  readonly observations: readonly TrendObservationView[];
+  /** True once the lookup has answered, so the panel can say "nothing yet". */
+  readonly loaded: boolean;
 }
 
 /** Sparkline geometry in design pixels, ready for the SVG to draw. */

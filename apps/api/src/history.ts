@@ -146,7 +146,7 @@ export class TrendHistoryStore {
     const since = new Date(nowMs - HISTORY_WINDOW_MS).toISOString();
     const rows = this.#db
       .prepare(
-        `SELECT trend_key, approximate_volume, observed_at
+        `SELECT trend_key, approximate_volume, rank, observed_at
          FROM trend_snapshots
          WHERE observed_at >= ?
          ORDER BY observed_at ASC`,
@@ -154,14 +154,34 @@ export class TrendHistoryStore {
       .all(since) as {
       trend_key: string;
       approximate_volume: string | null;
+      rank: number;
       observed_at: string;
     }[];
+
+    /*
+     * This trend's own rows, keyed by fetch, so each point can carry what
+     * Google actually said at that moment rather than only where it placed.
+     * The figure at each observation is what shows a search climbing — the
+     * peak alone cannot, and neither can a rank.
+     */
+    const own = new Map<string, { volume: string | null; feedRank: number }>();
+    for (const row of rows) {
+      if (row.trend_key !== trendKey) continue;
+      own.set(row.observed_at, { volume: row.approximate_volume, feedRank: row.rank });
+    }
 
     const points: TrendHistoryPoint[] = [];
     for (const [at, ranks] of ranksByFetch(rows)) {
       const rank = ranks.get(trendKey);
       if (rank === undefined) continue;
-      points.push({ at, rank });
+
+      const seen = own.get(at);
+      points.push({
+        at,
+        rank,
+        ...(seen?.volume == null ? {} : { volume: seen.volume }),
+        ...(seen === undefined ? {} : { feedRank: seen.feedRank }),
+      });
     }
 
     const ranks = points.map((point) => point.rank);

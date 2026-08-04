@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
+  import DayTrendModal from './lib/components/DayTrendModal.svelte';
   import ErrorScreen from './lib/components/ErrorScreen.svelte';
   import LoadingScreen from './lib/components/LoadingScreen.svelte';
   import PageDots from './lib/components/PageDots.svelte';
@@ -146,12 +147,23 @@
             onview={(view) => trends.setView(view)}
             onmode={(mode) => trends.setMode(mode)}
             onselect={(id) => trends.select(id)}
+            onopenday={(key) => trends.openDayTrend(key)}
             onmenu={() => (menuOpen = true)}
           />
         </section>
       </div>
 
       <PageDots pages={PAGES} current={page} onselect={goto} />
+
+      <!--
+        Beside the settings dialog rather than inside Search Pulse, so it
+        shares that dialog's stacking context and clears the page indicator.
+        Rendered from the store's own state, which means a poll landing while
+        it is open refreshes it instead of leaving it stale.
+      -->
+      {#if trends.dayTrend !== null}
+        <DayTrendModal detail={trends.dayTrend} onclose={() => trends.closeDayTrend()} />
+      {/if}
 
       {#if menuOpen}
         <SettingsModal

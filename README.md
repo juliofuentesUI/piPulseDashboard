@@ -651,6 +651,32 @@ difference into an eightfold one. The strip now spans local midnight to now, wit
 running first sighting to last, and the axis is named once beneath the list. It reads
 straight off the row as "ran mid-morning, held for twenty minutes".
 
+### The trend record
+
+Tapping any of the ten opens a dialog holding everything stored about that
+search — peak bucket, when it ran, fetches, best rank, first sighting, and then
+**every stored observation**: the time of each fetch, Google's figure at that
+moment, and its feed slot. That log is the one place on the dashboard a search
+can be seen *moving*. A row carries a peak and a span, and neither can show a
+trend climbing, falling back, and climbing again.
+
+**It is the settings dialog's markup, class name for class name** — `.backdrop`,
+`.scrim`, `.panel`, `.head`, `.heading`, `.close`, `.body`. Themes reach these by
+name, so `millennium` hangs its hieroglyph border-image and gold Cinzel heading
+off `.panel` without knowing a second dialog exists. Matching the structure is
+what buys the frame; a bespoke one would have needed its own copy of the art.
+It mounts in `App.svelte` beside `SettingsModal` so it shares that stacking
+context and clears the page indicator.
+
+**The two halves cover different windows and both say so.** The summary is the
+day digest, counted from local midnight; the observation log is the history
+endpoint's rolling 24 hours. A trend that started last night therefore lists
+more rows than the day's fetch count — which is worth showing, since it is the
+real arc — so `FETCHES` is qualified `TODAY`, the log is headed `LAST 24H`,
+`FIRST SEEN` names the true start, and rows from before midnight carry a
+weekday. Without that last one the column runs `11:03 PM` then `12:04 AM` and
+reads as time going backwards.
+
 `TODAY` is fetched only while it is open. It is a scan of the whole day's rows rather than
 one trend's, and it can only change when the backend records a new fetch, which is every
 ten minutes. Unlike the ordering and the theme it is **not** remembered across a restart:

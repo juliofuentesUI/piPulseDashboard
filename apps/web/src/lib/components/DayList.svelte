@@ -8,9 +8,10 @@
     axisEnd: string;
     /** Quarter-day gridlines, as percentages along that axis. */
     marks: readonly number[];
+    onopen: (key: string) => void;
   }
 
-  let { rows, axisStart, axisEnd, marks }: Props = $props();
+  let { rows, axisStart, axisEnd, marks, onopen }: Props = $props();
 </script>
 
 <!--
@@ -22,6 +23,11 @@
 <ol class="days">
   {#each rows as row (row.key)}
     <li class="day-row">
+      <!--
+        The whole row is the target, like the live list's. This is a
+        touchscreen and the row is already what a finger is aiming at.
+      -->
+      <button class="hit" type="button" onclick={() => onopen(row.key)}>
       <span class="rank">{row.rank}</span>
 
       <span class="body">
@@ -67,6 +73,7 @@
           ></span>
         </span>
       </span>
+      </button>
     </li>
   {/each}
 </ol>
@@ -136,11 +143,30 @@
 
   .day-row {
     display: grid;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* The grid moved onto the button so the whole row is the hit area. */
+  .hit {
+    display: grid;
     grid-template-columns: 44px minmax(0, 1fr);
     align-items: center;
     gap: 10px;
+    width: 100%;
     min-width: 0;
-    min-height: 0;
+
+    font: inherit;
+    text-align: left;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  /* Flat design: pressing recolours rather than moving anything. */
+  .hit:active .title {
+    color: var(--c-hot);
   }
 
   /* Same cartouche the live list uses, so a rank reads the same on both. */
