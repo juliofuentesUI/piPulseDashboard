@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 
 import { config } from './config.js';
 import { TtlCache } from './cache.js';
+import { CategoriserUnavailableError, TrendCategoriser } from './categorise.js';
 import { SchemaMigrationError, startOfLocalDay, TrendHistoryStore } from './history.js';
 import { GoogleTrendingRssProvider, type TrendProvider } from './trends.js';
 import type { ApiErrorBody, TrendingSearch, TrendsSnapshot, WeatherSnapshot } from './types.js';
@@ -60,6 +61,117 @@ try {
   );
 }
 
+/**
+ * The categoriser, or null when there is nothing to categorise with.
+ *
+ * No key means none is constructed, which is the whole "works with it off"
+ * property: nothing is called, nothing is logged per fetch, and the screen is
+ * exactly what it was before this feature existed.
+ */
+const categoriser =
+  config.categories.enabled && config.categories.apiKey !== ''
+    ? new TrendCategoriser({
+        apiKey: config.categories.apiKey,
+        model: config.categories.model,
+        timeoutMs: config.categories.requestTimeoutMs,
+        reasoningEffort: config.categories.reasoningEffort,
+      })
+    : null;
+
+if (categoriser === null) {
+  app.log.info('Trend categories are off; no OPENAI_API_KEY set or disabled');
+}
+
+/**
+ * Stops all categorising until the process restarts.
+ *
+ * Only one thing trips this: an account with no credit, which answers 429 like
+ * a rate limit but never recovers. Everything else is left to heal itself,
+ * because "uncategorised" is already the retry list — a trend that fails now is
+ * still on the feed in ten minutes and gets asked about again.
+ */
+let categoriesHalted = false;
+
+/**
+ * Only one batch in flight at a time.
+ *
+ * A fetch takes ten minutes to come round and a batch takes about two seconds,
+ * so these should never overlap — but "should never" is not a guarantee, and
+ * two concurrent batches would ask about the same trends twice and pay twice.
+ */
+let categorising: Promise<void> | null = null;
+
+/**
+ * Asks about the trends in this fetch that have never been settled.
+ *
+ * Deliberately **not** awaited by the caller. This runs after the list has
+ * already been handed back, so a slow or failing OpenAI cannot delay the
+ * screen's first paint — badges simply appear on the next 60-second poll,
+ * which is the right trade for a mark that is not load-bearing.
+ */
+function categoriseNew(trends: readonly TrendingSearch[]): void {
+  if (categoriser === null || history === null || categoriesHalted) return;
+  if (categorising !== null) return;
+
+  const store = history;
+  const model = config.categories.model;
+
+  const pending = store.needCategory(trends.map((trend) => trend.id));
+  if (pending.length === 0) return;
+
+  const batch = trends.filter((trend) => pending.includes(trend.id));
+
+  categorising = (async () => {
+    try {
+      const result = await categoriser.categorise(batch);
+
+      store.recordCategories(
+        { asked: pending, settled: result.categories, model },
+        Date.now(),
+      );
+
+      if (result.rejected.length > 0) {
+        // Never silent. A rejected answer is either a model that drifted or a
+        // bug in our validation, and both need to be visible to be found.
+        app.log.warn({ rejected: result.rejected }, 'Discarded category answers');
+      }
+
+      app.log.info(
+        {
+          asked: pending.length,
+          settled: result.categories.size,
+          inputTokens: result.usage?.inputTokens,
+          outputTokens: result.usage?.outputTokens,
+        },
+        'Categorised new trends',
+      );
+    } catch (error) {
+      if (error instanceof CategoriserUnavailableError && error.permanent) {
+        categoriesHalted = true;
+        app.log.error(
+          { err: error },
+          'Trend categories halted until restart; this will not recover on its own',
+        );
+      } else {
+        // Counts the attempt even though nothing was settled, so a trend the
+        // model will not answer for is eventually left alone rather than asked
+        // about on every fetch until it drops off the feed.
+        try {
+          store.recordCategories(
+            { asked: pending, settled: new Map(), model },
+            Date.now(),
+          );
+        } catch (writeError) {
+          app.log.error({ err: writeError }, 'Could not record category attempt');
+        }
+        app.log.warn({ err: error }, 'Could not categorise this batch; will retry');
+      }
+    } finally {
+      categorising = null;
+    }
+  })();
+}
+
 /*
  * The screen polls us every minute and we poll Google every ten. This cache is
  * what keeps those two rates apart, so a browser refresh — or a second Pi on
@@ -82,9 +194,42 @@ const trendsCache = new TtlCache<readonly TrendingSearch[]>({
       app.log.error({ err: error }, 'Could not record trend snapshot');
     }
 
+    // Fire and forget, after the record exists. Nothing waits on this.
+    categoriseNew(trends);
+
     return trends;
   },
 });
+
+/**
+ * The stored category for each trend, where there is one.
+ *
+ * Read time, not write time. The list is cached for ten minutes and a trend is
+ * usually categorised a second or two after it first appears in one, so
+ * attaching this to the cached value would hold every badge back by up to a
+ * full cache period for no reason.
+ */
+function attachCategories(
+  trends: readonly TrendingSearch[],
+): readonly TrendingSearch[] {
+  if (history === null || trends.length === 0) return trends;
+
+  let categories: Map<string, string>;
+  try {
+    categories = history.categoriesFor(trends.map((trend) => trend.id));
+  } catch (error) {
+    // A category is decoration; the list is not. A failed lookup costs badges
+    // and nothing else.
+    app.log.warn({ err: error }, 'Could not read trend categories');
+    return trends;
+  }
+  if (categories.size === 0) return trends;
+
+  return trends.map((trend) => {
+    const category = categories.get(trend.id);
+    return category === undefined ? trend : { ...trend, category };
+  });
+}
 
 app.get('/api/health', async () => ({
   ok: true,
@@ -132,13 +277,23 @@ app.get('/api/trends/now', async (request, reply) => {
       .header('age', String(ageSeconds));
 
     /*
+     * Categories are attached at read time rather than stored on the cached
+     * list, so a trend categorised a minute after it was fetched gets its badge
+     * on the very next poll instead of waiting out the ten-minute cache.
+     *
+     * Guarded like every other use of the store: no database, no categories, no
+     * badges, and the list is untouched.
+     */
+    const withCategories = attachCategories(result.value);
+
+    /*
      * `storedAt` and not "now": this is when the list was actually retrieved
      * from Google, which is the age the screen has to report. The two numbers
      * differ by up to the cache TTL on every request served from cache.
      */
     const snapshot: TrendsSnapshot = {
       region: config.trends.region,
-      trends: result.value,
+      trends: withCategories,
       updatedAt: new Date(result.storedAt).toISOString(),
     };
     return snapshot;
@@ -210,12 +365,28 @@ app.get('/api/trends/today', async (request, reply) => {
      */
     const now = Date.now();
     reply.header('cache-control', 'no-cache');
-    return history.dayDigest({
+
+    const day = history.dayDigest({
       sinceMs: startOfLocalDay(now, config.location.timezone),
       untilMs: now,
       timezone: config.location.timezone,
       limit: DAY_ENTRY_LIMIT,
     });
+
+    // Only the ten entries that survived the cut need a lookup, same as the
+    // headlines are attached after the list is trimmed rather than before.
+    const categories = history.categoriesFor(
+      day.entries.map((entry) => entry.trendKey),
+    );
+    if (categories.size === 0) return day;
+
+    return {
+      ...day,
+      entries: day.entries.map((entry) => {
+        const category = categories.get(entry.trendKey);
+        return category === undefined ? entry : { ...entry, category };
+      }),
+    };
   } catch (error) {
     request.log.error({ err: error }, 'Trend day digest failed');
     const body: ApiErrorBody = {

@@ -192,6 +192,15 @@ export interface TrendingSearch {
    * screen its list by failing payload validation.
    */
   readonly news?: readonly TrendNewsItem[];
+  /**
+   * What the trend is about, as a model read it from the headlines.
+   *
+   * **The one value on a trend row that Google did not supply.** Optional
+   * because it is absent whenever no key is configured, the model could not
+   * place the trend, or it simply has not been asked about yet — all three
+   * draw no badge, which is the honest state.
+   */
+  readonly category?: string;
 }
 
 export interface TrendsSnapshot {
@@ -212,6 +221,8 @@ export interface TrendRowView {
   readonly age: string;
   /** Bar width as a percentage, on a log scale. */
   readonly bar: number;
+  /** Ours, not Google's. Empty string when the trend has no category. */
+  readonly category: string;
 }
 
 /**
@@ -313,6 +324,15 @@ export interface TrendDayEntry {
   readonly lastSeenAt: string;
   /** First to last sighting. A span, never a claim of continuous presence. */
   readonly activeMinutes: number;
+  /**
+   * What the trend is about, as a model read it from the headlines.
+   *
+   * **The one value on a trend row that Google did not supply.** Optional
+   * because it is absent whenever no key is configured, the model could not
+   * place the trend, or it simply has not been asked about yet — all three
+   * draw no badge, which is the honest state.
+   */
+  readonly category?: string;
 }
 
 /** A calendar day of stored trends, as the API ranked them. */
@@ -331,6 +351,8 @@ export interface TrendDayRowView {
   readonly key: string;
   readonly rank: string;
   readonly title: string;
+  /** Ours, not Google's. Empty string when the trend has no category. */
+  readonly category: string;
   /** Google's biggest bucket that day, compacted: "20K+". Empty if unstated. */
   readonly volume: string;
   /** How long it stayed on the feed, e.g. "53M". Empty when never measurable. */

@@ -146,11 +146,27 @@ const PRECEDENCE: readonly TrendCategory[] = [
   'business',
 ];
 
-/** Raised when the upstream call failed outright. Partial answers do not raise. */
+/**
+ * Raised when the upstream call failed outright. Partial answers do not raise.
+ *
+ * `permanent` separates the failures that retrying can fix from the one that
+ * it cannot, and the distinction was found the hard way: **an account with no
+ * credit answers `429 Too Many Requests`, the same status as a rate limit.**
+ * A rate limit clears in seconds; an unfunded account never clears, and
+ * retrying it means 120 futile calls a day forever. Only a person with a card
+ * can fix that, and a restart is what happens once they have.
+ */
 export class CategoriserUnavailableError extends Error {
   override readonly name = 'CategoriserUnavailableError';
-  constructor(message: string, options?: { cause?: unknown }) {
+  /** True when retrying cannot possibly help. Trips the caller's breaker. */
+  readonly permanent: boolean;
+
+  constructor(
+    message: string,
+    options?: { cause?: unknown; permanent?: boolean },
+  ) {
     super(message, options);
+    this.permanent = options?.permanent ?? false;
   }
 }
 
@@ -272,15 +288,24 @@ export class TrendCategoriser {
       });
 
       if (!response.ok) {
-        /*
-         * 429 is not special-cased. Every upstream failure has the same
-         * consequence — this batch is abandoned and its trends are still
-         * uncategorised — so telling them apart only matters for the log,
-         * which the status code already does.
-         */
         const detail = (await response.text()).slice(0, 300);
+
+        /*
+         * The one failure worth telling apart, and the status code will not do
+         * it: an unfunded account and a rate limit are both 429. The body
+         * carries `insufficient_quota` for the first and `rate_limit_exceeded`
+         * for the second, and they need opposite handling.
+         *
+         * The message says so in words on purpose. Logged as a bare 429 this
+         * reads as rate limiting, and somebody spends an afternoon tuning a
+         * backoff for what is a billing page.
+         */
+        const outOfCredit = detail.includes('insufficient_quota');
         throw new CategoriserUnavailableError(
-          `OpenAI responded ${response.status} ${response.statusText}: ${detail}`,
+          outOfCredit
+            ? 'OpenAI rejected the call: the account has no credit. This is not a rate limit and will not recover on its own — add credit at platform.openai.com and restart.'
+            : `OpenAI responded ${response.status} ${response.statusText}: ${detail}`,
+          { permanent: outOfCredit },
         );
       }
       payload = await response.json();

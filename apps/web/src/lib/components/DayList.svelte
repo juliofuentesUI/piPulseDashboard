@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { BadgeStyle } from '../badge.svelte';
-  import { DEMO_TODAY } from '../category-demo';
   import type { TrendDayRowView } from '../types';
   import CategoryBadge from './CategoryBadge.svelte';
 
@@ -35,12 +34,13 @@
       <span class="rank">{row.rank}</span>
 
       <span class="body">
-        <!-- TEMPORARY category assignment — real ones arrive in C5. -->
         <span class="head">
-          <CategoryBadge
-            category={DEMO_TODAY[Number(row.rank) - 1] ?? 'sport'}
-            variant={badge === 'glyph' ? 'plain' : 'abbrev'}
-          />
+          {#if row.category !== ''}
+            <CategoryBadge
+              category={row.category}
+              variant={badge === 'glyph' ? 'plain' : 'abbrev'}
+            />
+          {/if}
           <span class="title">{row.title}</span>
         </span>
 

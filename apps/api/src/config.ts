@@ -10,6 +10,12 @@ function str(value: string | undefined, fallback: string): string {
   return value === undefined || value.trim() === '' ? fallback : value;
 }
 
+/** Anything but an explicit "false"/"0"/"off" is on, so a typo fails safe. */
+function bool(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined || value.trim() === '') return fallback;
+  return !['false', '0', 'off', 'no'].includes(value.trim().toLowerCase());
+}
+
 export interface LocationConfig {
   readonly name: string;
   readonly latitude: number;
@@ -30,6 +36,30 @@ export interface TrendsConfig {
   readonly databasePath: string;
 }
 
+/**
+ * Semantic categorisation of trends, which is the one thing here that costs
+ * money and talks to a third party.
+ *
+ * There is no `enabled: true` by default anywhere in this block, and that is
+ * deliberate: with no key nothing is constructed, nothing is called and the
+ * dashboard runs exactly as it did before this existed. "Works with it off" is
+ * the default path rather than a branch someone has to remember to test.
+ */
+export interface CategoriesConfig {
+  /** Absent unless set. Its absence is the off switch. */
+  readonly apiKey: string;
+  /** An explicit off switch for keeping the key but stopping the calls. */
+  readonly enabled: boolean;
+  readonly model: string;
+  /**
+   * How hard the model may think. `minimal` measured 10x cheaper than the
+   * default with identical answers on everything unambiguous — GPT-5 models
+   * bill reasoning as output, and this task's evidence is all in the prompt.
+   */
+  readonly reasoningEffort: 'minimal' | 'low' | 'medium' | 'high';
+  readonly requestTimeoutMs: number;
+}
+
 export interface AppConfig {
   readonly port: number;
   readonly host: string;
@@ -37,6 +67,7 @@ export interface AppConfig {
   readonly cacheTtlMs: number;
   readonly requestTimeoutMs: number;
   readonly trends: TrendsConfig;
+  readonly categories: CategoriesConfig;
 }
 
 export const config: AppConfig = {
@@ -56,4 +87,17 @@ export const config: AppConfig = {
     requestTimeoutMs: num(process.env['TRENDS_REQUEST_TIMEOUT_MS'], 8000),
     databasePath: str(process.env['TRENDS_DB_PATH'], 'data/trends.db'),
   },
+  categories: {
+    apiKey: str(process.env['OPENAI_API_KEY'], ''),
+    enabled: bool(process.env['TRENDS_CATEGORY_ENABLED'], true),
+    model: str(process.env['TRENDS_CATEGORY_MODEL'], 'gpt-5-nano'),
+    reasoningEffort: reasoning(process.env['TRENDS_CATEGORY_EFFORT']),
+    requestTimeoutMs: num(process.env['TRENDS_CATEGORY_TIMEOUT_MS'], 30_000),
+  },
 };
+
+/** Falls back to `minimal` rather than the model's default, which is expensive. */
+function reasoning(value: string | undefined): CategoriesConfig['reasoningEffort'] {
+  const asked = (value ?? '').trim().toLowerCase();
+  return asked === 'low' || asked === 'medium' || asked === 'high' ? asked : 'minimal';
+}

@@ -174,11 +174,30 @@ export interface TrendNewsItem {
 }
 
 /**
- * One trending search, carrying only what the official feed actually states.
+ * What a trend is about, as inferred by a model from its headlines.
+ *
+ * **The one value in this file that Google did not supply.** Everything else on
+ * a trend row is the feed's wording or arithmetic over stored rows; this is a
+ * reading, and it can simply be wrong. The badge is drawn as a notched plate
+ * for exactly that reason, and the legend says so in words.
+ *
+ * A string rather than a union, because the closed set lives in
+ * `categorise.ts` and the web app has its own copy of these shapes — a union
+ * here would have to be kept identical in three places to add one category.
+ * The set is enforced where it is decided and where it is stored.
+ */
+export type TrendCategory = string;
+
+/**
+ * One trending search: what the official feed states, plus one thing it does
+ * not.
  *
  * Every optional field is absent rather than guessed when Google does not
- * supply it. That is the rule the whole screen rests on: a number on it can
- * always be traced back to something the feed said.
+ * supply it. That rule still holds for all of them **except `category`**, which
+ * is ours and is marked as such wherever it appears. It was worth breaking the
+ * "feed only" framing of this type rather than bolting on a parallel map that
+ * every caller would have to join by hand — but the distinction is real and the
+ * screen has to keep making it.
  */
 export interface TrendingSearch {
   /** Normalised form of the title. Stable across fetches; see `trendKey`. */
@@ -213,6 +232,12 @@ export interface TrendingSearch {
    * way `relatedQueries` is empty rather than absent.
    */
   readonly news: readonly TrendNewsItem[];
+  /**
+   * Ours, not Google's — see `TrendCategory`. Absent when the trend has not
+   * been categorised: no key configured, the model could not place it, or it
+   * simply has not been asked about yet. All three draw no badge.
+   */
+  readonly category?: TrendCategory;
 }
 
 export interface TrendsSnapshot {
@@ -324,6 +349,11 @@ export interface TrendDayEntry {
    * checked, so this is a span, never a claim of continuous presence.
    */
   readonly activeMinutes: number;
+  /**
+   * Ours, not Google's — see `TrendCategory`. Decided once when the trend was
+   * first seen and read back here, never recomputed for the day view.
+   */
+  readonly category?: TrendCategory;
 }
 
 /**

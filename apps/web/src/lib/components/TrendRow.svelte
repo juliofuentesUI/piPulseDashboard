@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { BadgeStyle } from '../badge.svelte';
-  import { DEMO_NOW } from '../category-demo';
   import type { TrendRowView } from '../types';
   import CategoryBadge from './CategoryBadge.svelte';
 
@@ -10,11 +9,18 @@
     onselect: (id: string) => void;
   }
 
-  let { id, rank, title, volume, age, bar, selected, badge, onselect }: Props = $props();
-
-  // TEMPORARY — categories are still assigned by row position. Real ones arrive
-  // with the API contract in C5. See lib/category-demo.ts.
-  const demoCategory = $derived(DEMO_NOW[Number(rank) - 1] ?? 'sport');
+  let {
+    id,
+    rank,
+    title,
+    volume,
+    age,
+    bar,
+    category,
+    selected,
+    badge,
+    onselect,
+  }: Props = $props();
 </script>
 
 <li class="row" class:selected>
@@ -32,10 +38,10 @@
 
     <span class="body">
       <span class="line">
-        <CategoryBadge
-          category={demoCategory}
-          variant={badge === 'glyph' ? 'plain' : 'abbrev'}
-        />
+        <!-- Absent category, no badge. Nothing is invented to fill the gap. -->
+        {#if category !== ''}
+          <CategoryBadge {category} variant={badge === 'glyph' ? 'plain' : 'abbrev'} />
+        {/if}
         <span class="title">{title}</span>
         <span class="figures">
           {#if volume !== ''}

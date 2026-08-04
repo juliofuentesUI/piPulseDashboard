@@ -53,7 +53,41 @@ const SCHEMA = `
   -- inflating "times observed".
   CREATE UNIQUE INDEX IF NOT EXISTS trend_snapshots_once
     ON trend_snapshots (trend_key, observed_at);
+
+  -- What a trend is about, decided once and never revisited.
+  --
+  -- A separate table rather than a column on trend_snapshots, because a
+  -- category belongs to the *trend* and that table holds one row per trend per
+  -- fetch — 1,820 rows for 481 trends here. As a column it would be written on
+  -- one row and read back with a "most recent non-null" lookup, which is the
+  -- awkwardness the news column already carries, for a value that never
+  -- changes. As a table, "which trends have never been categorised" is one
+  -- query against a primary key, and that query is the whole cost control.
+  --
+  -- A new table needs no entry in #migrate(): unlike ADD COLUMN, CREATE TABLE
+  -- IF NOT EXISTS does reach a database that already exists.
+  CREATE TABLE IF NOT EXISTS trend_categories (
+    trend_key  TEXT PRIMARY KEY,
+    -- NULL means tried and not settled, which is retried. A stored
+    -- 'uncategorised' means the model looked and could not place it, which is
+    -- an answer and is never retried.
+    category   TEXT,
+    -- Which model decided, so a change of model or of the category set can be
+    -- found later rather than silently mixed in with what came before.
+    model      TEXT,
+    decided_at TEXT,
+    attempts   INTEGER NOT NULL DEFAULT 0
+  );
 `;
+
+/**
+ * How many times a trend may fail to be categorised before it is left alone.
+ *
+ * Without this a trend the model will not answer for is asked about on every
+ * fetch, forever. The circuit breaker upstream covers a whole account being
+ * unusable; this covers one trend being stubborn.
+ */
+export const MAX_CATEGORY_ATTEMPTS = 3;
 
 /**
  * A schema upgrade failed, as distinct from the disk being unusable.
@@ -446,6 +480,111 @@ export class TrendHistoryStore {
       trendCount: byKey.size,
       fetchCount: ranked.size,
     };
+  }
+
+  // --- Categories ---------------------------------------------------------
+  //
+  // Storage only. What a category *means*, how one is decided and what the
+  // closed set is all live in `categorise.ts`; this file has never interpreted
+  // anything and does not start here.
+
+  /**
+   * The stored category for each of `keys` that has one.
+   *
+   * Keys with no row, or with a row that has not settled, are simply absent —
+   * the screen draws no badge for them, which is the honest state and costs no
+   * row space.
+   */
+  categoriesFor(keys: readonly string[]): Map<string, string> {
+    const found = new Map<string, string>();
+    if (keys.length === 0) return found;
+
+    const select = this.#db.prepare(
+      'SELECT category FROM trend_categories WHERE trend_key = ? AND category IS NOT NULL',
+    );
+    for (const key of keys) {
+      const row = select.get(key) as { category: string } | undefined;
+      if (row !== undefined) found.set(key, row.category);
+    }
+    return found;
+  }
+
+  /**
+   * Which of `keys` still need asking about — the whole point of the table.
+   *
+   * A trend is worth asking about if it has never been tried, or has been
+   * tried fewer than `MAX_CATEGORY_ATTEMPTS` times without settling. A trend
+   * the model placed — including one it honestly placed as `uncategorised` —
+   * is never asked about again, which is what keeps a badge from flickering
+   * between polls on a display nobody is touching.
+   */
+  needCategory(keys: readonly string[]): string[] {
+    if (keys.length === 0) return [];
+
+    const select = this.#db.prepare(
+      'SELECT category, attempts FROM trend_categories WHERE trend_key = ?',
+    );
+    return keys.filter((key) => {
+      const row = select.get(key) as
+        | { category: string | null; attempts: number }
+        | undefined;
+      if (row === undefined) return true;
+      return row.category === null && row.attempts < MAX_CATEGORY_ATTEMPTS;
+    });
+  }
+
+  /**
+   * Records a finished batch: what was settled, and that the rest was tried.
+   *
+   * Both halves matter. Writing the answers is obvious; counting the attempt
+   * on the ones that came back empty is what stops an unanswerable trend being
+   * asked about on every fetch until it drops off the feed.
+   *
+   * `attempts` is incremented for every key in the batch, settled or not, so
+   * the column reads as "times we asked" rather than "times we failed".
+   */
+  recordCategories(
+    batch: {
+      readonly asked: readonly string[];
+      readonly settled: ReadonlyMap<string, string>;
+      readonly model: string;
+    },
+    decidedAtMs: number,
+  ): void {
+    if (batch.asked.length === 0) return;
+    const decidedAt = new Date(decidedAtMs).toISOString();
+
+    /*
+     * One statement for both cases. A key with an answer stores it; a key
+     * without keeps whatever it had — which is NULL — and only its attempt
+     * count moves. `excluded` is the row that would have been inserted.
+     */
+    const upsert = this.#db.prepare(`
+      INSERT INTO trend_categories (trend_key, category, model, decided_at, attempts)
+      VALUES (?, ?, ?, ?, 1)
+      ON CONFLICT (trend_key) DO UPDATE SET
+        category   = COALESCE(excluded.category, trend_categories.category),
+        model      = COALESCE(excluded.model, trend_categories.model),
+        decided_at = COALESCE(excluded.decided_at, trend_categories.decided_at),
+        attempts   = trend_categories.attempts + 1
+    `);
+
+    this.#db.exec('BEGIN');
+    try {
+      for (const key of batch.asked) {
+        const category = batch.settled.get(key) ?? null;
+        upsert.run(
+          key,
+          category,
+          category === null ? null : batch.model,
+          category === null ? null : decidedAt,
+        );
+      }
+      this.#db.exec('COMMIT');
+    } catch (error) {
+      this.#db.exec('ROLLBACK');
+      throw error;
+    }
   }
 
   close(): void {

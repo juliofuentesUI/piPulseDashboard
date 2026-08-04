@@ -40,6 +40,10 @@ export function toTrendRows(
     volume: formatVolume(trend.approximateVolume),
     age: trend.publishedAt === undefined ? '' : shortAgo(trend.publishedAt, now),
     bar: barWidth(values[index] ?? 0, min, max),
+    // Passed straight through, never derived. An absent category draws no
+    // badge, which is the same treatment every unstated field here already
+    // gets — the row shows what is known and stays quiet about the rest.
+    category: trend.category ?? '',
   }));
 }
 
@@ -440,6 +444,7 @@ export function toDayView(day: TrendDay): TrendDayView {
         key: entry.trendKey,
         rank: String(index + 1),
         title: entry.title.toUpperCase(),
+        category: entry.category ?? '',
         volume: formatVolume(entry.peakVolume),
         duration: entry.activeMinutes <= 0 ? '' : formatDuration(entry.activeMinutes),
         // Held inside the axis: a run still going at this moment starts at the
