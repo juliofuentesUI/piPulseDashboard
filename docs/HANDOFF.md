@@ -23,8 +23,10 @@ the user saying so:
   not supply is left out. This is the rule the whole Search Pulse half rests on.
 - **One phase merged and usable before the next starts.**
 
-**Nothing is in flight.** Working tree clean, `main` pushed to `origin` at `bc28f09`, no
-branch parked, no question outstanding.
+**Nothing is in flight.** Working tree clean, `main` pushed to `origin`, no branch parked,
+no question outstanding. (Deliberately no commit hash here — pinning one means every commit
+to this file makes the file wrong, including the commit that wrote it. `git log --oneline -1`
+is always right.)
 
 ## The Pi
 
