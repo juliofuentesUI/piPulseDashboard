@@ -35,6 +35,24 @@ import { relativeTime } from './view';
 const POLL_INTERVAL_MS = 60 * 1000;
 
 /**
+ * How soon to re-ask when a list arrives with categories still missing.
+ *
+ * Measured: a cold start's first response carries 0/10 categories and the
+ * batch lands about nine seconds later. Eight is inside that in the good case
+ * and the second attempt covers the rest.
+ */
+const CATEGORY_CATCH_UP_MS = 8 * 1000;
+
+/**
+ * How many times to chase them before waiting for the normal poll.
+ *
+ * Not optional. "No categories" is the permanent state with no API key
+ * configured, and without a cap that setup would poll every eight seconds for
+ * as long as the panel is on.
+ */
+const MAX_CATEGORY_CATCH_UPS = 2;
+
+/**
  * Past this, the list is no longer keeping up with the backend's ten-minute
  * refresh and stops calling itself live. The slack over ten minutes covers one
  * missed upstream fetch without crying wolf.
@@ -72,6 +90,10 @@ export class Trends {
   #now = $state(new Date());
 
   #timer: ReturnType<typeof setInterval> | undefined;
+  #categoryTimer: ReturnType<typeof setTimeout> | undefined;
+  #categoryCatchUps = 0;
+  /** The list these catch-ups belong to, so a new fetch gets a fresh budget. */
+  #categoriesFetchedAt = '';
   #controller: AbortController | undefined;
 
   /**
@@ -331,6 +353,7 @@ export class Trends {
     window.removeEventListener('online', this.#handleOnline);
     window.removeEventListener('offline', this.#handleOffline);
     clearInterval(this.#timer);
+    clearTimeout(this.#categoryTimer);
     this.#controller?.abort();
     this.#historyController?.abort();
     this.#dayController?.abort();
@@ -360,6 +383,8 @@ export class Trends {
       // The backend has just recorded a fetch, so the day has a row it did not
       // have a moment ago — but only the open view is worth re-reading for it.
       if (this.view === 'today') void this.#loadDay();
+
+      this.#catchUpOnCategories(snapshot);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
 
@@ -371,6 +396,42 @@ export class Trends {
       // Only give up the screen if there is genuinely nothing to show.
       this.phase = this.#snapshot === null ? 'error' : 'ready';
     }
+  }
+
+  /**
+   * Asks again, soon, when the list arrived without its categories.
+   *
+   * The backend categorises *after* handing the list back — deliberately, so a
+   * slow model can never delay the screen's first paint. The cost is that the
+   * first response of a cold start carries no categories at all: measured at
+   * 0/10, then 10/10 about nine seconds later. Without this the panel would
+   * show no badges for a full minute after every boot, which reads as broken
+   * and was reported as exactly that.
+   *
+   * The catch-up is a call to our own service on localhost. It costs no Google
+   * fetch and no model call — the backend is serving its ten-minute cache and
+   * only joining stored categories to it.
+   *
+   * Capped, because "no categories" is also the permanent state when there is
+   * no API key: without a limit that configuration would poll every few seconds
+   * forever. Two extra attempts is enough to cover a batch that is still in
+   * flight and cheap enough not to matter when nothing is ever coming.
+   */
+  #catchUpOnCategories(snapshot: TrendsSnapshot): void {
+    // A new list from Google is a fresh chance; reset the budget for it.
+    if (snapshot.updatedAt !== this.#categoriesFetchedAt) {
+      this.#categoriesFetchedAt = snapshot.updatedAt;
+      this.#categoryCatchUps = 0;
+    }
+
+    const missing = snapshot.trends.some((trend) => trend.category === undefined);
+    if (!missing || this.#categoryCatchUps >= MAX_CATEGORY_CATCH_UPS) return;
+
+    this.#categoryCatchUps += 1;
+    clearTimeout(this.#categoryTimer);
+    this.#categoryTimer = setTimeout(() => {
+      void this.refresh();
+    }, CATEGORY_CATCH_UP_MS);
   }
 
   #age(): string {
