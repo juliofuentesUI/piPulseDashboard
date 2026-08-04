@@ -788,17 +788,24 @@ every trend that *started* in a window, with the volume it had while young — n
 accumulated totals `trends.google.com` shows for trends up to a day old. It answers "what
 caught fire today", not "what were the day's biggest searches".
 
-## Explicitly out of scope
+## Scope — the ban list was removed 2026-08-04
 
-Never add any of these to Search Pulse:
+This section used to forbid hosted models, AI summarisation and categorisation, Reddit and
+forums, search-result scraping, business-idea generation, and SEO metrics Google does not
+supply. **The user removed all of it on 2026-08-04**, on the grounds that it was slowing
+development more than it was protecting anything. `CLAUDE.md` records the removal.
 
-- OpenAI APIs, Gemini summaries, local language models
-- Reddit or forum data
-- News summarisation, sentiment analysis, AI categorisation
-- Business-idea generation, opportunity scoring
-- Search-result scraping
-- Keyword difficulty, CPC estimates, advertising competition
+It is written down rather than deleted so that nobody reinstates it from memory, and so
+that a commit from before that date does not read as a rule being broken.
 
-The short version of the rule: everything on this screen must trace back to the official
-feed or to an explicit local rule over snapshots we stored ourselves. A field the feed
-does not supply is left out, never inferred.
+Two things from it survive, and neither is a rule:
+
+- **Label things as what they are.** Google's volume figures are the floor of a bucket, not
+  a count of searches; the feed is ordered by recency, not popularity; `ON FEED` is how long
+  Google listed a trend, not how long anyone cared. Those are facts about the data, and the
+  AMENDED sections above explain each one rather than asserting it. A screen that mislabels
+  them is wrong, whatever the rules say.
+- **Google Trends does not supply keyword difficulty, cost per click, ad competition or
+  conversion probability.** Not because it is forbidden to show them, but because the feed
+  genuinely does not contain them. Showing one means adding a provider that actually
+  supplies it.
