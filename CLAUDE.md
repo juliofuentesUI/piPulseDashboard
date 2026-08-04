@@ -19,16 +19,16 @@ overbuild them.
 Prefer plain CSS and hand-rolled helpers over new dependencies. The pixel sprites and the
 runtime payload validation are hand-written on purpose, not for lack of a library.
 
-"Do not overbuild" is about **scope, not tools**. There is no banned-technology list for
-the stack — an earlier constraint against React, Tailwind and Docker was lifted, and the
-stack is settled as Svelte + Vite + Fastify. Adding a dev-tooling script is fine. The
-Search Pulse list below is a different thing: it bans sources and methods, not build
-tooling, and it does not loosen.
+"Do not overbuild" is about **scope, not tools**. There is no banned-technology list at
+all any more: the constraint against React, Tailwind and Docker was lifted early, the stack
+settled as Svelte + Vite + Fastify, and the Search Pulse list that banned hosted models and
+outside sources was removed on 2026-08-04. Nothing is off the table by default — but a new
+dependency, a paid API or a third page still has to be worth what it costs, and that is a
+conversation to have rather than a rule to look up.
 
 **Attract mode** — the dashboard driving itself when nobody is touching it — has its own
-plan, [docs/attract-mode-plan.md](docs/attract-mode-plan.md). Specified 2026-08-04, not
-started, and **three questions must be settled before any code**. Two things to know before
-reading it: the user calls it "carousel mode", but `carousel` already means the two-page
+plan, [docs/attract-mode-plan.md](docs/attract-mode-plan.md). Built 2026-08-04. Two things
+to know before reading it: the user calls it "carousel mode", but `carousel` already means the two-page
 horizontal scroller everywhere in this repo, so the code and docs say **attract**. And it
 does **not** loosen the two-page rule below — it automates the navigation that already
 exists and adds no page, no route, and no new way to reach anything.
@@ -60,7 +60,7 @@ Two operational rules for it:
   more than one component, and `.screen` in particular is both the panel and the 7-day
   layout's root.
 
-### Search Pulse guardrails
+### Search Pulse
 
 **Starting a fresh session? Read [docs/HANDOFF.md](docs/HANDOFF.md) first** — where the
 work stands, what surprised us, and the decisions not to silently revisit.
@@ -69,37 +69,25 @@ The plan — phases, screen layout, acceptance criteria — is
 [docs/search-pulse-plan.md](docs/search-pulse-plan.md). Read it before starting a phase
 and update it as phases land.
 
-Search Pulse is built in phases, and **each phase is merged and usable before the next
-one starts.** Finishing the current phase is the whole job; do not roll ahead into the
-next to "complete the feature".
+**The guardrails that used to live here were removed on 2026-08-04, at the user's
+request.** They banned hosted models, AI categorisation, unofficial sources and anything
+outside a narrow question, and required every value on screen to trace back to the feed or
+to a local rule. They had done their job and had started costing more than they returned.
+Recorded rather than quietly deleted so nobody reinstates them from memory or reads an old
+commit and thinks a rule was broken.
 
-**The carousel stays two pages: Weather and Search Pulse.** Everything Search Pulse gains
-is a view *inside* that one section — the trend list, the details panel, the rank graph,
-the daily view — reached by a tap or a vertical switch, never by another card beside the
-weather. A horizontal swipe means "change section" and must keep meaning only that.
+What survives is not a rule but arithmetic, and it lives in `README.md` and the plan doc
+where it is explained rather than asserted: Google's volume figures are the floor of a
+bucket and not a count of searches, the feed is ordered by recency and not popularity, and
+`ON FEED` measures how long Google listed a trend rather than how long anyone cared.
+**Label things as what they are** — that is engineering, not a guardrail, and it is the
+only part of the old section worth carrying forward.
 
-Everything the screen shows must trace back to the official Google Trending Now feed, or
-to an explicit local rule over snapshots we stored ourselves. A field the feed does not
-supply is **left out** — never inferred, never approximated, never filled in with a
-plausible-looking value. Status labels like `NEW` or `RISING` come from documented rules
-in code that a person can read and check, not from a model. Approximate volume stays
-labelled approximate; volume buckets are not search counts.
-
-Never add any of these to Search Pulse:
-
-- OpenAI, Gemini, or any other hosted model; local language models
-- News summarisation, sentiment analysis, AI categorisation, AI-written conclusions
-- Reddit, forums, or any unofficial source; scraping of search-result pages
-- Business-idea generation, opportunity scoring, subjective recommendations
-
-Google Trends reports demand movement and nothing else. It does not supply keyword
-difficulty, ranking difficulty, cost per click, advertising competition, or conversion
-probability, so no value on this screen may be labelled as one of those unless a dedicated
-SEO provider is added and is genuinely the thing supplying it.
-
-The question the screen exists to answer is "what searches are suddenly capturing
-people's attention right now?", and later "how long did they last?". Anything that does
-not serve one of those is out of scope.
+The layout is currently a two-page carousel, Weather and Search Pulse, with everything else
+reached from inside a page. That is a description of what exists, not a limit on what may
+be built. A third page is a real design change with real cost — the page indicator, the
+swipe gesture and attract mode's tour all assume two — so cost it out before adding one,
+but it is no longer forbidden.
 
 ## Verifying UI changes
 

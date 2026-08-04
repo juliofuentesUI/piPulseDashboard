@@ -13,15 +13,22 @@ Do not infer it from this file, and do not pick up anything below as "the obviou
 thing" — the open items listed here are genuinely optional and none of them is queued.
 Ask, then read whichever documents the answer points at.
 
-Everything in `CLAUDE.md` still applies to whatever it turns out to be. In particular the
-three rules that have shaped every feature so far and are not up for renegotiation without
-the user saying so:
+**The Search Pulse guardrails were removed on 2026-08-04, at the user's request.** They
+banned hosted models, AI categorisation, unofficial sources and anything outside a narrow
+question, and required every value on screen to trace back to the feed or to a local rule.
+They are gone. Do not enforce them from memory, and do not read an older commit and
+conclude a rule was broken — `CLAUDE.md` records the removal.
 
-- **The carousel stays two pages.** New views go *inside* a section, reached by a tap or a
-  switch. Attract mode was built under this rule and did not bend it.
-- **Nothing on screen may be inferred, approximated, or filled in.** A field the source did
-  not supply is left out. This is the rule the whole Search Pulse half rests on.
-- **One phase merged and usable before the next starts.**
+What is left in their place is not a rule but arithmetic, and it is documented in
+`README.md` and the plan doc rather than asserted here: volume figures are the floor of a
+bucket and not a count, the feed is ordered by recency and not popularity, and `ON FEED`
+measures how long Google listed a trend rather than how long anyone cared. **Label things
+as what they are.** That is engineering, and it survives on its own merits.
+
+The layout is a two-page carousel today, and everything else is reached from inside a page.
+That is a description, not a limit. A third page is a real change with real cost — the page
+indicator, the swipe and attract mode's tour all assume two — so cost it out, but it is no
+longer forbidden.
 
 **Nothing is in flight.** Working tree clean, `main` pushed to `origin`, no branch parked,
 no question outstanding. (Deliberately no commit hash here — pinning one means every commit
