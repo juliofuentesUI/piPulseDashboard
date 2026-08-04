@@ -358,6 +358,17 @@ export interface TrendDayView {
   readonly axisStart: string;
   /** Right end of it. Always the present moment. */
   readonly axisEnd: string;
+  /**
+   * Quarter-day gridlines along the run axis, as percentages — only the ones
+   * the day has actually reached.
+   *
+   * They exist to stop the track reading as a bar that failed to fill. The
+   * trend list's bar and this one share `.track`/`.fill` so the themes paint
+   * both, but there they mean "how big" and grow from the left edge, while
+   * here they mean "when" and float. Graduations are what tell the eye which
+   * of the two it is looking at.
+   */
+  readonly marks: readonly number[];
   /** Ranked best first. Empty when the day has recorded nothing yet. */
   readonly rows: readonly TrendDayRowView[];
 }

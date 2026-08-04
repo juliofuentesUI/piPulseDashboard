@@ -6,9 +6,11 @@
     /** Ends of the run axis every row is drawn against. */
     axisStart: string;
     axisEnd: string;
+    /** Quarter-day gridlines, as percentages along that axis. */
+    marks: readonly number[];
   }
 
-  let { rows, axisStart, axisEnd }: Props = $props();
+  let { rows, axisStart, axisEnd, marks }: Props = $props();
 </script>
 
 <!--
@@ -50,6 +52,14 @@
           against each other and against the clock.
         -->
         <span class="track">
+          <!--
+            Graduations first, run over the top. Without them the track reads as
+            a bar that failed to fill, because the trend list's bar is exactly
+            that and shares these class names — the eye arrives already trained.
+          -->
+          {#each marks as mark (mark)}
+            <span class="mark" style:--at="{mark}%"></span>
+          {/each}
           <span
             class="fill"
             style:--run-start="{row.spanStart}%"
@@ -204,12 +214,40 @@
    * of growing from the left edge. Same class names as the trend list's bar on
    * purpose: the themes already know how to paint a track and its fill.
    */
+  /*
+   * 16px, not 10. `--divider` is 4px on every theme and applies top and bottom,
+   * so a 10px track leaves a 2px interior — the border was eight of the ten
+   * pixels and the run had almost nowhere to paint. This leaves 8px inside,
+   * which is more than the trend list's bar gets and right for a track whose
+   * job is to show a position rather than a length.
+   */
   .track {
     position: relative;
     display: block;
-    height: 10px;
+    height: 16px;
     background: var(--c-bg);
     border: var(--divider) solid var(--line);
+  }
+
+  /*
+   * A hairline, and dim. It has to be enough to read the track as a scale and
+   * not enough to compete with the run, which is the only thing on the row
+   * carrying data.
+   *
+   * Both numbers were set against `gba-blue` rather than a dark theme, because
+   * that is where it goes wrong: its track is cream and its run a pale blue, so
+   * a graduation in the ink colour reads *stronger* than the data it sits
+   * under. At 1px and 0.3 the run is four times the width and the darker mark
+   * of the two in every theme.
+   */
+  .mark {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--at);
+    width: 1px;
+    background: var(--line);
+    opacity: 0.3;
   }
 
   .fill {

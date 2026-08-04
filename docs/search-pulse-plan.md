@@ -645,6 +645,41 @@ UNITED STATES        SINCE 12:00 AM      167 TRENDS · 43 FETCHES
 
 No written summary is generated. The records speak for themselves.
 
+### The tiebreaks measure Google's listing, not attention — AMENDED 2026-08-03
+
+Found while explaining the screen, and it is not obvious from the code. **Rules 3 and 4 —
+fetches appeared in, and minutes on feed — are partly a statement about how busy the news
+was**, not purely about how long a search held people.
+
+The feed holds ten slots ordered newest-first, so a trend is pushed out when ten newer ones
+are detected, whatever it is doing. Worked example from the record:
+
+```
+appropriations bill   10:43 AM  feed slot 8  10000+
+                      10:54 AM  feed slot 8  10000+
+                      11:04 AM  gone
+
+the 11:04 feed's largest member: cyclospora, 5000+
+```
+
+It was dropped while **twice the size of anything that replaced it**. Two fetches and ten
+minutes is therefore "Google listed it for ten minutes", not "interest lasted ten minutes".
+10:43–11:04 was a churny stretch — ten brand-new trends inside twenty minutes — and
+everything alive in it got flushed fast. The same search at a quiet hour would have sat in
+the feed far longer on identical real-world interest.
+
+Consequences, and none of them are a reason to change the ranking:
+
+- **Rule 1 is clean and the others are not.** Peak volume is Google's own stated figure and
+  is not affected by feed churn. That is why the band says `BY PEAK VOLUME` and why volume
+  is the primary key rather than a tiebreak.
+- **Do not read a 21-versus-10-minute gap as a fact about public attention.** It is a
+  reasonable ordering, not a measurement.
+- **`ON FEED` is the honest label** and must stay. `ACTIVE`, `LASTED` or `HELD` would all
+  claim the thing this cannot support.
+- If a future phase wants real staying power, it needs a different source. The feed cannot
+  answer it, and no arithmetic over these rows can recover it.
+
 ### The day boundary
 
 `TODAY` runs from **local midnight** in the dashboard's own zone, not UTC and not a rolling

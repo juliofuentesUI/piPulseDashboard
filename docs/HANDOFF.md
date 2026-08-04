@@ -256,6 +256,14 @@ distinction; it was discussed at length before the view was built.
 columns. The live list still shows five, because its hidden rows are by definition the
 least interesting under whichever ordering is active — that decision stands.
 
+**The tiebreaks are weaker than the primary key, and it is not visible in the code.**
+Fetches and minutes-on-feed measure how long *Google listed* a trend. The feed evicts on
+arrival order, ten slots newest-first, so a churny hour flushes everything in it — observed:
+`appropriations bill` was pushed out at `10000+` by a feed topping out at `5000+`. Peak
+volume is the only key immune to this. Full write-up under **AMENDED** in the plan; the
+short version is that `ON FEED` is the honest label and must not become `ACTIVE`, `LASTED`
+or `HELD`.
+
 ## Decisions already made — do not silently revisit
 
 | Decision | Why |

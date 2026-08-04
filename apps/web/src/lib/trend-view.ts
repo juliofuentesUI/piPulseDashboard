@@ -418,6 +418,7 @@ export function toDayView(day: TrendDay): TrendDayView {
     // The axis is only drawn when there is a span to place runs along.
     axisStart: known ? formatClock(new Date(start)) : '',
     axisEnd: known ? 'NOW' : '',
+    marks: known ? axisMarks(start, end) : [],
     rows: day.entries.map((entry, index) => {
       const first = Date.parse(entry.firstSeenAt);
       const last = Date.parse(entry.lastSeenAt);
@@ -451,6 +452,34 @@ export function toDayView(day: TrendDay): TrendDayView {
 
 /** Narrowest a run is drawn, as a percentage of the day. One sighting shows. */
 const MIN_RUN = 1.5;
+
+/** Hours after local midnight the axis draws a gridline at. */
+const MARK_HOURS = [6, 12, 18];
+
+/**
+ * Where the quarter marks fall along the axis, in percent.
+ *
+ * Only the ones the day has reached: at nine in the morning the axis ends
+ * before noon, and a gridline pinned to the right edge would read as the axis
+ * claiming a time it does not cover.
+ *
+ * These are counted forward from local midnight rather than resolved through
+ * the zone, so on the two DST changeover days a year they sit an hour off true.
+ * That is why they carry no labels — they are a ruler for the eye, and nothing
+ * on the screen states a time from them. The two ends of the axis are labelled
+ * and both are exact.
+ */
+function axisMarks(startMs: number, endMs: number): number[] {
+  const span = endMs - startMs;
+  const marks: number[] = [];
+
+  for (const hour of MARK_HOURS) {
+    const at = startMs + hour * 60 * 60 * 1000;
+    if (at <= startMs || at >= endMs) continue;
+    marks.push(((at - startMs) / span) * 100);
+  }
+  return marks;
+}
 
 // --- Ordering -------------------------------------------------------------
 

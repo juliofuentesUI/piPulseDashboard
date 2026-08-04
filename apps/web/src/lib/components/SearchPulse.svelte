@@ -164,7 +164,12 @@
           <p class="lead">NOTHING RECORDED YET TODAY.</p>
         </div>
       {:else}
-        <DayList rows={day.rows} axisStart={day.axisStart} axisEnd={day.axisEnd} />
+        <DayList
+          rows={day.rows}
+          axisStart={day.axisStart}
+          axisEnd={day.axisEnd}
+          marks={day.marks}
+        />
       {/if}
     </div>
   {:else}

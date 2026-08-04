@@ -488,6 +488,14 @@ continuous presence.
 A trend Google stated no volume for still appears, with `peakVolume` absent, ranked below
 every trend that has one — never dropped, and never given a number we invented.
 
+**Rule 1 is a measurement; rules 3 and 4 are only an ordering.** `timesObserved` and
+`activeMinutes` count how long *Google listed* a trend, and the feed evicts on arrival order
+— ten slots, newest first — so a busy news hour flushes everything in it fast. Observed:
+`appropriations bill` held `10000+` and was pushed out by a feed whose largest member was
+`5000+`, twice its size. Read a gap between two of these as a tiebreak, never as a fact
+about how long people cared. `peakVolume` is the one key feed churn cannot touch, which is
+why it sorts first and why the screen says `BY PEAK VOLUME`.
+
 ### `GET /api/health`
 
 Liveness plus the configured location and cache TTL.
