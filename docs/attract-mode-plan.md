@@ -101,7 +101,22 @@ trend card is the strongest thing to look at from across a room. That is still t
 still the obvious first extension — but it is a change to make deliberately, not one to
 assume.
 
-### 2. Where is the hidden control? — **ANSWERED: a two-second hold on the title**
+### 2. Where is the control? — **ANSWERED: a settings switch, plus a hidden hold**
+
+**Amended 2026-08-04, after use.** The hold shipped first and the user could not work it on
+a phone — two seconds is hard to judge with no feedback while you wait. More to the point,
+they asked for it to be visible: *"just so it's visibly there not so hidden in case I forget
+someday."*
+
+So settings gained a **`CAROUSEL` section, `ON` / `OFF`**, between `SCREEN` and `THEME`, in
+the same list idiom as every other choice there. It is now the primary control and the hold
+is a shortcut.
+
+The switch does something the hold never could: **turn the behaviour off.** A hold can only
+start it, so before this there was no way to read the dashboard for ten minutes without it
+taking over every sixty seconds. `ON` is the default and is remembered.
+
+The original reasoning for the hold, still true and still why it exists:
 
 It has to be unreachable by accident on a touchscreen where every other interaction is a
 tap, and findable by the one person who knows it exists. It is also **not urgent to find**,

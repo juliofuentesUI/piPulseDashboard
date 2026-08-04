@@ -16,8 +16,23 @@
  * untouched: this drives what exists, it does not extend it.
  */
 
+import { readSetting, writeSetting } from './storage';
 import type { PulseView } from './trend-view';
 import type { ScreenId } from './screen.svelte';
+
+const STORAGE_KEY = 'pipulse:attract';
+
+/**
+ * On unless it has been switched off, and remembered like the theme and the
+ * layout — a wall display that gets power-cycled should come back doing what it
+ * was doing.
+ *
+ * Defaulting to on matters: a panel nobody has configured is exactly the panel
+ * that should be showing everything it knows.
+ */
+function storedEnabled(): boolean {
+  return readSetting(STORAGE_KEY) !== 'off';
+}
 
 /** How long each stop holds. The user asked for five seconds. */
 export const ATTRACT_STEP_MS = 5_000;
@@ -74,6 +89,16 @@ export class Attract {
   /** True while the tour is running. */
   active = $state(false);
 
+  /**
+   * Whether the panel is allowed to drive itself at all.
+   *
+   * Off means off: it will not resume on idle and the hidden hold will not
+   * start it. That is the point of having a switch — someone reading the
+   * dashboard for ten minutes should be able to stop it taking over every
+   * minute, and the hold alone could never express that.
+   */
+  enabled = $state(storedEnabled());
+
   #index = 0;
   #step: ReturnType<typeof setInterval> | undefined;
   #idle: ReturnType<typeof setTimeout> | undefined;
@@ -107,8 +132,26 @@ export class Attract {
    * why the mode needs no badge — a panel that changes every five seconds is
    * self-evidently driving itself.
    */
+  /**
+   * Turns the whole behaviour on or off, and remembers it.
+   *
+   * Switching it on does not merely permit the tour, it starts it — the switch
+   * lives in the settings dialog, and a control that appears to do nothing
+   * until sixty seconds later is a control nobody trusts.
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    writeSetting(STORAGE_KEY, enabled ? 'on' : 'off');
+
+    if (enabled) this.start();
+    else {
+      this.stop();
+      this.#clearIdle();
+    }
+  }
+
   start(): void {
-    if (this.active) return;
+    if (this.active || !this.enabled) return;
     this.active = true;
     this.#clearIdle();
 
@@ -151,7 +194,9 @@ export class Attract {
     if (suspended) {
       this.stop();
       this.#clearIdle();
-    } else {
+    } else if (!this.active) {
+      // Already touring means the dialog was closed by the switch that started
+      // it, and restarting the countdown here would schedule a redundant start.
       this.#restartIdle();
     }
   }
@@ -174,7 +219,7 @@ export class Attract {
 
   #restartIdle(): void {
     this.#clearIdle();
-    if (this.#suspended) return;
+    if (this.#suspended || !this.enabled) return;
     this.#idle = setTimeout(() => this.start(), ATTRACT_IDLE_MS);
   }
 

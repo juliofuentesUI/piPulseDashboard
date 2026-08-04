@@ -1049,9 +1049,21 @@ WEATHER · NOW  →  WEATHER · 7-DAY  →  SEARCH PULSE · NOW  →  SEARCH PUL
 - **Any touch stops it at once** and hands the panel back, wherever it had got to.
 - **Sixty seconds without input resumes it**, carrying on through the tour rather than
   starting over.
-- **A two-second hold on the screen title starts it immediately.** Deliberately hidden: it
-  has no affordance and is not a button, because the mode arrives on its own anyway and
-  this is only for starting it now. Holding the menu grid does nothing.
+- **Settings has a `CAROUSEL` section**, `ON` / `OFF`, between `SCREEN` and `THEME`. This is
+  the visible control and the only one that can switch the behaviour *off* — useful when
+  reading the dashboard for a while, since otherwise it takes over every minute. Picking
+  `ON` closes the dialog and starts the tour at once; picking `OFF` leaves the dialog open,
+  because the point of switching it off is to keep reading undisturbed. Remembered across a
+  restart, and **on by default**: a panel nobody has configured is exactly the one that
+  should be showing everything it knows.
+- **A two-second hold on the screen title also starts it.** Deliberately hidden: it has no
+  affordance and is not a button. Holding the menu grid does nothing. It is a shortcut, not
+  the only way in — the settings switch is.
+
+  Labelled `CAROUSEL` in the interface because that is the user's word for it, while the
+  code says `attract`. `carousel` is already the two-page scroller in the code; nothing in
+  the interface carries that other meaning, so the two names are each the clearer one where
+  they sit.
 
 **No dialog ever opens by itself.** The tour switches between the two weather layouts
 directly rather than through the settings dialog, and visits no modal at all — not the

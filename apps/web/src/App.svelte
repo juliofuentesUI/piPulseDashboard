@@ -99,6 +99,17 @@
   };
 
   /**
+   * Turning it on closes the dialog and starts the tour at once — there is
+   * nothing to look at behind a settings panel, and a control whose effect is
+   * invisible for a minute reads as broken. Turning it off leaves the dialog up,
+   * because the point of switching it off is to keep reading undisturbed.
+   */
+  const pickCarousel = (on: boolean): void => {
+    if (on) menuOpen = false;
+    attract.setEnabled(on);
+  };
+
+  /**
    * Any input from a person hands the panel back and restarts the countdown.
    *
    * Pointer and key events only, never scroll: the tour navigates *by*
@@ -227,8 +238,10 @@
         <SettingsModal
           current={themes.current}
           screen={screens.current}
+          carousel={attract.enabled}
           onselect={pickTheme}
           onscreen={pickScreen}
+          oncarousel={pickCarousel}
           onclose={() => (menuOpen = false)}
         />
       {/if}

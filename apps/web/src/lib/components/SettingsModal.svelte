@@ -5,12 +5,31 @@
   interface Props {
     current: Theme;
     screen: Screen;
+    /** Whether the panel is allowed to drive itself when left alone. */
+    carousel: boolean;
     onselect: (theme: Theme) => void;
     onscreen: (screen: Screen) => void;
+    oncarousel: (on: boolean) => void;
     onclose: () => void;
   }
 
-  let { current, screen, onselect, onscreen, onclose }: Props = $props();
+  let { current, screen, carousel, onselect, onscreen, oncarousel, onclose }: Props =
+    $props();
+
+  /**
+   * Two options rather than a switch, because every other choice on this panel
+   * is a list with the active one inverted and a lone toggle would be the only
+   * control here behaving differently.
+   *
+   * Labelled CAROUSEL because that is what the user calls it. The code says
+   * `attract` — `carousel` is already the two-page scroller there — but nothing
+   * in the interface carries that other meaning, so the user's word is the
+   * clearer one on screen.
+   */
+  const CAROUSEL_OPTIONS: readonly { on: boolean; name: string }[] = [
+    { on: true, name: 'ON' },
+    { on: false, name: 'OFF' },
+  ];
 
   let dialog: HTMLDivElement | undefined = $state();
 
@@ -63,6 +82,32 @@
                 type="button"
                 aria-pressed={option.id === screen.id}
                 onclick={() => onscreen(option)}
+              >
+                <span class="name">{option.name}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </section>
+
+      <!--
+        The panel driving itself. It also starts on its own after a minute of
+        quiet and from a two-second hold on the screen title, but neither is
+        visible — and a mode with no visible control is one you have to
+        remember. Picking ON closes this dialog and starts it, because a switch
+        that appears to do nothing for a minute is a switch nobody trusts.
+      -->
+      <section class="group">
+        <h3 class="group-heading">CAROUSEL</h3>
+        <ul class="options">
+          {#each CAROUSEL_OPTIONS as option (option.name)}
+            <li>
+              <button
+                class="option"
+                class:active={option.on === carousel}
+                type="button"
+                aria-pressed={option.on === carousel}
+                onclick={() => oncarousel(option.on)}
               >
                 <span class="name">{option.name}</span>
               </button>
