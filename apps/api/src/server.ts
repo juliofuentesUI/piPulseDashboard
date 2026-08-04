@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 
 import { config } from './config.js';
 import { TtlCache } from './cache.js';
-import { startOfLocalDay, TrendHistoryStore } from './history.js';
+import { SchemaMigrationError, startOfLocalDay, TrendHistoryStore } from './history.js';
 import { GoogleTrendingRssProvider, type TrendProvider } from './trends.js';
 import type { ApiErrorBody, TrendingSearch, TrendsSnapshot, WeatherSnapshot } from './types.js';
 import { fetchWeather } from './weather.js';
@@ -32,8 +32,32 @@ const trendProvider: TrendProvider = new GoogleTrendingRssProvider({
 let history: TrendHistoryStore | null = null;
 try {
   history = new TrendHistoryStore(config.trends.databasePath);
+
+  /*
+   * Silent on every start after the first, because there is nothing to say.
+   * When it does speak it is the one line that proves an upgrade reached the
+   * database rather than only the code — which on a Pi that has been
+   * collecting for weeks is the thing worth being sure of.
+   */
+  if (history.migrationsApplied.length > 0) {
+    app.log.info(
+      { columns: history.migrationsApplied },
+      'Trend history schema upgraded in place',
+    );
+  }
 } catch (error) {
-  app.log.error({ err: error }, 'Trend history unavailable; running without it');
+  /*
+   * Two failures, one symptom. Both leave the screen with no history, but a
+   * schema that would not upgrade is our bug and a disk that will not take a
+   * write is the SD card — and from the panel they look identical, which is
+   * exactly why the log has to separate them.
+   */
+  app.log.error(
+    { err: error },
+    error instanceof SchemaMigrationError
+      ? 'Trend history schema could not be upgraded; running without history'
+      : 'Trend history unavailable; running without it',
+  );
 }
 
 /*

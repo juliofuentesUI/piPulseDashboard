@@ -259,6 +259,24 @@
    * a plain block parent would size them to their content and their
    * `justify-content: center` would centre against that instead of the panel.
    */
+  /*
+   * Each page is given its own compositor layer, and that is a performance fix
+   * rather than a style.
+   *
+   * Without it a swipe repaints both pages every frame. The flat themes survive
+   * that because they paint flat fills and hairlines; `millennium` does not —
+   * it carries fourteen box-shadows, nine `border-image` nine-slices, fifteen
+   * gradients, two `filter: drop-shadow`s and two `background-clip: text`
+   * headings, against zero of any of them elsewhere. On a Pi 5 that is the
+   * difference between a swipe that tracks the finger and one that does not.
+   *
+   * Promoted, each page is rasterised once and the scroll becomes the GPU
+   * moving two textures. The cost is about 4 MB of layer memory for the pair.
+   *
+   * `contain: paint` is deliberately *not* used with it. It would clip each
+   * page to its own box, and the panel already clips at `.screen`; adding a
+   * second, tighter clip risks cutting the theme's art for no further gain.
+   */
   .page {
     display: grid;
     grid-template-rows: minmax(0, 1fr);
@@ -266,5 +284,6 @@
     height: 100%;
     min-width: 0;
     scroll-snap-align: start;
+    will-change: transform;
   }
 </style>

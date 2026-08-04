@@ -55,8 +55,30 @@ const SCHEMA = `
     ON trend_snapshots (trend_key, observed_at);
 `;
 
+/**
+ * A schema upgrade failed, as distinct from the disk being unusable.
+ *
+ * The two look identical from the screen — both end with no history — but they
+ * need different fixes, and only one of them is our fault. Opening the store is
+ * allowed to fail, so the caller catches either; this is what lets it say which
+ * happened in the log rather than reporting a broken column as a broken card.
+ */
+export class SchemaMigrationError extends Error {
+  constructor(step: string, options?: { cause?: unknown }) {
+    super(`could not apply schema migration: ${step}`, options);
+    this.name = 'SchemaMigrationError';
+  }
+}
+
 export class TrendHistoryStore {
   readonly #db: DatabaseSync;
+
+  /**
+   * Migration steps this open actually applied, in order. Empty on every start
+   * after the first — which is the normal case, and why the caller only logs
+   * when there is something in it.
+   */
+  readonly migrationsApplied: readonly string[];
 
   constructor(path: string) {
     const file = resolve(path);
@@ -67,7 +89,7 @@ export class TrendHistoryStore {
     // which matters on a wall display that gets switched off at the socket.
     this.#db.exec('PRAGMA journal_mode = WAL');
     this.#db.exec(SCHEMA);
-    this.#migrate();
+    this.migrationsApplied = this.#migrate();
   }
 
   /**
@@ -82,19 +104,34 @@ export class TrendHistoryStore {
    * we do not know what Google said then, and inventing it would put a made-up
    * figure in the one place the whole screen's honesty rests on.
    */
-  #migrate(): void {
+  #migrate(): readonly string[] {
     const columns = this.#db.prepare('PRAGMA table_info(trend_snapshots)').all() as {
       name: string;
     }[];
     const present = new Set(columns.map((column) => column.name));
 
-    if (!present.has('published_at')) {
-      this.#db.exec('ALTER TABLE trend_snapshots ADD COLUMN published_at TEXT');
-    }
+    /*
+     * Every column this schema has gained since the first release, in the order
+     * it gained them. `ADD COLUMN` is metadata-only in SQLite — it does not
+     * rewrite a single row — so this stays instant whether the table holds a
+     * hundred rows or a million.
+     */
+    const additions: readonly (readonly [string, string])[] = [
+      ['published_at', 'TEXT'],
+      ['news', 'TEXT'],
+    ];
 
-    if (!present.has('news')) {
-      this.#db.exec('ALTER TABLE trend_snapshots ADD COLUMN news TEXT');
+    const applied: string[] = [];
+    for (const [name, type] of additions) {
+      if (present.has(name)) continue;
+      try {
+        this.#db.exec(`ALTER TABLE trend_snapshots ADD COLUMN ${name} ${type}`);
+      } catch (error) {
+        throw new SchemaMigrationError(`add ${name}`, { cause: error });
+      }
+      applied.push(name);
     }
+    return applied;
   }
 
   /**
