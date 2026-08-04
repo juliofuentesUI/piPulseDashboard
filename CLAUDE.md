@@ -25,6 +25,14 @@ stack is settled as Svelte + Vite + Fastify. Adding a dev-tooling script is fine
 Search Pulse list below is a different thing: it bans sources and methods, not build
 tooling, and it does not loosen.
 
+**Attract mode** — the dashboard driving itself when nobody is touching it — has its own
+plan, [docs/attract-mode-plan.md](docs/attract-mode-plan.md). Specified 2026-08-04, not
+started, and **three questions must be settled before any code**. Two things to know before
+reading it: the user calls it "carousel mode", but `carousel` already means the two-page
+horizontal scroller everywhere in this repo, so the code and docs say **attract**. And it
+does **not** loosen the two-page rule below — it automates the navigation that already
+exists and adds no page, no route, and no new way to reach anything.
+
 The weather half has its own plan, [docs/weather-provider-plan.md](docs/weather-provider-plan.md)
 — switching from Open-Meteo to Google's Weather API. It is a separate document because the
 Search Pulse guardrails below do not apply to it, and three questions have to be settled

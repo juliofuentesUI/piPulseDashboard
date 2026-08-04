@@ -101,10 +101,26 @@ was cut into four.)
 
 ## What is left
 
-**Phase 5, reliability and polish**, is the only Search Pulse phase not built. It is not
-gated, but it is loosely specified — request timeouts and retry, feed-parsing tests,
-migration support, burn-in protection, a `/api/trends/health` endpoint. Scope it with the
-user before starting; the plan lists more than one session's work under one heading.
+**Attract mode is specified and not started** — `docs/attract-mode-plan.md`, requested
+2026-08-04. The dashboard drives itself when nobody is touching it: five seconds a screen,
+stops the instant it is touched, resumes a minute after the last input, plus a hidden
+control to start it now. **Three questions have to be settled before any code**, two of
+which change the shape of it: what is in the tour, where the hidden control lives, and what
+an open dialog does to the timer. The user calls it "carousel mode"; the document calls it
+attract mode, because `carousel` already means the two-page scroller everywhere else.
+
+It does **not** relax the two-page rule. It drives the navigation that already exists.
+
+**Phase 5, reliability and polish**, is partly done now. Already built: request timeouts,
+last-known-good cache, duplicate-snapshot protection, migration support, and migration
+logging. Still open: exponential retry on a failed fetch, feed-parsing tests (there are
+none at all), a `/api/trends/health` endpoint, burn-in protection, and auto-return to the
+top trend after inactivity.
+
+**Two of those overlap attract mode and should not be built before it.** Burn-in protection
+is largely what attract mode does — a screen that moves every five seconds needs far less of
+it — and "auto-return after inactivity" is a special case of the same idle timer. Decide
+attract mode first, then see what is left of both.
 
 **Deploying is `./scripts/pi-setup.sh` then `./scripts/pi-start.sh`**, both documented in
 `README.md`. Setup proves SQLite can actually write where the history lives, which is what
@@ -135,6 +151,7 @@ Then, only if the work touches them:
 4. **`docs/millennium-theme-plan.md`** — the theme, and every placement that was tried and
    rejected before the one that shipped.
 5. **`docs/weather-provider-plan.md`** — the Open-Meteo → Google switch, still at W0.
+6. **`docs/attract-mode-plan.md`** — the self-driving display, specified and not started.
 
 Per-project memories also load automatically in this directory. They cover Pi deployment,
 git workflow, and two gotchas repeated below.
