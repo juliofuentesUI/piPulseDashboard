@@ -9,6 +9,20 @@ returns zero results for every query and has done since 2026-08-04. Real data is
 environment variable away — `EVENTS_PROVIDER=serpapi` — and that path is built, wired and
 verified against the live (empty) API.
 
+**DIRECTION CHANGED 2026-08-05 (evening): stop waiting, find a different source.** Re-probed
+that evening and the engine was still empty; issue #4117 was still open with no staff
+comment, no assignee and no ETA, and the reporter's own examples show the same failure in
+Austin, Buenos Aires and Brazil with Google's direct link empty too. The user's call was that
+a source which can go to zero worldwide, indefinitely, and bill for the zeroes is not one to
+wait on.
+
+So the open work on this feature is **choosing a replacement provider**, not polishing what
+exists. `EventProvider` was built for exactly this: a new source is a new class and one
+binding in `server.ts`. Requirements are low — a title, some date text, and either a street
+address or a venue name; coordinates are optional because the geocoder handles the rest and
+caches permanently. **Check what a zero-result call costs before wiring anything to a daily
+refresh**, which is the trap measurement 2 records.
+
 Everything in this document that could be measured without that source **was** measured, on
 2026-08-05, against the live APIs and the running app. Where something is inferred it says
 so. Where the outage prevented a measurement, it says that too, and names what the missing

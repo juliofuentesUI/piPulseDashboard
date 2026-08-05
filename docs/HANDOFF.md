@@ -1,184 +1,101 @@
-# Handoff — 2026-08-05
+# Handoff — 2026-08-05 (evening)
 
-Rewritten after the session that built trend categories. The previous handoff covered
-Search Pulse phases 0–5, the `millennium` theme and attract mode; all of that is still true
-and still described in the plan documents it pointed at. This one covers what changed and
-what happens next. Delete or rewrite it when it stops being true.
+Rewritten after the session that built the events map. The previous handoff said the next
+session would be *planning* that feature; it planned it and then built most of it, so that
+document is gone. Delete or rewrite this one when it stops being true.
 
-## Start here — the next session is planning, not building
+## Start here — the events map needs a new data source
 
-**The next session designs a new screen: a map of nearby events, as pins, on the
-carousel.** Tapping a pin shows that event's details, and it has to be performant on a Pi.
-The stack is already chosen — **SerpApi, MapTiler and Leaflet** — and the user will paste a
-detailed implementation write-up at the start of the session.
+**The map is built and works. It has no real data, and getting some is the open problem.**
 
-**The API keys will be in that pasted text.** Move them into `.env` as the first action,
-tell the user plainly that a pasted key is in a stored transcript and should be rotated
-once, and then get on with the work — see the note at the end of this document. Do not
-labour the point; it has already been made once and accepted.
+`docs/events-map-plan.md` is the reference for all of it.
 
-**Nothing is to be built until a plan exists and the user has agreed to it.** They asked
-explicitly for back-and-forth until there is shared agreement on what the feature is. That
-is the job — not code.
+**SerpApi's Google Events engine has returned zero results for every query since
+2026-08-04** — verified repeatedly, most recently on the evening of 2026-08-05. It is not our
+configuration and not SerpApi's parser: the raw HTML Google served them says *"Can't find
+events that match"*, and the same failure reproduces in Austin, Buenos Aires and Brazil.
+[serpapi/public-roadmap#4117](https://github.com/serpapi/public-roadmap/issues/4117) is still
+open, still has no staff comment, no assignee and no ETA.
 
-**Search Pulse is paused, deliberately, and it is in a good state.** Everything below about
-it is context, not a queue. Do not pick up its open items unless asked.
+**The user's decision on 2026-08-05 was to stop waiting on it and look for a different
+source.** That is the next piece of work on this feature. Things to know before starting:
 
-### The stack is chosen
+- **The provider interface already exists for exactly this.** `EventProvider` in
+  `apps/api/src/events.ts`, one binding in `server.ts`, and everything downstream — pipeline,
+  route, browser — sees the same normalised `LocalEvent`. A new source is a new class, not a
+  rewrite. `MockEventProvider` is the worked example.
+- **Whatever replaces it must supply, at minimum:** a title, some date text, and either a
+  street address or a venue name. Coordinates are a bonus, not a requirement — the geocoder
+  handles the rest and caches permanently.
+- **Cost it out first.** SerpApi's free tier bills empty responses exactly like full ones,
+  which is the trap that made the outage expensive rather than merely annoying. Whatever
+  comes next, check what a zero-result call costs before wiring it to a daily refresh.
+- **Eventbrite is still out** — its public event search was removed in February 2020.
 
-**SerpApi for events, MapTiler for tiles, Leaflet for the map.** The user decided this on
-2026-08-05, and they have a detailed implementation write-up from ChatGPT that they will
-paste in at the start of the session. **Read that before proposing anything**, and treat it
-as their intent rather than as a specification to follow literally — parts of it will be
-right, and the job is to find the parts that meet this codebase badly.
+**Nothing else about the feature is blocked.** With `EVENTS_PROVIDER=mock` the page runs
+end to end, and the switchover is one environment variable.
 
-Eventbrite is out. Its public event search was removed in February 2020 and never replaced,
-which is what pushed the source to SerpApi — whose Google Events engine does what
-Eventbrite's search used to.
+## What exists now
 
-The choice is a good one and it answers most of what was worrying about this feature.
-Leaflet is small and renders **raster** tiles with no WebGL, which is the right shape for a
-Pi. MapTiler supports **custom styles**, which is a real answer to the aesthetic problem
-below rather than a workaround.
+### The events map — a third carousel page
 
-### Five things to raise before designing
-
-These are not objections. They are the costs, and this user has been consistently clear
-that costs get discussed rather than discovered.
-
-**1. SerpApi does not return coordinates, and the feature is pins on a map.** Verified
-against SerpApi's Google Events documentation on 2026-08-05: each event carries `title`,
-`date`, `address` (text), `link`, `description`, `ticket_info`, `venue`, `thumbnail` and an
-`event_location_map` — **no latitude or longitude**. A text address cannot be placed on a
-Leaflet map, so every event has to be geocoded before it can be a pin.
-
-**MapTiler geocodes, and its quota makes this a small problem rather than a large one** —
-the user pointed this out and checking it was worth doing. The free tier allows **1,000
-search sessions a month**, and a venue's coordinates never change: geocode once, store in
-SQLite keyed by the address, never look it up again. Realistically that is a few hundred
-distinct venues *ever*, not per month.
-
-That caching is the same pattern `trend_categories` already uses, down to the reasoning —
-see `docs/trend-category-plan.md` for why "decide once and store" is worth more than the
-money it saves. Reuse the shape; it is proven here and the next reader will recognise it.
-
-What still needs designing is the failure path. An address that will not geocode is a pin
-with nowhere to go, and the honest answer is probably that the event is listed but not
-pinned rather than dropped or guessed at.
-
-**2. SerpApi is the real cost of this feature, and it is not small.** The free tier is
-**250 searches a month** — about eight a day — and paid starts at **$25/month for 1,000**.
-For comparison, trend categorisation costs $2.62 a *year*.
-
-That makes polling cadence a design decision rather than a detail. The trends feed is
-fetched every ten minutes, which would be 4,320 SerpApi searches a month and past the
-paid tier. Events do not change every ten minutes: one fetch every three hours is 240 a
-month and fits inside the free tier; hourly is 720 and needs the $25 plan. **Pick the
-cadence from the quota, and put the arithmetic in the plan the way the category plan does.**
-
-**MapTiler has its own ceiling and a harsher failure than SerpApi's.** Free allows 100k API
-requests, 1k search sessions and 5k map sessions a month, and **exceeding any of them
-suspends the maps for the rest of the month**. A wall display that goes blank until the 1st
-is a much worse outcome than a stale list, so this needs the same treatment the categories
-got: the screen has to work, and say why, when the map will not load. A "map session" is an
-initialised map object, so how often the Leaflet instance is created — once per page load,
-or every time attract mode tours past — is a number worth knowing before it is discovered.
-
-**3. It is a third page, and everything assumes two.** `PAGES` in `App.svelte`, the page
-indicator, the swipe gesture and attract mode's four-stop tour were all written for two.
-`CLAUDE.md` no longer forbids a third — it asks for the cost to be counted first, and that
-is this plan's job. Bounded: mostly `PageDots`, `ATTRACT_TOUR` and the carousel arithmetic.
-
-**4. Leaflet would be this project's first real front-end dependency.** The stack is Svelte,
-Vite and Fastify and nothing else — the sprites, the RSS parser and the payload validation
-are hand-written on purpose. `CLAUDE.md` permits new dependencies explicitly but requires
-them to be worth what they cost. Leaflet is about 40 KB and needs no WebGL, so this is
-probably the easiest of the five to justify; it still deserves a sentence in the plan.
-
-**5. Default map tiles will fight this dashboard's entire look.** Every pixel of this panel
-is flat, aliased, six-colour pixel art authored at 720 × 720. A standard tile set dropped
-into it will look like a photograph pasted into a painting. MapTiler's custom styles are the
-lever here — a style drawn from the same palette, with labels and detail stripped back — and
-the panel has **six themes**, so the question of whether the map restyles per theme is real
-and probably wants answering early. **This is the part most likely to look wrong and is
-worth a render before much is built.**
-
-Two smaller things to clarify with the user: what "low GPS data" meant (coarse coordinates?
-small payloads? it was never pinned down), and where "near me" comes from, since the Pi has
-no GPS and the dashboard's location is a fixed San Jose in `config.ts`.
-
-## What landed this session
-
-Search Pulse gained semantic trend categories. Seven commits, `f31b3bb` to `a2cde46`, all on
-`main` and pushed. The full write-up is **`docs/trend-category-plan.md`**, which records the
-measurements, the decisions and the questions the user answered.
+Three commits: `1cea137` (backend), `00c103a` (the page), `97cbdac` (list view), `8c147d5`
+(placeholder art). Built against mock data throughout.
 
 | | |
 | --- | --- |
-| Eleven categories, plus an honest `uncategorised` | `apps/api/src/categorise.ts` |
-| One OpenAI call per fetch, only for trends never seen before | same |
-| Stored once in `trend_categories`, never recomputed | `apps/api/src/history.ts` |
-| A badge on every row, as a glyph or as three letters | `CategoryBadge.svelte`, `category-glyphs.ts` |
-| A legend explaining all eleven | `CategoryLegend.svelte` |
-| `BADGES` and `LEGEND` in settings | `SettingsModal.svelte` |
-| A manual refresh control on Search Pulse | `SearchPulse.svelte` |
-| `NO API KEY` / `KEY REJECTED` when categorising is not working | same |
+| `EventProvider` + SerpApi and Mock implementations | `apps/api/src/events.ts`, `events-mock.ts` |
+| MapTiler geocoding behind four measured gates | `apps/api/src/geocode.ts` |
+| Permanent address→coordinate cache in SQLite | `apps/api/src/events-store.ts` |
+| Dedup, distance filter, ordering | `apps/api/src/event-pipeline.ts` |
+| Free-text date parsing | `apps/api/src/event-dates.ts` |
+| Leaflet map, created once and never destroyed | `EventsMap.svelte` |
+| Two-column list with sorting and thumbnails | `EventList.svelte` |
+| Bottom sheet, generated placeholder tiles | `EventSheet.svelte`, `EventThumb.svelte` |
 
-**It costs $2.62 a year.** Measured, not projected — see the plan for the arithmetic.
+15 mock fixtures with duplicates, a recurring market, an unplaceable online event and one
+outside the radius. They exercise the real geocoder, so the mock tests the production path
+rather than bypassing it.
 
-### The five things that surprised us
+### QR codes on headlines — `02c4ee5`
 
-**1. GPT-5 models bill reasoning as output, and the first cost estimate missed it entirely.**
-Ten trends on default settings spent 1,101 input tokens and **2,222 output tokens** — 94% of
-the bill was thinking about a nine-way label whose evidence was already in the prompt.
-`reasoning_effort: minimal` cuts it to 176 with identical answers on everything unambiguous.
-That one parameter is the difference between $2.62 a year and about $20. It is set in
-`config.ts` and **should not be removed without re-running the numbers**.
+Tapping a headline in the trend card or the day-trend record opens a QR code for the
+article. Headlines always carried real publisher URLs; the view layer had been discarding
+them. `qrcode-generator`, 8.8 KB gzipped, zero dependencies.
 
-**2. An unfunded OpenAI account answers `429`, exactly like a rate limit.** The body says
-`insufficient_quota` and it never recovers, where a rate limit clears in seconds. Retrying
-it means 120 futile calls a day forever, so it trips a circuit breaker that halts
-categorising until restart. The log says so in words, because as a bare 429 somebody spends
-an afternoon tuning a backoff for what is a billing page.
+## What is NOT built, and matters before real data
 
-**3. Colour cannot carry the category, and this was measured across all six themes.** In
-`dmg-green`, `blue` and `hot` are the same hex. In `brutalist-mono`, `warm` *is* the
-background. The floor is three separable fills, not eight — so shape carries the category
-and one token says "this is a badge". The full ΔE table is in the plan.
+- **Budget guards.** No monthly ledger, no ceiling, no backoff when a source returns
+  nothing. Nothing can run away while the provider is `mock`, but these must exist before
+  any paid source is wired up. Question 2 in the plan has the design.
+- **Events are not persisted** — only geocodes are. A restart re-fetches.
+- **No freshness readout and no manual refresh** on the events page, where Search Pulse has
+  both.
+- **No marker clustering.** Eleven pins do not need it; real density might.
+- **Nothing has run on the Pi's own hardware yet** beyond loading. The plan's real Pi risk
+  is swipe smoothness with a third compositor layer carrying raster tiles, and only the
+  device will show it.
+- **There is no test runner in this repo at all** — no `test` script, no test files, either
+  workspace. The user's call on 2026-08-05: tests once the feature works fully.
+- **`README.md` does not document the events endpoint** or the budget arithmetic.
 
-**4. A word badge does not fit and a glyph barely does.** `ENTERTAINMENT` at 13px is 128px
-of a 264px `TODAY` row and would clip five titles in six. Measured over all 481 stored
-titles: a 16px glyph costs `TODAY` 4.4 points of fit and `NOW` 0.2. Both badge styles
-shipped behind a setting because the render argued for both.
+## The keys, and what happened to them
 
-**5. The legend caught a glyph collision on its first render.** `ai` was drawn as the
-conventional four-pointed sparkle, which at 8 × 8 is a cross with four dots — and `health`
-is a cross. Invisible while drawing glyphs one at a time, obvious the moment eleven sit in a
-column. **A legend is a design tool as well as a feature.**
+**Both the SerpApi and MapTiler keys were committed to this public repository on
+2026-08-05**, in `pi-setup.sh`, so a Pi with no keyboard could receive them by `git pull`.
+They were removed again in `385d981`.
 
-### Known bug, not fixed
+**They are still in git history and always will be.** Deletion did not retire them —
+rotation does, and at the time of writing **it has not been done**. The user knows and chose
+to defer it. If it still has not happened, it is worth one reminder and no more.
 
-**`obituary` is too loose, and it produced a genuinely bad result.** The trend
-`bruce springsteen` was badged `OBT` — *someone has died* — from a headline reading
-*"Bruce Springsteen says wife Patti Scialfa's cancer is in remission"*. Good news, about
-living people.
+What replaced the mechanism: `scripts/pi-keys.env`, untracked and gitignored beside `.env`,
+carried to the Pi on a USB stick or over SSH. `pi-setup.sh` reads it and appends only
+missing values, so a key already rotated on the Pi is never clobbered.
 
-Two causes, both mine: the gloss says "someone has died — whoever they were and however it
-happened", which is loose enough to catch illness; and `obituary` sits first in the
-precedence order, so any hint of death beats everything else. The fix is to require that
-**the person named in the trend has died**, and to re-check whether it still needs to
-outrank `crime`. A milder case from the same batch: a man flying a helicopter to go
-shopping was badged `crime`.
-
-**This is the one thing in Search Pulse worth fixing before anything else there.** A
-dashboard on a wall saying someone died when they have not is worse than any late badge.
-
-### Still unanswered from the category plan
-
-Questions 3–8 were never formally answered; the build proceeded on the recommendations.
-They are listed in `docs/trend-category-plan.md` and none is blocking. The two most worth
-revisiting are whether `obituary` should exist at all given the bug above, and whether the
-`weather` category sits oddly next to a dashboard whose other page is the weather.
+**The laptop cannot reach the Pi.** WSL has no tailscale interface — `raspberrypi` resolves
+via the Windows resolver but every port times out, because traffic routes to the home
+gateway which knows nothing about `100.x`. Any scp or ssh has to run from Windows, not WSL.
 
 ## The Pi
 
@@ -228,10 +145,13 @@ Endpoints: `/api/health`, `/api/weather`, `/api/trends/now` (accepts `?refresh=1
 
 1. **`CLAUDE.md`** — the standing rules, including that there is no banned-technology list
    and that new dependencies are a conversation rather than a lookup.
-2. **`docs/trend-category-plan.md`** — the most recent work, and the closest thing to a
-   worked example of how this project plans a feature: measure first, record what the
-   measurement killed, ask the user the questions that actually change the design.
-3. **`README.md`** — API contract, layout bands, the reasoning behind the bar scale and the
+2. **`docs/events-map-plan.md`** — the current work, and where the events source problem is
+   written down in full: the outage evidence, the four geocoding gates, the budget
+   arithmetic, and the open questions each with a recommendation.
+3. **`docs/trend-category-plan.md`** — the closest thing to a worked example of how this
+   project plans a feature: measure first, record what the measurement killed, ask the user
+   the questions that actually change the design.
+4. **`README.md`** — API contract, layout bands, the reasoning behind the bar scale and the
    two orderings.
 
 Then, only if the work touches them: `docs/search-pulse-plan.md`,
@@ -239,6 +159,31 @@ Then, only if the work touches them: `docs/search-pulse-plan.md`,
 `docs/weather-provider-plan.md` (still gated at W0, three questions unanswered).
 
 ## Gotchas
+
+**`VITE_` variables are compile-time, not runtime.** Vite substitutes them into the
+JavaScript during `npm run build`, so a bundle built before a key exists carries an empty
+value forever and no amount of correct `.env` afterwards changes it. This cost a real
+debugging round on the Pi: `pi-setup.sh` was building before it seeded the keys, and the map
+reported "NO MAP KEY SET" with a perfectly correct `.env` beside it. Fixed in `3127a00` by
+seeding first. Only `VITE_`-prefixed values are affected; everything the API reads is
+ordinary runtime environment.
+
+**Do not reuse a class name `millennium.css` targets, unless you want what it does.** It
+reaches into other components by class name, so a *new* component picking one up inherits
+styling meant for something else — invisible in the other five themes. Caught twice in one
+session: `.foot` is the 7-day footer and carries 44px of padding each side, which destroyed
+a card's meta row; `.views` is Search Pulse's full-width band and carries an inset channel.
+Both renamed. `.where` was kept deliberately, because inheriting the gold plaque was right.
+Check before naming: `grep -oE "\.[a-z][a-z-]*" apps/web/src/styles/millennium.css | sort -u`.
+
+**Empty upstream responses can still cost money.** SerpApi bills a query that returns
+nothing exactly like one that returns twenty events — 250 → 244 across six empty probes.
+Any budget guard has to count *results*, not calls.
+
+**Verify a QR by rebuilding its grid, not by looking at it.** There is no scanner in this
+environment. Pull the rendered module grid out of the DOM and compare it against an
+independently generated one; a corrupted render and a correct one look identical at a
+glance.
 
 **Measure, do not eyeball.** This is the house rule and it earned its place again this
 session: the word badge was killed by measuring 481 real titles, the colour scheme by
