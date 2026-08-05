@@ -109,15 +109,15 @@ let categorising: Promise<void> | null = null;
  * screen's first paint — badges simply appear on the next 60-second poll,
  * which is the right trade for a mark that is not load-bearing.
  */
-function categoriseNew(trends: readonly TrendingSearch[]): void {
-  if (categoriser === null || history === null || categoriesHalted) return;
-  if (categorising !== null) return;
+function categoriseNew(trends: readonly TrendingSearch[]): Promise<void> | null {
+  if (categoriser === null || history === null || categoriesHalted) return null;
+  if (categorising !== null) return categorising;
 
   const store = history;
   const model = config.categories.model;
 
   const pending = store.needCategory(trends.map((trend) => trend.id));
-  if (pending.length === 0) return;
+  if (pending.length === 0) return null;
 
   const batch = trends.filter((trend) => pending.includes(trend.id));
 
@@ -170,7 +170,28 @@ function categoriseNew(trends: readonly TrendingSearch[]): void {
       categorising = null;
     }
   })();
+
+  return categorising;
 }
+
+/**
+ * Longest the list will wait for its badges before going out without them.
+ *
+ * The batch itself measures about 2.3 seconds for ten trends at `minimal`
+ * effort, so in the ordinary case this is never reached and the list and its
+ * badges arrive together — which is what stops a badge visibly popping in
+ * seconds after the row it belongs to.
+ *
+ * The cap is what keeps that from becoming a dependency. If OpenAI is slow, the
+ * list goes out bare and the batch keeps running; the client asks again shortly
+ * and picks the answers up. A screen that will not show trending searches
+ * because a labelling service is having a bad day would be a much worse
+ * dashboard than one with late badges.
+ *
+ * Paid at most once per upstream fetch — every other request is served from a
+ * ten-minute cache and never reaches this path at all.
+ */
+const CATEGORISE_WAIT_MS = 4000;
 
 /*
  * The screen polls us every minute and we poll Google every ten. This cache is
@@ -194,8 +215,21 @@ const trendsCache = new TtlCache<readonly TrendingSearch[]>({
       app.log.error({ err: error }, 'Could not record trend snapshot');
     }
 
-    // Fire and forget, after the record exists. Nothing waits on this.
-    categoriseNew(trends);
+    /*
+     * Wait a moment for the badges, but never longer than the cap.
+     *
+     * This runs only on a cache miss — once per upstream fetch — so it costs
+     * a few seconds every ten minutes and nothing at all in between. What it
+     * buys is the list and its badges arriving in the same paint, instead of
+     * the badges appearing seconds later on rows the eye has already read.
+     */
+    const settling = categoriseNew(trends);
+    if (settling !== null) {
+      await Promise.race([
+        settling,
+        new Promise((resolve) => setTimeout(resolve, CATEGORISE_WAIT_MS)),
+      ]);
+    }
 
     return trends;
   },
@@ -262,8 +296,48 @@ app.get('/api/weather', async (request, reply) => {
   }
 });
 
+/**
+ * Shortest gap allowed between *forced* upstream fetches.
+ *
+ * The ten-minute cache exists to protect an unauthenticated feed that Google
+ * rate-limits by IP, and a button on a touchscreen is exactly the thing that
+ * would hammer it — a wall display invites idle prodding in a way a CLI does
+ * not. This is the floor that keeps "refresh now" from becoming "refresh
+ * forty times".
+ *
+ * Thirty seconds, not the full ten minutes: the point of the control is that
+ * the ten minutes is sometimes too long to wait, so a floor anywhere near it
+ * would defeat the feature. Google's feed only turns over every ten to twenty
+ * minutes anyway, so a faster press mostly returns the same list — which costs
+ * one request and disappoints nobody.
+ */
+const FORCED_FETCH_FLOOR_MS = 30_000;
+
+let lastForcedFetchMs = 0;
+
 app.get('/api/trends/now', async (request, reply) => {
   try {
+    /*
+     * `?refresh=1` drops the cache so the next read goes to Google. Refused
+     * silently inside the floor: the honest answer to "refresh" when the data
+     * is fifteen seconds old is the data we already have, and an error would
+     * make a working button look broken.
+     */
+    const forced = (request.query as { refresh?: string }).refresh === '1';
+    if (forced) {
+      const now = Date.now();
+      if (now - lastForcedFetchMs >= FORCED_FETCH_FLOOR_MS) {
+        lastForcedFetchMs = now;
+        trendsCache.invalidate();
+        request.log.info('Manual refresh; dropping the trends cache');
+      } else {
+        request.log.info(
+          { withinMs: now - lastForcedFetchMs },
+          'Manual refresh refused; inside the upstream floor',
+        );
+      }
+    }
+
     const result = await trendsCache.get();
 
     if (result.state === 'stale') {

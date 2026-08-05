@@ -144,17 +144,23 @@ export class TrendsRequestError extends Error {
  * costing an upstream request is exactly what the backend cache exists to
  * prevent.
  */
-export async function requestTrends(signal: AbortSignal): Promise<TrendsSnapshot> {
+export async function requestTrends(
+  signal: AbortSignal,
+  options?: { readonly force?: boolean },
+): Promise<TrendsSnapshot> {
   if (!navigator.onLine) {
     throw new TrendsRequestError({ kind: 'offline', message: 'NO NETWORK' });
   }
 
   let response: Response;
   try {
-    response = await fetch('/api/trends/now', {
-      signal,
-      headers: { accept: 'application/json' },
-    });
+    // `?refresh=1` asks the backend to drop its cache. It enforces its own
+    // floor on how often that is honoured, because the feed being protected is
+    // Google's and the browser is in no position to police it.
+    response = await fetch(
+      options?.force === true ? '/api/trends/now?refresh=1' : '/api/trends/now',
+      { signal, headers: { accept: 'application/json' } },
+    );
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
     throw new TrendsRequestError(

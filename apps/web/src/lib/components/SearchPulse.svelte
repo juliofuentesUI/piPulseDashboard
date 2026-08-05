@@ -15,6 +15,7 @@
     TrendHistoryView,
     TrendRowView,
   } from '../types';
+  import Refresh from '../weather-icons/Refresh.svelte';
   import DayList from './DayList.svelte';
   import Sparkline from './Sparkline.svelte';
   import TitleBar from './TitleBar.svelte';
@@ -37,6 +38,9 @@
     badge: BadgeStyle;
     /** Why badges are missing, or empty when nothing is wrong. */
     categoryWarning: string;
+    /** True while a manual refresh is in flight. */
+    refreshing: boolean;
+    onrefresh: () => void;
     onview: (view: PulseView) => void;
     onmode: (mode: PulseMode) => void;
     onselect: (id: string) => void;
@@ -64,6 +68,8 @@
     view,
     badge,
     categoryWarning,
+    refreshing,
+    onrefresh,
     onview,
     onmode,
     onselect,
@@ -131,6 +137,26 @@
         <span class="status-text">{status.text}</span>
       </span>
     {/if}
+
+    <!--
+      The feed only turns over every ten to twenty minutes and the backend
+      caches it for ten, so most of the time this returns the same list. It
+      exists for the times that is too long to wait, and it is the same pixel
+      glyph the weather footer already uses for the same job.
+
+      The backend enforces its own floor on how often a press reaches Google,
+      because the feed is unauthenticated and rate-limited by IP — a button on
+      a touchscreen is exactly what would abuse it.
+    -->
+    <button
+      class="refresh"
+      type="button"
+      onclick={onrefresh}
+      disabled={refreshing}
+      aria-label={refreshing ? 'Refreshing trends' : 'Refresh trends now'}
+    >
+      <Refresh />
+    </button>
   </div>
 
   <!--
@@ -435,6 +461,35 @@
     padding: 0 24px;
     overflow: hidden;
     border-bottom: var(--divider) solid var(--line);
+  }
+
+  /*
+   * 44px square, which is the touch-target floor, inside a 64px band. The
+   * sprite is 32px and draws itself, so this is a frame around it rather than
+   * a button with a label.
+   */
+  .refresh {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    color: var(--c-blue);
+    background: var(--c-bg);
+    border: 2px solid var(--c-blue);
+    cursor: pointer;
+  }
+
+  /* Flat design: a press swaps the fill rather than moving anything. */
+  .refresh:active:not(:disabled) {
+    background: var(--c-ink);
+    color: var(--c-bg);
+  }
+
+  .refresh:disabled {
+    opacity: 0.45;
+    cursor: default;
   }
 
   /* Where the ordering chips would be, naming the ordering TODAY fixes. */

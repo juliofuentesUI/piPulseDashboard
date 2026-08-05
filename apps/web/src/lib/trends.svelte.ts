@@ -85,6 +85,8 @@ export class Trends {
   phase = $state<DashboardPhase>('loading');
   failure = $state<DashboardFailure | null>(null);
   online = $state(true);
+  /** True while a manual refresh is in flight, so the control can say so. */
+  refreshing = $state(false);
 
   #snapshot = $state<TrendsSnapshot | null>(null);
   #now = $state(new Date());
@@ -376,13 +378,32 @@ export class Trends {
     this.#dayHistoryController?.abort();
   }
 
-  async refresh(): Promise<void> {
+  /**
+   * A refresh a person asked for, which skips the backend's ten-minute cache.
+   *
+   * Separate from `refresh()` because the two mean different things: the timer
+   * asks "has anything changed", and this asks "go and look now". Only this one
+   * is allowed to cost an upstream request, and the backend still refuses it
+   * inside its own floor — the browser is not the right place to protect
+   * Google's feed from a button.
+   */
+  async refreshNow(): Promise<void> {
+    if (this.refreshing) return;
+    this.refreshing = true;
+    try {
+      await this.refresh({ force: true });
+    } finally {
+      this.refreshing = false;
+    }
+  }
+
+  async refresh(options?: { readonly force?: boolean }): Promise<void> {
     const controller = new AbortController();
     this.#controller?.abort();
     this.#controller = controller;
 
     try {
-      const snapshot = await requestTrends(controller.signal);
+      const snapshot = await requestTrends(controller.signal, options);
       this.#snapshot = snapshot;
       this.#now = new Date();
       this.failure = null;
