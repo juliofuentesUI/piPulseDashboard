@@ -50,15 +50,21 @@ that costs get discussed rather than discovered.
 against SerpApi's Google Events documentation on 2026-08-05: each event carries `title`,
 `date`, `address` (text), `link`, `description`, `ticket_info`, `venue`, `thumbnail` and an
 `event_location_map` — **no latitude or longitude**. A text address cannot be placed on a
-Leaflet map. Something has to geocode it, which is a second lookup with its own quota;
-MapTiler offers geocoding. **This is the biggest gap between the chosen stack and the
-described feature and it should be settled first.**
+Leaflet map, so every event has to be geocoded before it can be a pin.
 
-The good news is that the fix has a pattern already in this codebase: a venue's coordinates
-never change, so geocode once, store in SQLite keyed by address, and never look it up
-again. That is exactly what `trend_categories` does for categories, down to the reasoning —
+**MapTiler geocodes, and its quota makes this a small problem rather than a large one** —
+the user pointed this out and checking it was worth doing. The free tier allows **1,000
+search sessions a month**, and a venue's coordinates never change: geocode once, store in
+SQLite keyed by the address, never look it up again. Realistically that is a few hundred
+distinct venues *ever*, not per month.
+
+That caching is the same pattern `trend_categories` already uses, down to the reasoning —
 see `docs/trend-category-plan.md` for why "decide once and store" is worth more than the
-money it saves.
+money it saves. Reuse the shape; it is proven here and the next reader will recognise it.
+
+What still needs designing is the failure path. An address that will not geocode is a pin
+with nowhere to go, and the honest answer is probably that the event is listed but not
+pinned rather than dropped or guessed at.
 
 **2. SerpApi is the real cost of this feature, and it is not small.** The free tier is
 **250 searches a month** — about eight a day — and paid starts at **$25/month for 1,000**.
@@ -69,6 +75,14 @@ fetched every ten minutes, which would be 4,320 SerpApi searches a month and pas
 paid tier. Events do not change every ten minutes: one fetch every three hours is 240 a
 month and fits inside the free tier; hourly is 720 and needs the $25 plan. **Pick the
 cadence from the quota, and put the arithmetic in the plan the way the category plan does.**
+
+**MapTiler has its own ceiling and a harsher failure than SerpApi's.** Free allows 100k API
+requests, 1k search sessions and 5k map sessions a month, and **exceeding any of them
+suspends the maps for the rest of the month**. A wall display that goes blank until the 1st
+is a much worse outcome than a stale list, so this needs the same treatment the categories
+got: the screen has to work, and say why, when the map will not load. A "map session" is an
+initialised map object, so how often the Leaflet instance is created — once per page load,
+or every time attract mode tours past — is a number worth knowing before it is discovered.
 
 **3. It is a third page, and everything assumes two.** `PAGES` in `App.svelte`, the page
 indicator, the swipe gesture and attract mode's four-stop tour were all written for two.
