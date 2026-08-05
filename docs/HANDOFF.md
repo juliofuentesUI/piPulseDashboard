@@ -245,3 +245,11 @@ plainly was accepted. **Do the work, name what you changed and why, and let them
 you.**
 
 They are often on a phone, so keep replies scannable.
+
+**Keys belong in `.env`, never in the conversation.** This came up the hard way last
+session: an OpenAI key was pasted into the chat, which put it in a stored transcript and
+meant it had to be revoked and reissued before it could be used. The working pattern is that
+the user writes the key into `.env` themselves and simply says which variable it is under —
+the API reads it through `--env-file-if-exists`, and nothing needs the value to appear in
+the conversation at all. If a key does get pasted, say so plainly and once, and treat
+rotating it as the first step rather than an aside.
