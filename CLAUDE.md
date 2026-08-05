@@ -83,6 +83,19 @@ bucket and not a count of searches, the feed is ordered by recency and not popul
 **Label things as what they are** — that is engineering, not a guardrail, and it is the
 only part of the old section worth carrying forward.
 
+**Trend categories** — the badge on each row saying what a trend is about — have their own
+plan, [docs/trend-category-plan.md](docs/trend-category-plan.md). Built 2026-08-04. It is
+the only part of this project that calls a paid API, and three things about it are
+load-bearing:
+
+- **`reasoning_effort: minimal` is the difference between $2.62 a year and about $20.**
+  GPT-5 models bill reasoning as output, and this task's evidence is all in the prompt.
+  Do not remove it without re-running the arithmetic in the plan.
+- **A category is decided once and never recomputed.** That is what stops a badge
+  flickering between polls; the model genuinely answers differently on boundary cases.
+- **It must work with the key absent.** No key means the categoriser is never constructed
+  and the dashboard is exactly what it was before the feature existed.
+
 The layout is currently a two-page carousel, Weather and Search Pulse, with everything else
 reached from inside a page. That is a description of what exists, not a limit on what may
 be built. A third page is a real design change with real cost — the page indicator, the

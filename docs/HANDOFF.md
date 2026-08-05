@@ -1,532 +1,247 @@
-# Handoff — 2026-08-04
+# Handoff — 2026-08-05
 
-Four sessions are folded into this. The first built Search Pulse Phases 0–3.5 and the Pi
-deploy scripts; the second built the `millennium` theme end to end, including the supplied
-artwork; the third built Phase 4, the `TODAY` view; the fourth built the trend record,
-stored headlines and reported times, and attract mode. Read this first, then the documents
-it points at. Delete or rewrite it when it stops being true.
+Rewritten after the session that built trend categories. The previous handoff covered
+Search Pulse phases 0–5, the `millennium` theme and attract mode; all of that is still true
+and still described in the plan documents it pointed at. This one covers what changed and
+what happens next. Delete or rewrite it when it stops being true.
 
-## Start here — the next session is a new direction
+## Start here — the next session is planning, not building
 
-**The user is starting the next session to add a new feature, and has not said what it is.**
-Do not infer it from this file, and do not pick up anything below as "the obvious next
-thing" — the open items listed here are genuinely optional and none of them is queued.
-Ask, then read whichever documents the answer points at.
+**The next session designs a new screen: a map of nearby events, as pins, on the
+carousel.** The user's description: a cheap maps API or library, pins from Eventbrite,
+tapping a pin shows that event's details, and it has to be performant on a Pi.
 
-**The Search Pulse guardrails were removed on 2026-08-04, at the user's request.** They
-banned hosted models, AI categorisation, unofficial sources and anything outside a narrow
-question, and required every value on screen to trace back to the feed or to a local rule.
-They are gone. Do not enforce them from memory, and do not read an older commit and
-conclude a rule was broken — `CLAUDE.md` records the removal.
+**Nothing is to be built until a plan exists and the user has agreed to it.** They asked
+explicitly for back-and-forth until there is shared agreement on what the feature is. That
+is the job — not code.
 
-What is left in their place is not a rule but arithmetic, and it is documented in
-`README.md` and the plan doc rather than asserted here: volume figures are the floor of a
-bucket and not a count, the feed is ordered by recency and not popularity, and `ON FEED`
-measures how long Google listed a trend rather than how long anyone cared. **Label things
-as what they are.** That is engineering, and it survives on its own merits.
+**Search Pulse is paused, deliberately, and it is in a good state.** Everything below about
+it is context, not a queue. Do not pick up its open items unless asked.
 
-The layout is a two-page carousel today, and everything else is reached from inside a page.
-That is a description, not a limit. A third page is a real change with real cost — the page
-indicator, the swipe and attract mode's tour all assume two — so cost it out, but it is no
-longer forbidden.
+### Four things to know before planning the map
 
-**Nothing is in flight.** Working tree clean, `main` pushed to `origin`, no branch parked,
-no question outstanding. (Deliberately no commit hash here — pinning one means every commit
-to this file makes the file wrong, including the commit that wrote it. `git log --oneline -1`
-is always right.)
+These are not objections. They are the costs, and the user has been clear that costs get
+discussed rather than discovered.
+
+**1. Eventbrite has no public event search, and has not since February 2020.** Verified
+2026-08-05. The `GET /v3/events/search/` endpoint was removed and there is no replacement
+for searching events across the platform — only *retrieve by ID*, *list by venue*, and
+*list by organization*. Broad discovery requires their distribution partner programme,
+which is an application. **This may be the single fact that reshapes the feature**, and it
+should be settled before anything is designed around it. Ticketmaster's Discovery API is
+the usual substitute and does support latitude/longitude search on a free tier; SeatGeek is
+another. None of this has been decided.
+
+**2. It is a third page, and everything assumes two.** `PAGES` in `App.svelte`, the page
+indicator, the swipe gesture and attract mode's four-stop tour were all written for two
+pages. `CLAUDE.md` no longer forbids a third — it says to cost it out first, and that is
+this plan's job. The cost is real but bounded; it is mostly `PageDots`, `ATTRACT_TOUR` and
+the carousel's scroll arithmetic.
+
+**3. A map is the first real dependency this project would take.** The stack is Svelte,
+Vite and Fastify, and nothing else on the front end — the sprites, the RSS parser and the
+payload validation are all hand-written on purpose. Leaflet or MapLibre would be a genuine
+departure. `CLAUDE.md` permits it explicitly ("there is no banned-technology list at all
+any more") but requires it to be worth what it costs. Raster tiles on a Pi 5 are probably
+fine; WebGL is the open question.
+
+**4. Photographic map tiles will fight this dashboard's entire look.** Every pixel of this
+panel is flat, aliased, six-colour pixel art authored at 720 × 720. A standard OSM tile
+dropped into it will look like a screenshot pasted into a painting. There are answers —
+a hand-styled tile set, a vector map drawn to the palette, or an abstract non-geographic
+layout — and picking one is a design decision, not an implementation detail. **This is
+likely the hardest part of the feature and it is worth raising early.**
+
+Two smaller things worth clarifying with the user: what "low GPS data" means (the phrase is
+ambiguous — coarse coordinates? small payloads?), and where "near me" comes from, since the
+dashboard has no GPS and its location is a fixed San Jose in `config.ts`.
+
+## What landed this session
+
+Search Pulse gained semantic trend categories. Seven commits, `f31b3bb` to `a2cde46`, all on
+`main` and pushed. The full write-up is **`docs/trend-category-plan.md`**, which records the
+measurements, the decisions and the questions the user answered.
+
+| | |
+| --- | --- |
+| Eleven categories, plus an honest `uncategorised` | `apps/api/src/categorise.ts` |
+| One OpenAI call per fetch, only for trends never seen before | same |
+| Stored once in `trend_categories`, never recomputed | `apps/api/src/history.ts` |
+| A badge on every row, as a glyph or as three letters | `CategoryBadge.svelte`, `category-glyphs.ts` |
+| A legend explaining all eleven | `CategoryLegend.svelte` |
+| `BADGES` and `LEGEND` in settings | `SettingsModal.svelte` |
+| A manual refresh control on Search Pulse | `SearchPulse.svelte` |
+| `NO API KEY` / `KEY REJECTED` when categorising is not working | same |
+
+**It costs $2.62 a year.** Measured, not projected — see the plan for the arithmetic.
+
+### The five things that surprised us
+
+**1. GPT-5 models bill reasoning as output, and the first cost estimate missed it entirely.**
+Ten trends on default settings spent 1,101 input tokens and **2,222 output tokens** — 94% of
+the bill was thinking about a nine-way label whose evidence was already in the prompt.
+`reasoning_effort: minimal` cuts it to 176 with identical answers on everything unambiguous.
+That one parameter is the difference between $2.62 a year and about $20. It is set in
+`config.ts` and **should not be removed without re-running the numbers**.
+
+**2. An unfunded OpenAI account answers `429`, exactly like a rate limit.** The body says
+`insufficient_quota` and it never recovers, where a rate limit clears in seconds. Retrying
+it means 120 futile calls a day forever, so it trips a circuit breaker that halts
+categorising until restart. The log says so in words, because as a bare 429 somebody spends
+an afternoon tuning a backoff for what is a billing page.
+
+**3. Colour cannot carry the category, and this was measured across all six themes.** In
+`dmg-green`, `blue` and `hot` are the same hex. In `brutalist-mono`, `warm` *is* the
+background. The floor is three separable fills, not eight — so shape carries the category
+and one token says "this is a badge". The full ΔE table is in the plan.
+
+**4. A word badge does not fit and a glyph barely does.** `ENTERTAINMENT` at 13px is 128px
+of a 264px `TODAY` row and would clip five titles in six. Measured over all 481 stored
+titles: a 16px glyph costs `TODAY` 4.4 points of fit and `NOW` 0.2. Both badge styles
+shipped behind a setting because the render argued for both.
+
+**5. The legend caught a glyph collision on its first render.** `ai` was drawn as the
+conventional four-pointed sparkle, which at 8 × 8 is a cross with four dots — and `health`
+is a cross. Invisible while drawing glyphs one at a time, obvious the moment eleven sit in a
+column. **A legend is a design tool as well as a feature.**
+
+### Known bug, not fixed
+
+**`obituary` is too loose, and it produced a genuinely bad result.** The trend
+`bruce springsteen` was badged `OBT` — *someone has died* — from a headline reading
+*"Bruce Springsteen says wife Patti Scialfa's cancer is in remission"*. Good news, about
+living people.
+
+Two causes, both mine: the gloss says "someone has died — whoever they were and however it
+happened", which is loose enough to catch illness; and `obituary` sits first in the
+precedence order, so any hint of death beats everything else. The fix is to require that
+**the person named in the trend has died**, and to re-check whether it still needs to
+outrank `crime`. A milder case from the same batch: a man flying a helicopter to go
+shopping was badged `crime`.
+
+**This is the one thing in Search Pulse worth fixing before anything else there.** A
+dashboard on a wall saying someone died when they have not is worse than any late badge.
+
+### Still unanswered from the category plan
+
+Questions 3–8 were never formally answered; the build proceeded on the recommendations.
+They are listed in `docs/trend-category-plan.md` and none is blocking. The two most worth
+revisiting are whether `obituary` should exist at all given the bug above, and whether the
+`weather` category sits oddly next to a dashboard whose other page is the weather.
 
 ## The Pi
 
-**It is deployed, on autostart, and collecting continuously** as of 2026-08-04. That last
-part is new and it matters: before autostart it had recorded 16 fetches across 30 hours,
-because **nothing is recorded unless the dashboard is actually on screen** — see Gotchas.
-
-**It is up to date and running attract mode**, confirmed working by the user on 2026-08-04.
-So it also has the trend record, the stored headlines and reported times, and the swipe
-fix — and both schema columns are in its database, added in place by `#migrate()`.
-
-The `CAROUSEL` switch in settings is there too, confirmed on the panel — so the Pi is level
-with `main` as of the end of this session. Nothing to deploy.
-
-Future upgrades are:
+**Deployed and running, on autostart.** The user deploys with:
 
 ```bash
 git pull && npm run build && sudo reboot
 ```
 
-`npm run build` rather than `pi-setup.sh`, because no dependency has changed and the build
-is the only part of setup a code change needs. **`pi-start.sh` never builds**, and will
-happily serve a stale build without saying so — that is the trap on this path, not the
-database.
-
-**Upgrading cannot lose history, and the user has asked about this more than once.** Three
-independent reasons, all verified: `pi-start.sh` never references the database;
-`pi-setup.sh` only deletes it behind `--seed` *and* `--force`, and dies rather than guess;
-and `apps/api/data/` is gitignored so `git pull` cannot touch it. The two schema columns
-added this session arrive through `#migrate()` on first start, in place.
-
-## Where the work stands
-
-| Phase | What | State |
-| --- | --- | --- |
-| 0 | Carousel shell, swipe navigation, placeholder screen | Done |
-| 1 | Live Google Trending Now list | Done |
-| 2 | Tap-to-select, trend details panel | Done |
-| 3 | SQLite history, rank graph, movement labels | Done |
-| — | Ordering fix: SURGING / BIGGEST modes | Done |
-| 3.5 | Full-screen trend card: image + 3 headlines | Done |
-| — | Raspberry Pi deploy scripts | Done |
-| — | `millennium` theme, M1–M8, artwork included | Done |
-| 4 | Daily history view (`TODAY`) | Done — 2026-08-03 |
-| 5 | Reliability and polish | Partly done — see below |
-| — | Trend record dialog, opened from a TODAY row | Done — 2026-08-04 |
-| — | Stored headlines and Google's reported time | Done — 2026-08-04 |
-| — | Attract mode, the self-driving display | Done — 2026-08-04 |
-
-## Phase 4 — the TODAY view
-
-A second list view inside Search Pulse, reached by a visible `NOW` / `TODAY` chip pair.
-`docs/search-pulse-plan.md` has the full write-up; the parts worth knowing up front:
-
-- **It is a calendar day in local time**, midnight to now, not a rolling 24 hours. The
-  user chose that. `startOfLocalDay` in `history.ts` resolves the boundary through `Intl`,
-  reading the offset **twice** — the offset now is not the offset at midnight on a DST
-  changeover day.
-- **Search Pulse gained a fifth band, 44px, and the ordering chips moved into it.** Neither
-  existing strip could hold a chip pair: measured, the region strip had 12px of slack and
-  the title bar 50px, against the ~142px needed. The band was paid for out of the trend
-  list, whose rows went 66px → 57px against 48px of content.
-- **Two figures from the plan's sketch did not survive contact with real data** — peak rank
-  and the volume bar. Both are written up under Gotchas below, because both were the kind
-  of wrong that renders perfectly.
-- **`dayDigest` ranks at read time; no aggregate table was added.** ~1,440 rows a day is
-  nothing for SQLite, and it keeps every figure recomputable from the raw record.
-- `ranksByFetch` is now shared between the rank graph and the day digest, so the
-  tie-sharing rule exists once. Two copies of it would have drifted without failing a
-  build.
-
-## The `millennium` theme
-
-Built 2026-08-03 as an intermediary phase at the user's request, between 3.5 and 4. Its
-own document is **`docs/millennium-theme-plan.md`** and it is thorough — read it before
-touching the theme. The short version, and the parts that reach outside the theme:
-
-- **It is the one thing allowed to break "flat by design" and "original pixel art only."**
-  The user made that call explicitly. It is itself the sixth theme; do not generalise the
-  exception to the app or to a seventh.
-- **It grew the theme system by exactly two things.** A `--line` token in `app.css`, so
-  structural rules can differ from `ink` — this one touches all five flat themes and was
-  verified not to change them. And `styles/millennium.css`, keyed off `[data-theme]`,
-  which reaches into components' private class names by specificity rather than by editing
-  them.
-- **That class coupling is the theme's main hazard.** Renaming `.column` in
-  `ForecastColumn.svelte` drops the gold off one band without failing a build or touching
-  the other themes. It already bit once: `.screen` is used by *both* App.svelte's panel and
-  WeekDashboard's root, so a bare `.screen` rule painted the stone field and inset shadow
-  twice on the 7-day layout for two commits. It is `.device > .screen` now. **Read the
-  markup before writing a selector in that file** — a doubled dark vignette is nearly
-  invisible in a render.
-- **Character art goes in the title band, not behind the page.** The plan originally said
-  page-background and was wrong: behind opaque plaques a figure lands at about 2% visible,
-  and brightening it to compensate puts a face under a 64px temperature.
-- **The painted plaques and frames are `border-image` 9-slices**, which is what makes the
-  source resolution irrelevant. A 9-slice needs a border thick enough to hold the bevel,
-  so it only suits a **fixed-size box** — that is why the ordering chips are still CSS.
-
-### Adding or changing art
-
-**Never copy a file into `apps/web/public/themes/millennium/`.** Art arrives as framed
-gallery tiles at ~2.4 MB each; `scripts/theme-art.mjs` is what turns one into a panel asset
-— crops the painted frame, keys the black backdrop, trims, downsamples. It took the
-supplied set from 34 MB to 7.7 MB. Pass `--keep-frame --no-key` for anything that already
-has an alpha channel or the key will eat its dark field, and `--cell=col,row,cols,rows` to
-take one tile out of a sheet.
-
-Six of the fourteen supplied pieces are wired in; **eight are placed and deliberately
-unused.** That is not an oversight — every band on this panel already carries data, so
-adding one is a decision about what leaves the screen. The inventory, and which is which,
-is in that directory's `README.md`. (Eighteen files for fourteen pieces: the corner sheet
-was cut into four.)
-
-## What is left — all optional, none queued
-
-**Attract mode is done**, `docs/attract-mode-plan.md`. Four full-screen stops, five seconds
-each; a touch stops it, sixty seconds of quiet resumes it, a `CAROUSEL` switch in settings
-turns it on or off, and a two-second hold on the screen title is a hidden shortcut. Three
-things about it are load-bearing and easy to undo by accident:
-
-- **No dialog ever opens by itself.** The tour switches weather layouts through
-  `ScreenStore.show()`, never by opening settings — the user ruled that out explicitly.
-  `show()` deliberately does not persist and `onstop` calls `restore()`, so touring cannot
-  overwrite the layout that was actually chosen.
-- **Input is read from `pointerdown`/`keydown`/`wheel`, never `scroll`.** The tour navigates
-  *by* scrolling, so a scroll listener would read its own first step as a person. Do not
-  replace this with a suppression flag; the flag has to be right at every call site.
-- **The trend card's open flag lives in the `Trends` store**, not in `SearchPulse.svelte`,
-  so the tour can close it. A card left open covers the whole page.
-
-**Phase 5 is partly done.** Built: request timeouts, last-known-good cache,
-duplicate-snapshot protection, schema migration, migration logging, and the swipe
-performance fix. Still open:
-
-- Exponential retry on a failed Google fetch — today it just waits for the next poll
-- **Feed-parsing tests. There are none at all, anywhere in the repo.** This is the largest
-  real gap and the one most likely to matter.
-- `/api/trends/health`
-- Auto-return to the top trend after inactivity — **largely subsumed by attract mode**; do
-  not build it without deciding what is left of it
-- Burn-in protection — **also largely subsumed**, since the panel now moves every five
-  seconds for most of the day. What remains is the idle minute before attract resumes.
-
-**The weather-provider switch is still gated at W0**, `docs/weather-provider-plan.md`.
-Three questions before any code: real billable cost per refresh, whether Google's day/night
-splits can fill the 7-day table's three columns, and demo key versus real key.
-
-**Two small offers the user has not ruled on:** adding the trend card to the attract tour
-(a change to `ATTRACT_TOUR` and nothing else), and storing the feed's image alongside the
-headlines.
-
-## Read these, in this order
-
-1. **`CLAUDE.md`** — guardrails. The ban list, one-phase-at-a-time, the two-page carousel
-   rule, Node 24. These are non-negotiable and were set by the user.
-2. **`docs/search-pulse-plan.md`** — the full plan with a status table. Everywhere reality
-   contradicted the original plan is marked **AMENDED**; read those first, they are the
-   expensive lessons.
-3. **`README.md`** — API contract, layout bands, and the reasoning behind the bar scale,
-   the graph axes, and the two orderings.
-
-Then, only if the work touches them:
-
-4. **`docs/millennium-theme-plan.md`** — the theme, and every placement that was tried and
-   rejected before the one that shipped.
-5. **`docs/weather-provider-plan.md`** — the Open-Meteo → Google switch, still at W0.
-6. **`docs/attract-mode-plan.md`** — the self-driving display, built. Records the three
-   questions the user answered and what the build changed about them.
-
-Per-project memories also load automatically in this directory. They cover Pi deployment,
-git workflow, and two gotchas repeated below.
-
-## The six things that surprised us
-
-Each of these cost real debugging time. They are all written up in the plan doc under
-**AMENDED**, but here is the short version.
-
-**1. The feed is ordered by recency, not popularity.** This is the big one. The RSS export
-lists the 10 most *recently detected* trends, newest first. Feed position is arrival
-order. Verified against the live feed: `published strictly newest-first` true, `volume
-descending` false, largest trend routinely at position six. Consequences: the list offers
-two orderings, and the rank graph plots standing **by volume within each fetch** rather
-than feed position. Graphing feed position made `COOLING` near-inevitable — 17 of 18
-recorded trends only ever moved *down* the feed, because a `pubDate` never changes.
-
-**2. `relatedQueries` is always empty.** The feed has no related-searches field. Its
-`ht:news_item` entries are articles *about* a trend, not searches anyone ran. Phase 2's
-details panel was planned around related queries; **that gap is now filled by Phase 3.5**
-rather than by inventing them — see 2b below.
-
-**2b. There *is* an image and there *are* headlines — verified 2026-08-03.** Checked after
-the user asked whether a trend could show something explaining what it is about:
-
-| Field | State |
-| --- | --- |
-| `ht:picture` | Present on **10/10** items. Fetched one: 200, JPEG, 8.7 KB, 275 × 183 |
-| `ht:picture_source` | Present — names the outlet, e.g. "Reuters" |
-| `ht:news_item_title` | Present, 3 per trend, with source and article URL |
-| `<description>` | **Empty on 10/10** |
-| `ht:news_item_snippet` | **Empty on 30/30** |
-
-So there is no prose about a trend, but the headlines answer "what is this about" well —
-`artificial intelligence news` tells you nothing, its headline about Chinese military
-researchers tells you everything. This is the strongest candidate for filling the hole
-left by `relatedQueries`.
-
-**This became Phase 3.5, and it is built.** A full-screen card inside Search Pulse, reached
-by tapping the details band and left by the back control in its header; the image duotoned
-to the active theme in ~4 lines of CSS; all three headlines quoted with their sources; the
-article shown as outlet and domain in plain text rather than a tappable link, because a tap
-on a kiosk navigates away with no way back. QR remains the deferred answer for reaching an
-article.
-
-**Showing one headline would have been a bug.** Sampled 2026-08-03: four of five trends had
-three headlines about one event, but `artificial intelligence news` returned three
-different stories. Picking the first would have asserted the trend was about the first when
-it was about all three. That is why all three are shown.
-
-**The image treatment is CSS, not canvas.** An earlier version of this spec called for
-palette-posterizing on a canvas; tested against a real feed image on 2026-08-03 and it was
-overkill. Chunky pixels are a separate effect that CSS genuinely cannot do —
-`image-rendering: pixelated` only engages when upscaling, and these images are displayed
-smaller than they arrive — so that needs canvas and is deferred.
-
-**Use a `color`-blend overlay**, not `screen` or `multiply`. All three were rendered side
-by side across all five themes; the plan doc has the CSS and the comparison table. Short
-version: `screen` suits `gba-blue` alone and blows out elsewhere; `multiply` works
-everywhere but goes nearly greyscale on `midnight`, defeating the point; the `color`
-overlay holds a visible theme hue in all five *and* keeps the photo legible. The user
-picked it from the rendered comparison.
-
-**The overlay token is `sky`, not `ink` — and the first spec had this wrong.** Written with
-`var(--c-ink)` the treatment renders flat grey on `midnight`, which is the very failure
-`multiply` was rejected for. The `color` blend hands back the *overlay's* chroma spread
-(`max − min` of its RGB), and midnight's ink `#eaf2ff` has a spread of 21/255, so there is
-no hue in it to give. Measured over a real feed image, `sky` is the only token in the mid
-range in all five palettes; the numbers are in the plan doc. The blend mode was never the
-problem.
-
-**Test any image treatment against `midnight`.** Its `ink` is near-white while every other
-theme's is dark, so it inverts assumptions the other four share — it broke both rejected
-options *and* the first choice of overlay token. Do not judge a treatment from `gba-blue`.
-
-Chunky pixels are a separate effect that CSS genuinely cannot do — `image-rendering:
-pixelated` only engages when upscaling, and these images are displayed smaller than they
-arrive — so that needs canvas and is deferred. The plan's acceptance criterion said the
-image should "read as pixel art", which contradicted that; it has been corrected to the
-duotone and the theme recolour, which is what shipped.
-
-Settled: images load **directly from Google in the browser**. Phase 1's "Google is
-contacted only by the backend" was written to protect the rate-limited RSS endpoint, and
-these are `gstatic` CDN thumbnails cached a year, so the reason does not carry over. A
-proxy route with a host allowlist is ~30 lines if that property is ever wanted absolutely.
-The parser drops any URL that is not http(s) before it can reach an `src`.
-
-Headlines may be shown **quoted with attribution only** — never summarised, interpreted, or
-presented as related searches.
-
-**3. There is no relevance ordering available.** Complete element list: `title`,
-`ht:approx_traffic`, `pubDate`, `link`, `description`, `ht:picture`, `ht:picture_source`,
-`ht:news_item*`. No score, no rank. Google's relevance ranking is not published. Do not
-invent a composite and call it relevance.
-
-**4. The feed covers only ~2.5 hours.** Ten slots, a new trend every 10–20 minutes, so a
-search is visible for a couple of hours and then drops out. `?hours=24`, `?sort=relevance`
-and `?status=active` are all ignored — byte-identical responses. The legacy
-`trendingsearches/daily/rss` is retired (404).
-
-**5. Volumes look tiny next to `trends.google.com`.** That page shows accumulated totals
-for trends up to a day old; ours shows trends in their first hours. Both are real. This
-bounds Phase 4 — see below.
-
-## What TODAY claims, and what it must never claim
-
-Our record holds every trend that *started* in a window, with the volume it had **while
-young** — not accumulated totals. A trend that reaches 200K+ over 18 hours is captured
-during its first couple of hours at maybe 5K+, then drops out of the feed and is never
-seen again. So `TODAY` answers *"what caught fire today"*, not *"what were the day's
-biggest searches"*. Those sound the same and are not.
-
-The screen says `CAUGHT FIRE · BY PEAK VOLUME` for exactly this reason, and every volume on
-it is qualified `PEAK`. **Do not soften that wording into "biggest" or "top searches"**, and
-do not present the view as matching Google's 24-hour page. The user understands the
-distinction; it was discussed at length before the view was built.
-
-`TODAY` is also where the other five trends per fetch finally appear: it shows ten, in two
-columns. The live list still shows five, because its hidden rows are by definition the
-least interesting under whichever ordering is active — that decision stands.
-
-**The tiebreaks are weaker than the primary key, and it is not visible in the code.**
-Fetches and minutes-on-feed measure how long *Google listed* a trend. The feed evicts on
-arrival order, ten slots newest-first, so a churny hour flushes everything in it — observed:
-`appropriations bill` was pushed out at `10000+` by a feed topping out at `5000+`. Peak
-volume is the only key immune to this. Full write-up under **AMENDED** in the plan; the
-short version is that `ON FEED` is the honest label and must not become `ACTIVE`, `LASTED`
-or `HELD`.
-
-## Decisions already made — do not silently revisit
-
-| Decision | Why |
-| --- | --- |
-| Keep five rows on the live list | Glance display; hidden rows are the least relevant |
-| No third `HOTTEST` ordering mode | Offered, not taken. Two real orderings is enough |
-| Rank graph plots volume rank, not feed position | Feed position only ever goes down |
-| Axis spans the history that exists, capped at 24h | A fixed axis made most graphs unreadable |
-| Bar is log-scaled across the list's own range | Both linear and fixed-origin log were useless |
-| `ACTIVE` label dropped | True of every row always; it is noise |
-| `active` column dropped from the schema | Would be `1` on every row ever written |
-| Carousel stays two pages | User's rule. New views go *inside* Search Pulse |
-| Trend card shows all three headlines | One headline misrepresents broad queries |
-| Card image tinted by a `color`-blend overlay | Only option holding theme hue on all five themes |
-| The overlay's colour is `sky` | Measured: the only token with chroma in all five palettes |
-| Article shown as outlet · domain, not a link | A tap on a kiosk navigates away with no way back |
-| Card is entered from the details band | The band already describes the trend; biggest target |
-| ~~Headlines not stored in SQLite~~ **reversed 2026-08-04** | A day view has to say what its trends were *about*, and the feed drops them |
-| The image is still not stored | Only headlines were asked for; a CDN URL that may expire is a separate call |
-| Headlines stored only when they change | Measured: every-row would be ~79 MB/90d against a ~26 MB database |
-| Card image fetched by the browser, not proxied | The rule protected the rate-limited feed, not a CDN |
-| `millennium` may break flat design; nothing else may | User's explicit call, scoped to that one theme |
-| The three layouts do not change for a theme | The reference merges the two weather screens; we kept them apart |
-| Theme-specific CSS lives in one `[data-theme]` sheet | Beats scattering rules through twenty components |
-| Character art sits in the title band | The only slack on any layout; behind the page it is 2% visible |
-| Eight of fourteen art pieces stay unused | Each would have to displace a reading to appear |
-| Art is committed, not gitignored | User's call, told it was third-party art in a public repo |
-| `TODAY` is a local calendar day, not rolling 24h | User's call: it is what the name claims, and it is reproducible |
-| `NOW`/`TODAY` is a visible chip pair, not a swipe | A gesture nobody can see is a view nobody knows exists |
-| Search Pulse gained a 44px views band | Measured: no existing strip had room for a chip pair |
-| `TODAY` shows ten rows in two columns | The room exists here; scrolling is useless on a wall display |
-| Peak rank ranks but is not displayed | All ten shown rows reach #1; it would read as noise |
-| `TODAY`'s strip plots time, not volume | Two buckets across ten rows made a volume bar misleading |
-| No daily aggregate table | Read-time ranking keeps every figure recomputable from raw rows |
-| The open view is not remembered across restarts | `NOW` is the resting state, as the weather page is for the carousel |
-
-## Gotchas
-
-**The dev server serves stale code.** Three times now, and every time it presented as a
-code bug. Vite served a module missing a function the file plainly had; `tsx watch`
-stopped restarting the API entirely and a new route 404'd; and a CSS rule that had worked
-minutes earlier simply stopped applying. Not inotify exhaustion — 9 of 128 instances in
-use.
-
-**A `git checkout` triggers it too.** That third case was `git checkout main` before a
-fast-forward merge: it briefly reverts a file to main's version and then restores it, and
-the watcher latched the intermediate. So it is not only rapid rewrites — any fast
-swap-and-restore of a watched file can do it, and branch switching does that by design.
-
-**Comparing served bytes to disk is not a sufficient check.** In the CSS case `curl` came
-back byte-identical to disk (19,836 both) with every rule present, while the browser had
-parsed only the first of four. Check what the *browser* ended up with:
-
-```bash
-curl -s http://localhost:5173/src/lib/trend-view.ts | grep -c someNewFunction
-ps --ppid <tsx-watch-pid> -o pid,etime          # is the API child stale?
-```
-
-```js
-// in the page: does the rule exist, and did it apply?
-getComputedStyle(el).position;
-[...document.styleSheets].flatMap((s) => [...s.cssRules]).filter((r) => /* … */);
-```
-
-`touch` on the file revives Vite. `tsx watch` needed a full restart. Avoid rewriting one
-file several times in quick succession — batch edits into a single write — and `touch`
-after any branch switch before trusting what you see.
-
-**Nothing is recorded unless the dashboard is on screen.** The backend has no timer; it
-fetches Google on a cache miss, and only the dashboard's 60-second poll ever misses that
-cache. So `pi-start.sh` running with no browser records nothing, and a Pi switched off
-records nothing. Measured on the real Pi 2026-08-04: **30 hours of span, 16 fetches** — two
-and a half hours of actual collecting. Continuous is ~6 fetches an hour. `pi-setup.sh
---autostart` is the fix, and it must be run *before* `pi-start.sh`, which blocks on the
-browser until it closes.
-
-**The API may not be running.** The previous session left it running as a background
-process, which dies with the session. Run `npm run dev` from the repo root; it starts both
-the Fastify API on 3000 and Vite on 5173.
-
-**Node 24 is required**, not 22. `node:sqlite` is behind `--experimental-sqlite` on 22.
-This raised the Pi's deploy floor — see CLAUDE.md.
-
-**Verify at exactly 720 × 720, and check all three layouts** — `WEATHER NOW`,
-`7-DAY FORECAST`, and Search Pulse — plus the settings dialog and the trend card, which
-are separate surfaces with their own framing. Drive Playwright by accessible name, never
-by pixel coordinate. Never pass `filename` to `browser_take_screenshot`.
-
-**Anything touching a shared token means checking a flat theme too.** `millennium.css` is
-keyed off `[data-theme]` and cannot reach the others, but `--line`, `--font-display` and
-everything else in `app.css` reaches everything. `midnight` is the one to check: its `ink`
-is near-white where every other theme's is dark, so it breaks assumptions the other four
-share.
-
-**Measure collisions, do not eye them.** Every overlay placement in the theme was settled
-by reading back `getBoundingClientRect()` for the element and the thing it might cover.
-Guessing produced four wrong answers in a row; measuring produced the right one first
-time. Phase 4 repeated the lesson twice in one sitting: the `TODAY` axis caption looked
-fine in a render and was measured overlapping the page indicator by 64px — the dots are
-drawn *over* it, so the collision is invisible. And a bar that looked uniform in a
-screenshot measured correctly at 100% and 12%, so the eye was wrong in both directions.
-
-**Slack in the title bar is theme-dependent.** Measuring it under `millennium` gave 133px;
-the same bar at a flat theme's title size has 50px, because the theme restyles `h1.title`
-to another face and size. Measure a flat theme — it is the wider case — or a control will
-be sized to fit a bar it does not fit.
-
-**A figure that is in the ranking need not be on the screen.** `TODAY` ranks partly on peak
-rank, and displaying it would have printed `PEAK #1` on all ten rows: 20% of the day's 160
-trends topped a fetch, but ranking by peak volume selects almost exactly the ones that did.
-The same measurement is what killed the volume bar on that view — the ten rows held two
-distinct buckets, so every bar drew full or at the 12% floor. **Before putting a computed
-field on a row, check its spread across the rows that will actually be shown**, not across
-the whole table.
-
-**Stubbing `window.fetch` from `browser_evaluate` needs `.bind(window)`.** An unbound call
-throws "Illegal invocation", which takes down every other request and drops the panel into
-its error screen — it reads exactly like a bug in the change you are testing.
-
-**`tsx watch` went stale twice more this session, both times on an API change**, and both
-times it looked like the change had not worked — a migration that appeared not to run, and
-an endpoint serving old data. `touch apps/api/src/*.ts` and wait a few seconds. This is now
-five occurrences; treat "my API change did nothing" as a stale watcher until proven
-otherwise.
-
-**Measure the thing, not the proxy.** Chasing the millennium swipe lag with `requestAnimationFrame`
-timing produced 16.6ms on both themes, because rAF is vsync-locked and paint happens after
-it — the measurement could not see the cost at all. What did work was counting the expensive
-paint declarations per theme (millennium: 14 box-shadows, 9 `border-image`s, 15 gradients,
-2 filters; flat themes: zero of any) and fixing the mechanism. **The lag itself was never
-reproduced on this laptop, only on the Pi.** Say so when that happens rather than implying a
-fix was verified.
-
-**A four-stop loop makes a two-sample test lie.** Testing "is it still touring?" by comparing
-the screen before and five seconds later reported *false* — two advances around a four-stop
-tour can land back where it started. Sample the whole loop and count distinct states.
-
-**Do not deliver screenshots with `SendUserFile`.** They arrive on the user's phone as
-broken cards. Let the `browser_take_screenshot` tool result be the image and say in the
-reply which capture shows what.
+**`pi-setup.sh` is only needed to set the API key**, which it now prompts for. `.env` is
+gitignored and cannot arrive by `git pull` — that is deliberate, and it is why the prompt
+exists. The user writes the key by hand or lets setup ask.
+
+**Logs now exist.** Under `--autostart` there was no terminal, so everything the servers
+said went nowhere. `pi-start.sh` tees to `pipulse.log` at the repo root, keeping one
+previous run as `pipulse.log.1`.
+
+That change nearly reintroduced a known failure and the shape of it is worth remembering:
+piping to `tee` makes `$!` the *tee* process, and `kill_tree` walks children — of tee, which
+has none. The whole server tree would have been orphaned on exit, which is the
+orphaned-vite-holding-5173 failure that file already warns about. Process substitution
+(`> >(tee "$LOG")`) keeps `$!` on npm.
 
 ## The data
 
 SQLite at `apps/api/data/trends.db`, gitignored, WAL mode. **The laptop's** database as of
-this handoff: 1,800 rows, 474 distinct trends, 180 fetches, spanning 2026-08-03 04:43Z →
-2026-08-04 18:39Z. Of those rows 670 carry `published_at` and 238 carry `news`, because both
-columns arrived mid-session and older rows are never back-filled.
+this handoff: 2,290 snapshot rows, 617 distinct trends, 229 fetches, spanning
+2026-08-03 → 2026-08-05. 48 trends carry a category, of which **25 are `sport`** — just over
+half, which is what the plan predicted and the reason the category set is not smaller.
 
-**The Pi's is the one that matters now.** When it was last read it held 160 rows over 30
-hours — thin and gappy, because it only collected while the dashboard was on screen. It has
-been autostarting since, so it should now be accumulating ~144 fetches a day and its record
-should look nothing like that. **Read it before trusting any figure here:**
-`node scripts/history-db.mjs stats` on the Pi.
+Two tables now:
 
-The table is **`trend_snapshots`**, one row per trend per fetch: `id`, `trend_key`, `title`,
-`approximate_volume`, `rank` (feed position), `related_queries`, `first_seen_at`,
-`observed_at`, `published_at`, `news`. A unique index on `(trend_key, observed_at)` makes a
-repeated write idempotent.
+- **`trend_snapshots`** — one row per trend per fetch. Unchanged this session.
+- **`trend_categories`** — one row per trend. `category` NULL means *tried and not settled*
+  and is retried up to three times; a stored value, **including `uncategorised`**, means the
+  model answered and is never retried. That distinction is what stops a badge flickering.
 
-**There is a migration step, and it is the pattern to follow.** `CREATE TABLE IF NOT EXISTS`
-does nothing to a table that already exists, so a new column never reaches a Pi that has
-been collecting for weeks. `#migrate()` in `history.ts` reads `PRAGMA table_info`, adds what
-is missing, returns what it added, and throws `SchemaMigrationError` on failure so the log
-can separate "the schema would not upgrade" from "the disk will not take a write". `ADD
-COLUMN` is metadata-only in SQLite, so it is instant at any table size. Add to the
-`additions` list rather than editing `SCHEMA` alone. Verified against a database built with
-the original schema: first open reported both columns, second reported none, existing rows
-survived.
+A new table needs no `#migrate()` entry: unlike `ADD COLUMN`, `CREATE TABLE IF NOT EXISTS`
+does reach a database that already exists. `#migrate()`'s `additions` list is still
+hardcoded to `trend_snapshots`, so it will need a table parameter the day
+`trend_categories` gains a column.
 
-**`published_at` is Google's detection time; `first_seen_at` is ours.** Measured against the
-live feed, our first sighting runs **13–23 minutes late** in steady state and hours late
-after any gap. Google's `pubDate` lands on exact ten-minute boundaries — it buckets its own
-detection.
+Endpoints: `/api/health`, `/api/weather`, `/api/trends/now` (accepts `?refresh=1`),
+`/api/trends/history?key=`, `/api/trends/today`.
 
-**`news` is written only when it changes.** A trend sits in three to six fetches and its
-headlines rarely move, so storing them every time measured at ~79 MB over 90 days against a
-database otherwise projected at ~26 MB. Two consequences: reads must take the **most recent
-non-null** row, and that lookup has to reach **outside** the day window, because a trend that
-started last night carries its headlines on a yesterday row. Observed working: of six trends
-present in two consecutive fetches, five were skipped as unchanged and one was rewritten
-because a CBS headline had genuinely been replaced by an NBC one.
+## Read these, in this order
 
-**`rank` in the table is feed position.** The volume ranking the graph and the day digest use
-is computed at read time by `ranksByFetch`, which both share so the tie rule exists once.
+1. **`CLAUDE.md`** — the standing rules, including that there is no banned-technology list
+   and that new dependencies are a conversation rather than a lookup.
+2. **`docs/trend-category-plan.md`** — the most recent work, and the closest thing to a
+   worked example of how this project plans a feature: measure first, record what the
+   measurement killed, ask the user the questions that actually change the design.
+3. **`README.md`** — API contract, layout bands, the reasoning behind the bar scale and the
+   two orderings.
 
-Endpoints: `/api/health`, `/api/weather`, `/api/trends/now`, `/api/trends/history?key=`,
-`/api/trends/today`.
+Then, only if the work touches them: `docs/search-pulse-plan.md`,
+`docs/attract-mode-plan.md`, `docs/millennium-theme-plan.md`,
+`docs/weather-provider-plan.md` (still gated at W0, three questions unanswered).
+
+## Gotchas
+
+**Measure, do not eyeball.** This is the house rule and it earned its place again this
+session: the word badge was killed by measuring 481 real titles, the colour scheme by
+computing ΔE across six palettes, and the row space by `getBoundingClientRect` rather than a
+render. Guessing has produced a wrong answer nearly every time it has been tried here.
+
+**Verify at exactly 720 × 720, across all three layouts** — `WEATHER NOW`, `7-DAY FORECAST`
+and Search Pulse — plus the dialogs, which are separate surfaces. Drive Playwright by
+accessible name, never by pixel coordinate. Never pass `filename` to
+`browser_take_screenshot`.
+
+**Anything touching a shared token means checking a flat theme too.** `millennium.css` is
+keyed off `[data-theme]` and cannot reach the others, but `app.css` reaches everything.
+`midnight` is the one to check: its `ink` is near-white where every other theme's is dark.
+
+**Match an existing dialog's class skeleton when adding one.** `millennium.css` styles
+dialogs by reaching into `.panel`, `.head`, `.heading`, `.close` and `.body` from outside. A
+dialog that invents its own structure arrives unstyled in that theme and nowhere else —
+invisible until somebody switches themes. `CategoryLegend.svelte` got the gold frame and
+Cinzel heading for free by matching.
+
+**The dev server serves stale code.** Five occurrences and counting. Vite has served a
+module missing a function the file plainly had; `tsx watch` has stopped restarting entirely.
+A `git checkout` triggers it too. `touch` the file, and treat "my change did nothing" as a
+stale watcher until proven otherwise.
+
+**Check for a second API process before believing a bug.** Cost real time this session: a
+stale `tsx watch` still held port 3000, the new one died with `EADDRINUSE`, and the old one
+served a **warm cache** — so a fix looked like it had failed when it had never run.
+`ss -lptn 'sport = :3000'` names the holder.
+
+**Nothing is recorded unless the dashboard is on screen.** The backend has no timer; it
+fetches Google on a cache miss, and only the dashboard's poll ever misses that cache.
+
+**Node 24 is required**, not 22. `node:sqlite` is behind a flag on 22.
+
+**Do not deliver screenshots with `SendUserFile`.** They arrive on the user's phone as
+broken cards. Let the `browser_take_screenshot` tool result be the image.
 
 ## How the user works
 
-Ask before changing direction on their plan; they will say when they want something built.
-They read carefully and push back on hand-waving — when something is uncertain, say which
-part is verified and which is inferred. Several times the right answer was to test against
-the live feed or the database rather than reason about it, and that was always what they
-wanted. Explanations should be plain; they asked more than once for simpler language and
-were right to.
+They read carefully and push back on hand-waving — say which part is verified and which is
+inferred, every time. When something is uncertain the right move is almost always to test it
+against the live feed, the database or the running app rather than reason about it, and that
+has been what they wanted every time.
+
+They ask for plain language and have asked more than once; they are right to. Explain
+without jargon and without hedging.
+
+They give direction and expect it followed, but they also expect to be told the cost. Twice
+this session they asked for something I partly declined — an unlimited refresh button (given
+a 30-second floor, because Google rate-limits by IP) and a floating toast (given an in-strip
+message instead, because the layout has no spare room). Both times, stating the reason
+plainly was accepted. **Do the work, name what you changed and why, and let them overrule
+you.**
 
 They are often on a phone, so keep replies scannable.
