@@ -202,36 +202,18 @@ fi
 
 cd "$ROOT"
 
-step "Installing dependencies"
-note "npm ci — this includes dev dependencies on purpose, because the built"
-note "front end is served by 'vite preview' and Vite is one of them"
-npm ci
-good "dependencies installed"
-
-step "Building both workspaces"
-npm run build
-[ -f "$API_DIR/dist/server.js" ] || die "the API build produced no dist/server.js"
-[ -f "$ROOT/apps/web/dist/index.html" ] || die "the web build produced no dist/index.html"
-good "API and web built"
-
-# --- SQLite ---------------------------------------------------------------
-
-step "Checking SQLite"
-note "opening a throwaway database in $DATA_DIR and reading a row back"
-node "$ROOT/scripts/history-db.mjs" check "$DATA_DIR"
-good "SQLite is working"
-
-# --- Trend category API key ----------------------------------------------
+# --- Keys, before anything is built ---------------------------------------
 #
-# The one secret this project has, and the one thing a git pull cannot deliver:
-# .env is gitignored on purpose, so it is written here, once, and then survives
-# every upgrade for the same reason apps/api/data/ does.
+# This runs *before* the build, and the order is load-bearing.
 #
-# Skipping is a supported answer, not a failure. With no key the dashboard runs
-# exactly as it always has — the categoriser is never constructed, nothing is
-# called and no badges are drawn. That is why this asks rather than dies.
-
-step "Checking the trend category API key"
+# VITE_MAPTILER_KEY is not read at runtime. Vite substitutes it into the
+# JavaScript during `npm run build`, so a bundle built before the key exists
+# carries an empty tile URL forever — the map reports "NO MAP KEY SET" no
+# matter what .env says afterwards. Seeding after the build is what caused
+# exactly that on 2026-08-05.
+#
+# The OpenAI key below has no such constraint: the API reads it from the
+# environment at startup. Only the VITE_ prefixed one is compiled in.
 
 ENV_FILE="$ROOT/.env"
 
@@ -243,56 +225,7 @@ env_file_value() {
     tail -n 1 | sed 's/[[:space:]]*$//'
 }
 
-# `[ -r /dev/tty ]` is not the test: the node exists and passes -r even with no
-# controlling terminal, and the open then fails. Actually opening it is the only
-# honest check, and it has to happen in a subshell so a failure is a return code
-# rather than the end of the script.
-tty_readable() { ( : </dev/tty ) 2>/dev/null; }
-
-if [ -n "$(env_file_value OPENAI_API_KEY || true)" ]; then
-  good "OPENAI_API_KEY is already set in .env — leaving it alone"
-elif ! tty_readable; then
-  note "no terminal to ask on, so the key was not set"
-  note "add it later with: echo 'OPENAI_API_KEY=sk-...' >> .env"
-else
-  note "categorising trends needs an OpenAI key. Without one the dashboard runs"
-  note "normally and simply shows no category badges — this is safe to skip."
-  note "it is stored only in .env, which is gitignored and never committed."
-  printf '    paste a key, or press enter to skip: '
-
-  # -s so a key does not stay on screen; a Pi is usually a screen in a room.
-  # || true because a read that hits EOF must not take the whole script down.
-  API_KEY=""
-  read -rs API_KEY </dev/tty || true
-  printf '\n'
-
-  if [ -z "$API_KEY" ]; then
-    note "skipped — no key set, no badges, everything else unaffected"
-    note "add one later with: echo 'OPENAI_API_KEY=sk-...' >> .env"
-  else
-    case "$API_KEY" in
-      sk-*) ;;
-      *) note "warning: that does not start with 'sk-'. Storing it anyway." ;;
-    esac
-
-    # Rewriting rather than appending, so running this twice cannot leave two
-    # assignments in the file. grep rather than sed: a key is arbitrary text and
-    # would need escaping in a substitution, which is a bug waiting to happen.
-    if [ -f "$ENV_FILE" ]; then
-      grep -v '^[[:space:]]*OPENAI_API_KEY[[:space:]]*=' "$ENV_FILE" > "$ENV_FILE.tmp" || true
-      mv "$ENV_FILE.tmp" "$ENV_FILE"
-    fi
-    printf 'OPENAI_API_KEY=%s\n' "$API_KEY" >> "$ENV_FILE"
-    chmod 600 "$ENV_FILE"
-    unset API_KEY
-
-    good "key written to .env (readable only by you)"
-  fi
-fi
-
 # --- Events map keys -------------------------------------------------------
-#
-# ############################################################################
 # The events map needs a SerpApi key and a MapTiler key, and a Pi with no
 # keyboard cannot have them typed in. `.env` is gitignored and cannot arrive by
 # `git pull`, so they come from a **keys file** instead: an untracked file
@@ -361,6 +294,84 @@ else
   seed_env VITE_MAPTILER_KEY "$MAPTILER_SEED"
 
   unset SERPAPI_SEED MAPTILER_SEED
+fi
+
+step "Installing dependencies"
+note "npm ci — this includes dev dependencies on purpose, because the built"
+note "front end is served by 'vite preview' and Vite is one of them"
+npm ci
+good "dependencies installed"
+
+step "Building both workspaces"
+npm run build
+[ -f "$API_DIR/dist/server.js" ] || die "the API build produced no dist/server.js"
+[ -f "$ROOT/apps/web/dist/index.html" ] || die "the web build produced no dist/index.html"
+good "API and web built"
+
+# --- SQLite ---------------------------------------------------------------
+
+step "Checking SQLite"
+note "opening a throwaway database in $DATA_DIR and reading a row back"
+node "$ROOT/scripts/history-db.mjs" check "$DATA_DIR"
+good "SQLite is working"
+
+# --- Trend category API key ----------------------------------------------
+#
+# The one secret this project has, and the one thing a git pull cannot deliver:
+# .env is gitignored on purpose, so it is written here, once, and then survives
+# every upgrade for the same reason apps/api/data/ does.
+#
+# Skipping is a supported answer, not a failure. With no key the dashboard runs
+# exactly as it always has — the categoriser is never constructed, nothing is
+# called and no badges are drawn. That is why this asks rather than dies.
+
+step "Checking the trend category API key"
+
+# `[ -r /dev/tty ]` is not the test: the node exists and passes -r even with no
+# controlling terminal, and the open then fails. Actually opening it is the only
+# honest check, and it has to happen in a subshell so a failure is a return code
+# rather than the end of the script.
+tty_readable() { ( : </dev/tty ) 2>/dev/null; }
+
+if [ -n "$(env_file_value OPENAI_API_KEY || true)" ]; then
+  good "OPENAI_API_KEY is already set in .env — leaving it alone"
+elif ! tty_readable; then
+  note "no terminal to ask on, so the key was not set"
+  note "add it later with: echo 'OPENAI_API_KEY=sk-...' >> .env"
+else
+  note "categorising trends needs an OpenAI key. Without one the dashboard runs"
+  note "normally and simply shows no category badges — this is safe to skip."
+  note "it is stored only in .env, which is gitignored and never committed."
+  printf '    paste a key, or press enter to skip: '
+
+  # -s so a key does not stay on screen; a Pi is usually a screen in a room.
+  # || true because a read that hits EOF must not take the whole script down.
+  API_KEY=""
+  read -rs API_KEY </dev/tty || true
+  printf '\n'
+
+  if [ -z "$API_KEY" ]; then
+    note "skipped — no key set, no badges, everything else unaffected"
+    note "add one later with: echo 'OPENAI_API_KEY=sk-...' >> .env"
+  else
+    case "$API_KEY" in
+      sk-*) ;;
+      *) note "warning: that does not start with 'sk-'. Storing it anyway." ;;
+    esac
+
+    # Rewriting rather than appending, so running this twice cannot leave two
+    # assignments in the file. grep rather than sed: a key is arbitrary text and
+    # would need escaping in a substitution, which is a bug waiting to happen.
+    if [ -f "$ENV_FILE" ]; then
+      grep -v '^[[:space:]]*OPENAI_API_KEY[[:space:]]*=' "$ENV_FILE" > "$ENV_FILE.tmp" || true
+      mv "$ENV_FILE.tmp" "$ENV_FILE"
+    fi
+    printf 'OPENAI_API_KEY=%s\n' "$API_KEY" >> "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+    unset API_KEY
+
+    good "key written to .env (readable only by you)"
+  fi
 fi
 
 # --- Optional history import ---------------------------------------------
