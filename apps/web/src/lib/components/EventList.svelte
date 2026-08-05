@@ -1,6 +1,7 @@
 <script lang="ts">
   import { EVENT_SORTS, type EventSort } from '../events.svelte';
   import type { LocalEvent } from '../types';
+  import EventThumb from './EventThumb.svelte';
 
   interface Props {
     events: readonly LocalEvent[];
@@ -118,12 +119,13 @@
                 />
               {:else}
                 <!--
-                  The fallback is not decoration. Most events will have no
-                  usable thumbnail — the field is optional upstream and the
-                  hosts can refuse a hotlink — so this is the ordinary case,
-                  drawn in the panel's own grammar rather than left empty.
+                  Not a fallback so much as the ordinary case: `thumbnail` is
+                  optional upstream and most listings carry none. Drawn in the
+                  panel's own palette so a page of them still looks like this
+                  dashboard, and flat enough that it cannot be read as a photo
+                  of the event.
                 -->
-                <span class="no-thumb" aria-hidden="true"></span>
+                <EventThumb seed={event.id} />
               {/if}
             </span>
 
@@ -261,31 +263,6 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-  }
-
-  /*
-   * A flat diagonal cross, in the same weight as every other rule on the panel.
-   * Reads as "no picture" without borrowing an icon from another design.
-   */
-  .no-thumb {
-    display: block;
-    width: 100%;
-    height: 100%;
-    background:
-      linear-gradient(
-          to bottom right,
-          transparent calc(50% - 1px),
-          var(--c-sky) calc(50% - 1px),
-          var(--c-sky) calc(50% + 1px),
-          transparent calc(50% + 1px)
-        ),
-      linear-gradient(
-        to bottom left,
-        transparent calc(50% - 1px),
-        var(--c-sky) calc(50% - 1px),
-        var(--c-sky) calc(50% + 1px),
-        transparent calc(50% + 1px)
-      );
   }
 
   .text {
