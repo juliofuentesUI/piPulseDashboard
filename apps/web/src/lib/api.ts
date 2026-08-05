@@ -1,5 +1,7 @@
 import type {
   DashboardFailure,
+  EventsSnapshot,
+  LocalEvent,
   ForecastPeriod,
   ForecastPoint,
   TrendDay,
@@ -379,3 +381,135 @@ function isTrendHistory(value: unknown): value is TrendHistory {
 }
 
 const MOVEMENTS: readonly TrendMovement[] = ['rising', 'cooling', 'steady'];
+
+// --- Events map -----------------------------------------------------------
+
+/** A fetch failure already translated into something the screen can show. */
+export class EventsRequestError extends Error {
+  readonly failure: DashboardFailure;
+
+  constructor(failure: DashboardFailure, options?: { cause?: unknown }) {
+    super(failure.message, options);
+    this.name = 'EventsRequestError';
+    this.failure = failure;
+  }
+}
+
+/**
+ * Nearby events, already normalised, deduplicated, geocoded and distance-cut by
+ * the backend.
+ *
+ * The page never learns which provider produced these beyond
+ * `snapshot.source` — and it needs that only so it can say when the data is
+ * fabricated.
+ */
+export async function requestEvents(signal: AbortSignal): Promise<EventsSnapshot> {
+  if (!navigator.onLine) {
+    throw new EventsRequestError({ kind: 'offline', message: 'NO NETWORK' });
+  }
+
+  let response: Response;
+  try {
+    response = await fetch('/api/events', {
+      signal,
+      headers: { accept: 'application/json' },
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new EventsRequestError(
+      { kind: 'network', message: 'CANNOT REACH API' },
+      { cause: error },
+    );
+  }
+
+  if (!response.ok) {
+    if (response.status === 502 || response.status === 504) {
+      throw new EventsRequestError({ kind: 'network', message: 'CANNOT REACH API' });
+    }
+    throw new EventsRequestError({
+      kind: 'server',
+      message: response.status === 503 ? 'EVENTS SOURCE DOWN' : `API ERROR ${response.status}`,
+    });
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    throw new EventsRequestError(
+      { kind: 'malformed', message: 'BAD RESPONSE' },
+      { cause: error },
+    );
+  }
+
+  if (!isEventsSnapshot(payload)) {
+    throw new EventsRequestError({ kind: 'malformed', message: 'BAD RESPONSE' });
+  }
+  return payload;
+}
+
+/*
+ * Hand-rolled, like every other validator here. An empty `events` array is
+ * valid and means "nothing is on" — which since 2026-08-04 is also what a
+ * working SerpApi call looks like, so it must never read as a malformed
+ * response.
+ */
+function isEventsSnapshot(value: unknown): value is EventsSnapshot {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v['updatedAt'] === 'string' &&
+    (v['source'] === 'mock' || v['source'] === 'serpapi') &&
+    typeof v['radiusMiles'] === 'number' &&
+    isEventCenter(v['center']) &&
+    isEventCounts(v['counts']) &&
+    Array.isArray(v['events']) &&
+    v['events'].every(isLocalEvent)
+  );
+}
+
+function isEventCenter(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v['name'] === 'string' &&
+    typeof v['latitude'] === 'number' &&
+    typeof v['longitude'] === 'number'
+  );
+}
+
+function isEventCounts(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v['total'] === 'number' &&
+    typeof v['pinned'] === 'number' &&
+    typeof v['unpinned'] === 'number'
+  );
+}
+
+function isLocalEvent(value: unknown): value is LocalEvent {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v['id'] === 'string' &&
+    typeof v['title'] === 'string' &&
+    // `when` is the honest field and is always present, even when the date
+    // could not be parsed into an instant.
+    typeof v['when'] === 'string' &&
+    Array.isArray(v['links']) &&
+    Array.isArray(v['queries']) &&
+    isOptionalString(v['startsAt']) &&
+    isOptionalString(v['venue']) &&
+    isOptionalString(v['address']) &&
+    isEventCoordinates(v['coordinates'])
+  );
+}
+
+/** Absent is valid and means the event is listed but not pinned. */
+function isEventCoordinates(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v['latitude'] === 'number' && typeof v['longitude'] === 'number';
+}

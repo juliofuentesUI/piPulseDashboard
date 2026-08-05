@@ -102,6 +102,25 @@ be built. A third page is a real design change with real cost — the page indic
 swipe gesture and attract mode's tour all assume two — so cost it out before adding one,
 but it is no longer forbidden.
 
+### Events map
+
+A third page — nearby events as pins on a map — is planned in
+[docs/events-map-plan.md](docs/events-map-plan.md). **It is blocked, and the blocker is not
+ours:** SerpApi's Google Events engine has returned zero results for every query since
+2026-08-04 ([serpapi/public-roadmap#4117](https://github.com/serpapi/public-roadmap/issues/4117)).
+Verified on 2026-08-05 by reading the raw HTML Google served SerpApi, which says
+*"Can't find events that match."* SerpApi's status page claims the engine is healthy; it is
+wrong, so probe the engine rather than trusting the page.
+
+Two things from that plan worth knowing before touching it: **empty SerpApi responses bill
+exactly like full ones**, which is why the budget guard has to count results and not just
+calls; and **MapTiler counts Leaflet raster tiles as requests, not map sessions**, so the
+100k-requests limit is the one that matters and attract mode touring past the map costs
+nothing.
+
+Nothing gets built until Phase 0 in that document passes. Phase 0b — the tile-versus-pixel-art
+render — needs no SerpApi and can be done while waiting.
+
 ## Verifying UI changes
 
 The layout is authored at a fixed 720 × 720 and never reflows, so reading the CSS does

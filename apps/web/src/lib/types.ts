@@ -520,3 +520,73 @@ export interface TrendHistoryView {
   readonly observed: string;
   readonly movement: TrendMovement;
 }
+
+// --- Events map -----------------------------------------------------------
+
+/**
+ * Mirrors `LocalEvent` in the API's `types.ts`, like every other shape here.
+ * Changing one means changing both, on purpose.
+ *
+ * **This is the only event shape the UI ever sees.** No provider's wire format
+ * reaches the browser, which is what makes swapping SerpApi for the mock — or
+ * back — a change to one binding in `server.ts` and nothing on this side.
+ */
+export interface EventCoordinates {
+  readonly latitude: number;
+  readonly longitude: number;
+  /** How the position was found. A venue-index match is worth less than a street one. */
+  readonly source: 'provider' | 'address' | 'venue';
+}
+
+export interface EventLink {
+  readonly label: string;
+  readonly url: string;
+}
+
+export interface LocalEvent {
+  readonly id: string;
+  readonly title: string;
+  /** Verbatim from the source, e.g. "Sat, Aug 8, 7 – 10 PM". Always shown. */
+  readonly when: string;
+  /** Absent when the source's date string could not be parsed. */
+  readonly startsAt?: string;
+  readonly endsAt?: string;
+  readonly venue?: string;
+  readonly address?: string;
+  readonly description?: string;
+  readonly thumbnailUrl?: string;
+  readonly url?: string;
+  readonly links: readonly EventLink[];
+  readonly queries: readonly string[];
+  /** Absent means *listed but not pinned* — shown, counted, never guessed at. */
+  readonly coordinates?: EventCoordinates;
+  readonly distanceMiles?: number;
+}
+
+/** Which provider produced a snapshot. */
+export type EventSource = 'mock' | 'serpapi';
+
+export interface EventsSnapshot {
+  readonly events: readonly LocalEvent[];
+  readonly updatedAt: string;
+  /**
+   * **`mock` has to be visible on screen.** Fabricated events shown as real
+   * would be the worst failure this dashboard could have, and this is how the
+   * page knows to say so.
+   */
+  readonly source: EventSource;
+  readonly center: {
+    readonly name: string;
+    readonly latitude: number;
+    readonly longitude: number;
+  };
+  readonly radiusMiles: number;
+  readonly counts: {
+    readonly total: number;
+    readonly pinned: number;
+    /** Shown to the user as "N not on the map", never hidden. */
+    readonly unpinned: number;
+    readonly merged: number;
+    readonly outsideRadius: number;
+  };
+}

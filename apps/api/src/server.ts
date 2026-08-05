@@ -3,10 +3,16 @@ import Fastify from 'fastify';
 import { config } from './config.js';
 import { TtlCache } from './cache.js';
 import { CategoriserUnavailableError, TrendCategoriser } from './categorise.js';
+import { buildEvents } from './event-pipeline.js';
+import { SerpApiEventProvider, type EventProvider } from './events.js';
+import { MockEventProvider } from './events-mock.js';
+import { EventStore } from './events-store.js';
+import { MapTilerGeocoder, type Geocoder } from './geocode.js';
 import { SchemaMigrationError, startOfLocalDay, TrendHistoryStore } from './history.js';
 import { GoogleTrendingRssProvider, type TrendProvider } from './trends.js';
 import type {
   ApiErrorBody,
+  EventsSnapshot,
   TrendingSearch,
   TrendsRefreshResult,
   TrendsSnapshot,
@@ -271,6 +277,143 @@ function attachCategories(
   });
 }
 
+/**
+ * The events source, chosen by `EVENTS_PROVIDER`.
+ *
+ * This one binding is the whole point of the `EventProvider` interface: the
+ * pipeline, the route and the browser see the same normalised shape either way,
+ * so moving to real data is this line and nothing else.
+ *
+ * It defaults to the mock because SerpApi's Google Events engine has answered
+ * every query with nothing since 2026-08-04.
+ */
+const eventProvider: EventProvider | null = (() => {
+  if (config.events.provider === 'serpapi') {
+    if (config.events.serpApiKey === '') {
+      app.log.error('EVENTS_PROVIDER=serpapi but no SERPAPI_KEY is set; events are off');
+      return null;
+    }
+    return new SerpApiEventProvider({
+      apiKey: config.events.serpApiKey,
+      timeoutMs: config.events.requestTimeoutMs,
+      queries: config.events.queries,
+      location: config.events.searchLocation,
+      timeZone: config.location.timezone,
+    });
+  }
+  return new MockEventProvider({ timeZone: config.location.timezone });
+})();
+
+if (eventProvider?.source === 'mock') {
+  app.log.warn(
+    'Events are served from the MOCK provider — this data is fabricated. ' +
+      'Set EVENTS_PROVIDER=serpapi for real listings.',
+  );
+}
+
+/**
+ * The geocoder, or null when there is no key.
+ *
+ * Absent means every event is listed and none is pinned, which is a working
+ * screen rather than a broken one — the same "works with it off" property the
+ * categoriser has.
+ */
+const geocoder: Geocoder | null =
+  config.events.mapTilerKey === ''
+    ? null
+    : new MapTilerGeocoder({
+        apiKey: config.events.mapTilerKey,
+        timeoutMs: config.events.geocodeTimeoutMs,
+        center: {
+          latitude: config.location.latitude,
+          longitude: config.location.longitude,
+        },
+        // Deliberately not `radiusMiles`. This bound rejects nonsense; the
+        // pipeline separately drops anything outside the display radius, so
+        // "too far away" and "could not be placed" stay different answers.
+        sanityMiles: config.events.geocodeSanityMiles,
+      });
+
+if (geocoder === null && eventProvider !== null) {
+  app.log.warn('No MAPTILER_KEY set; events will be listed but never pinned');
+}
+
+/**
+ * The permanent address-to-coordinate cache. Opening it is allowed to fail for
+ * the same reason the trend history is: a full or read-only SD card should cost
+ * pins, not the screen.
+ */
+let eventStore: EventStore | null = null;
+if (eventProvider !== null) {
+  try {
+    eventStore = new EventStore(config.events.databasePath);
+  } catch (error) {
+    app.log.error({ err: error }, 'Geocode cache unavailable; running without it');
+  }
+}
+
+/*
+ * A day, not ten minutes. Seven SerpApi searches a day is ~217 a month against
+ * a 250 free tier; three-hourly would be 1,680 and past the paid plan too.
+ *
+ * Nothing drives this on a timer. Like the trends cache, it refreshes on the
+ * first miss after the TTL — so a Pi that is switched off spends no quota, and
+ * a carousel swipe or a browser reload costs nothing.
+ */
+const eventsCache = new TtlCache<EventsSnapshot>({
+  ttlMs: config.events.cacheTtlMs,
+  load: async () => {
+    if (eventProvider === null) throw new Error('events are disabled');
+
+    const fetched = await eventProvider.getEvents();
+
+    if (fetched.emptyQueries.length > 0) {
+      // The signature of the current outage. Logged as a count rather than a
+      // failure, because Google returning nothing is not an error we can fix.
+      app.log.warn(
+        { empty: fetched.emptyQueries.length, of: fetched.callsMade },
+        'Some event queries returned nothing',
+      );
+    }
+
+    const built = await buildEvents({
+      events: fetched.events,
+      center: {
+        latitude: config.location.latitude,
+        longitude: config.location.longitude,
+      },
+      radiusMiles: config.events.radiusMiles,
+      geocoder,
+      store: eventStore,
+      nowMs: Date.now(),
+      onWarn: (message, error) => app.log.warn({ err: error }, message),
+    });
+
+    app.log.info(
+      {
+        source: eventProvider.source,
+        upstreamCalls: fetched.callsMade,
+        geocodeCalls: built.geocodeCalls,
+        ...built.counts,
+      },
+      'Events refreshed',
+    );
+
+    return {
+      events: built.events,
+      updatedAt: new Date().toISOString(),
+      source: eventProvider.source,
+      center: {
+        name: config.location.name,
+        latitude: config.location.latitude,
+        longitude: config.location.longitude,
+      },
+      radiusMiles: config.events.radiusMiles,
+      counts: built.counts,
+    };
+  },
+});
+
 app.get('/api/health', async () => ({
   ok: true,
   location: config.location.name,
@@ -483,6 +626,43 @@ app.get('/api/trends/today', async (request, reply) => {
   }
 });
 
+app.get('/api/events', async (request, reply) => {
+  if (eventProvider === null) {
+    const body: ApiErrorBody = {
+      error: 'events_disabled',
+      message: 'The events source is not configured.',
+    };
+    return reply.code(503).send(body);
+  }
+
+  try {
+    const result = await eventsCache.get();
+
+    if (result.state === 'stale') {
+      request.log.warn('Serving stale events; the upstream refresh failed');
+    }
+
+    const ageSeconds = Math.max(0, Math.floor((Date.now() - result.storedAt) / 1000));
+    reply
+      .header('cache-control', 'no-cache')
+      .header('x-cache', result.state)
+      .header('age', String(ageSeconds));
+
+    /*
+     * `storedAt` rather than "now", same as the trends route: this is when the
+     * list was actually fetched, which is the age the screen has to report.
+     */
+    return { ...result.value, updatedAt: new Date(result.storedAt).toISOString() };
+  } catch (error) {
+    request.log.error({ err: error }, 'Events lookup failed with no cached fallback');
+    const body: ApiErrorBody = {
+      error: 'events_unavailable',
+      message: 'Could not retrieve nearby events right now.',
+    };
+    return reply.code(503).send(body);
+  }
+});
+
 async function start(): Promise<void> {
   try {
     await app.listen({ port: config.port, host: config.host });
@@ -501,6 +681,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     void app.close().then(
       () => {
         history?.close();
+        eventStore?.close();
         process.exit(0);
       },
       () => process.exit(1),

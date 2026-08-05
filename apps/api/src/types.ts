@@ -423,3 +423,119 @@ export interface ApiErrorBody {
   readonly error: string;
   readonly message: string;
 }
+
+// --- Events (SerpApi Google Events, or the mock provider) ------------------
+
+/**
+ * Named `LocalEvent` rather than `Event` on purpose: Node's own types declare a
+ * global `Event`, and a domain type that shadows it reads as a mistake at every
+ * use site. "Local" is also what this actually is — an event near the
+ * configured location.
+ */
+
+/**
+ * Where a pin goes, and how much that position is worth trusting.
+ *
+ * `source` is carried because the three routes are not equally exact and the
+ * screen is entitled to know which it got. A street address resolves to a
+ * building; a venue name resolves to whatever MapTiler's POI index calls that
+ * venue, which is usually right and occasionally a similarly-named street.
+ */
+export interface EventCoordinates {
+  readonly latitude: number;
+  readonly longitude: number;
+  /**
+   * `provider` — the source supplied coordinates and we did not geocode.
+   * `address` — geocoded from a street address, `place_type: address`.
+   * `venue`   — geocoded from a venue name against the POI index.
+   */
+  readonly source: 'provider' | 'address' | 'venue';
+}
+
+/** One way to find out more. Merged across duplicates rather than replaced. */
+export interface EventLink {
+  readonly label: string;
+  readonly url: string;
+}
+
+/**
+ * What a provider produces: normalised, deduplicated fields, but not yet
+ * geocoded and not yet distance-filtered.
+ *
+ * Splitting this from `LocalEvent` is what keeps geocoding a concern of the
+ * pipeline rather than of each provider. A provider's only job is to turn its
+ * own wire format into these fields; whether a pin can be placed is decided
+ * once, afterwards, for every provider alike.
+ */
+export interface SourceEvent {
+  /** Stable within a provider. Used as the first rung of the dedup ladder. */
+  readonly id: string;
+  readonly title: string;
+  /**
+   * Exactly what the source said about timing, e.g. "Sat, Aug 8, 7 – 10 PM".
+   * Always present, always shown verbatim. This is the honest field: when the
+   * parsed instants below are absent, this is still true.
+   */
+  readonly when: string;
+  /** Parsed from `when` where that was possible. Absent means unparseable. */
+  readonly startsAt?: string;
+  readonly endsAt?: string;
+  readonly venue?: string;
+  readonly address?: string;
+  readonly description?: string;
+  readonly thumbnailUrl?: string;
+  readonly url?: string;
+  readonly links: readonly EventLink[];
+  /** Which configured queries found it. Union of all of them after dedup. */
+  readonly queries: readonly string[];
+  /** Rare. SerpApi supplies none; the mock provider supplies a few. */
+  readonly coordinates?: { readonly latitude: number; readonly longitude: number };
+}
+
+/**
+ * The normalised event the rest of the system uses. **The UI consumes this and
+ * nothing else** — no provider's wire format ever reaches the browser, which is
+ * what makes swapping the source a one-line change in `server.ts`.
+ */
+export interface LocalEvent extends SourceEvent {
+  /**
+   * Absent means *listed but not pinned*: we could not place it and will not
+   * guess. The screen shows the event and counts it as unpinned rather than
+   * dropping it or inventing a position.
+   */
+  readonly coordinates?: EventCoordinates;
+  /** Absent exactly when `coordinates` is. Miles from the configured centre. */
+  readonly distanceMiles?: number;
+}
+
+/** Which provider produced a snapshot. Carried so the screen can say so. */
+export type EventSource = 'mock' | 'serpapi';
+
+export interface EventsSnapshot {
+  /** Nearest first among pinned events, then unpinned ones. */
+  readonly events: readonly LocalEvent[];
+  readonly updatedAt: string;
+  /**
+   * **`mock` must be visible on screen.** Fabricated events presented as real
+   * would be the worst thing this dashboard could do, and this field is how the
+   * UI is able to avoid it.
+   */
+  readonly source: EventSource;
+  readonly center: {
+    readonly name: string;
+    readonly latitude: number;
+    readonly longitude: number;
+  };
+  readonly radiusMiles: number;
+  readonly counts: {
+    /** Events inside the radius, and what is on screen. */
+    readonly total: number;
+    readonly pinned: number;
+    /** Listed but not placeable. Shown to the user, never hidden. */
+    readonly unpinned: number;
+    /** Dropped as duplicates of another event. */
+    readonly merged: number;
+    /** Placed, but further out than the radius. */
+    readonly outsideRadius: number;
+  };
+}

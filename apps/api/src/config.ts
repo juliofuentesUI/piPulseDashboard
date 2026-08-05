@@ -60,6 +60,46 @@ export interface CategoriesConfig {
   readonly requestTimeoutMs: number;
 }
 
+/**
+ * The events map: what is on near the dashboard, as pins.
+ *
+ * `provider` is the switch the whole feature turns on. It defaults to `mock`
+ * because SerpApi's Google Events engine has returned nothing since 2026-08-04
+ * and a default that silently spends a 250-a-month quota on empty responses
+ * would be the wrong one — see `docs/events-map-plan.md`.
+ *
+ * **Mock data must be visibly labelled on screen.** `EventsSnapshot.source`
+ * carries the answer to the browser for exactly that reason.
+ */
+export interface EventsConfig {
+  /** `mock` or `serpapi`. Anything unrecognised falls back to `mock`. */
+  readonly provider: 'mock' | 'serpapi';
+  /** Backend-only, never logged, never sent to the browser. */
+  readonly serpApiKey: string;
+  /** Backend-only. The browser gets `VITE_MAPTILER_KEY` for tiles instead. */
+  readonly mapTilerKey: string;
+  /** How far out an event may be and still appear. The user chose 20. */
+  readonly radiusMiles: number;
+  /**
+   * How often the backend asks upstream. A day, because seven queries daily is
+   * ~217 searches against a 250 free tier, and events do not turn over hourly.
+   */
+  readonly cacheTtlMs: number;
+  readonly requestTimeoutMs: number;
+  readonly geocodeTimeoutMs: number;
+  /**
+   * How far out a geocoding result may land before it is treated as nonsense.
+   * Separate from `radiusMiles`, which is what the screen shows.
+   */
+  readonly geocodeSanityMiles: number;
+  /** SQLite file for the permanent address-to-coordinate cache. */
+  readonly databasePath: string;
+  /** SerpApi's `location` parameter. Not the same thing as the map centre. */
+  readonly searchLocation: string;
+  /** The seven searches, run once per refresh. */
+  readonly queries: readonly string[];
+}
+
 export interface AppConfig {
   readonly port: number;
   readonly host: string;
@@ -68,7 +108,23 @@ export interface AppConfig {
   readonly requestTimeoutMs: number;
   readonly trends: TrendsConfig;
   readonly categories: CategoriesConfig;
+  readonly events: EventsConfig;
 }
+
+/**
+ * The seven searches. Overlapping on purpose — deduplication merges what they
+ * share, and the overlap is what stops a single phrasing deciding the whole
+ * screen's contents.
+ */
+const DEFAULT_EVENT_QUERIES: readonly string[] = [
+  'events near San Jose CA',
+  'farmers markets and street fairs near San Jose CA',
+  'free community events near San Jose CA',
+  'live music and nightlife near San Jose CA',
+  'art museum and cultural events near San Jose CA',
+  'food festivals and pop-up events near San Jose CA',
+  'tech meetups and networking events near San Jose CA',
+];
 
 export const config: AppConfig = {
   port: num(process.env['PORT'], 3000),
@@ -94,7 +150,44 @@ export const config: AppConfig = {
     reasoningEffort: reasoning(process.env['TRENDS_CATEGORY_EFFORT']),
     requestTimeoutMs: num(process.env['TRENDS_CATEGORY_TIMEOUT_MS'], 30_000),
   },
+  events: {
+    provider: provider(process.env['EVENTS_PROVIDER']),
+    serpApiKey: str(process.env['SERPAPI_KEY'], ''),
+    mapTilerKey: str(process.env['MAPTILER_KEY'], ''),
+    radiusMiles: num(process.env['EVENTS_RADIUS_MILES'], 20),
+    cacheTtlMs: num(process.env['EVENTS_CACHE_TTL_MS'], 24 * 60 * 60 * 1000),
+    requestTimeoutMs: num(process.env['EVENTS_REQUEST_TIMEOUT_MS'], 15_000),
+    geocodeTimeoutMs: num(process.env['EVENTS_GEOCODE_TIMEOUT_MS'], 8000),
+    geocodeSanityMiles: num(process.env['EVENTS_GEOCODE_SANITY_MILES'], 150),
+    databasePath: str(process.env['EVENTS_DB_PATH'], 'data/events.db'),
+    searchLocation: str(
+      process.env['EVENTS_SEARCH_LOCATION'],
+      'San Jose, California, United States',
+    ),
+    queries: list(process.env['EVENTS_QUERIES']) ?? DEFAULT_EVENT_QUERIES,
+  },
 };
+
+/**
+ * Defaults to `mock`, and an unrecognised value falls back to it too.
+ *
+ * Failing towards the provider that costs nothing is the safe direction: a typo
+ * in `EVENTS_PROVIDER` shows fabricated events clearly labelled as such, rather
+ * than quietly spending a quota that bills for empty responses.
+ */
+function provider(value: string | undefined): EventsConfig['provider'] {
+  return (value ?? '').trim().toLowerCase() === 'serpapi' ? 'serpapi' : 'mock';
+}
+
+/** A `|`-separated override for the query list, or undefined to use the default. */
+function list(value: string | undefined): readonly string[] | undefined {
+  if (value === undefined || value.trim() === '') return undefined;
+  const parts = value
+    .split('|')
+    .map((part) => part.trim())
+    .filter((part) => part !== '');
+  return parts.length === 0 ? undefined : parts;
+}
 
 /** Falls back to `minimal` rather than the model's default, which is expensive. */
 function reasoning(value: string | undefined): CategoriesConfig['reasoningEffort'] {
