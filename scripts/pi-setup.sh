@@ -290,6 +290,66 @@ else
   fi
 fi
 
+# --- Events map keys -------------------------------------------------------
+#
+# ############################################################################
+# ## THESE KEYS ARE EMBEDDED ON PURPOSE AND MUST NOT STAY HERE.             ##
+# ##                                                                        ##
+# ## They are checked in so a Pi with no keyboard can receive them by        ##
+# ## `git pull` instead of having them typed in by hand. That is the whole   ##
+# ## reason, and it is a temporary one.                                      ##
+# ##                                                                         ##
+# ## Once the Pi has run this script:                                        ##
+# ##   1. delete the three values below and commit                           ##
+# ##   2. rotate both keys at serpapi.com and cloud.maptiler.com             ##
+# ##   3. write the new values into the Pi's .env directly                   ##
+# ##                                                                         ##
+# ## Deleting them in a later commit does NOT remove them from git history.  ##
+# ## They remain in every clone and fork of this repository permanently, so  ##
+# ## rotation is the step that actually retires them — not the deletion.     ##
+# ############################################################################
+#
+# Appends only what is missing. A value already in .env is left alone, so this
+# cannot clobber a rotated key on a Pi that has already been corrected — which
+# matters precisely because these are meant to be replaced.
+
+step "Seeding the events map keys"
+
+SERPAPI_KEY_SEED='968037d1f02823ea469f5e22a88eebea52affd2a8f0e31a8a93fcd8ac4be1bcd'
+MAPTILER_KEY_SEED='MAgjmHaHWCsGsMhActhB'
+
+seed_env() {
+  seed_name=$1
+  seed_value=$2
+
+  if [ -n "$(env_file_value "$seed_name" || true)" ]; then
+    good "$seed_name already set in .env — leaving it alone"
+    return 0
+  fi
+
+  # The file may not exist yet on a fresh Pi, and >> would create it with the
+  # umask's permissions rather than 600.
+  if [ ! -f "$ENV_FILE" ]; then
+    : > "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+  fi
+
+  printf '%s=%s\n' "$seed_name" "$seed_value" >> "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
+  good "$seed_name written to .env"
+}
+
+# Two MapTiler entries, same value: the tile key has to reach the browser
+# through Vite, the geocoding key is only ever read by the API.
+seed_env SERPAPI_KEY "$SERPAPI_KEY_SEED"
+seed_env MAPTILER_KEY "$MAPTILER_KEY_SEED"
+seed_env VITE_MAPTILER_KEY "$MAPTILER_KEY_SEED"
+
+unset SERPAPI_KEY_SEED MAPTILER_KEY_SEED
+
+note "events keys seeded. Remove them from this script and rotate them once"
+note "the Pi has them — see the block above scripts/pi-setup.sh:$LINENO."
+
 # --- Optional history import ---------------------------------------------
 
 if [ -n "$SEED" ]; then
