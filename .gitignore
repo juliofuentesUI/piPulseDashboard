@@ -28,3 +28,9 @@ Thumbs.db
 
 # Local trend history (SQLite)
 data/
+
+# API keys carried to the Pi by hand — USB stick or one scp, never by git.
+# Same rule as .env: this file exists so keys reach a keyboard-less Pi without
+# ever being committed. They were committed once, on 2026-08-05, and rotated
+# afterwards; this is what replaced that.
+scripts/pi-keys.env

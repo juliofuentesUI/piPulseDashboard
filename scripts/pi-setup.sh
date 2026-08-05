@@ -293,30 +293,32 @@ fi
 # --- Events map keys -------------------------------------------------------
 #
 # ############################################################################
-# ## THESE KEYS ARE EMBEDDED ON PURPOSE AND MUST NOT STAY HERE.             ##
-# ##                                                                        ##
-# ## They are checked in so a Pi with no keyboard can receive them by        ##
-# ## `git pull` instead of having them typed in by hand. That is the whole   ##
-# ## reason, and it is a temporary one.                                      ##
-# ##                                                                         ##
-# ## Once the Pi has run this script:                                        ##
-# ##   1. delete the three values below and commit                           ##
-# ##   2. rotate both keys at serpapi.com and cloud.maptiler.com             ##
-# ##   3. write the new values into the Pi's .env directly                   ##
-# ##                                                                         ##
-# ## Deleting them in a later commit does NOT remove them from git history.  ##
-# ## They remain in every clone and fork of this repository permanently, so  ##
-# ## rotation is the step that actually retires them — not the deletion.     ##
-# ############################################################################
+# The events map needs a SerpApi key and a MapTiler key, and a Pi with no
+# keyboard cannot have them typed in. `.env` is gitignored and cannot arrive by
+# `git pull`, so they come from a **keys file** instead: an untracked file
+# beside this script, carried over on a USB stick or written once over SSH.
 #
-# Appends only what is missing. A value already in .env is left alone, so this
-# cannot clobber a rotated key on a Pi that has already been corrected — which
-# matters precisely because these are meant to be replaced.
+# On 2026-08-05 these values were briefly committed into this script, to get
+# them onto a keyboard-less Pi. **They were rotated afterwards**, because
+# deleting them here does not remove them from git history — every clone and
+# fork of this repository still carries the originals. Rotation is what retired
+# them; this deletion only stops it happening again.
+#
+# Appends only what is missing. A value already in .env is left alone, so a key
+# rotated on the Pi is never clobbered by a stale one in the keys file.
 
-step "Seeding the events map keys"
+step "Checking the events map keys"
 
-SERPAPI_KEY_SEED='968037d1f02823ea469f5e22a88eebea52affd2a8f0e31a8a93fcd8ac4be1bcd'
-MAPTILER_KEY_SEED='MAgjmHaHWCsGsMhActhB'
+# Untracked, and gitignored alongside .env. Same shape as .env:
+#   SERPAPI_KEY=...
+#   MAPTILER_KEY=...
+KEYS_FILE="$ROOT/scripts/pi-keys.env"
+
+keys_file_value() {
+  [ -f "$KEYS_FILE" ] || return 1
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$KEYS_FILE" |
+    tail -n 1 | sed 's/[[:space:]]*$//'
+}
 
 seed_env() {
   seed_name=$1
@@ -324,6 +326,11 @@ seed_env() {
 
   if [ -n "$(env_file_value "$seed_name" || true)" ]; then
     good "$seed_name already set in .env — leaving it alone"
+    return 0
+  fi
+
+  if [ -z "$seed_value" ]; then
+    note "$seed_name not set — add it to scripts/pi-keys.env and re-run"
     return 0
   fi
 
@@ -339,16 +346,22 @@ seed_env() {
   good "$seed_name written to .env"
 }
 
-# Two MapTiler entries, same value: the tile key has to reach the browser
-# through Vite, the geocoding key is only ever read by the API.
-seed_env SERPAPI_KEY "$SERPAPI_KEY_SEED"
-seed_env MAPTILER_KEY "$MAPTILER_KEY_SEED"
-seed_env VITE_MAPTILER_KEY "$MAPTILER_KEY_SEED"
+if [ ! -f "$KEYS_FILE" ]; then
+  note "no scripts/pi-keys.env, so the events keys were not set"
+  note "the dashboard still runs: events are listed without a map and without"
+  note "pins, which is a working screen rather than a broken one."
+else
+  SERPAPI_SEED="$(keys_file_value SERPAPI_KEY || true)"
+  MAPTILER_SEED="$(keys_file_value MAPTILER_KEY || true)"
 
-unset SERPAPI_KEY_SEED MAPTILER_KEY_SEED
+  # Two MapTiler entries, same value: the tile key has to reach the browser
+  # through Vite, the geocoding key is only ever read by the API.
+  seed_env SERPAPI_KEY "$SERPAPI_SEED"
+  seed_env MAPTILER_KEY "$MAPTILER_SEED"
+  seed_env VITE_MAPTILER_KEY "$MAPTILER_SEED"
 
-note "events keys seeded. Remove them from this script and rotate them once"
-note "the Pi has them — see the block above scripts/pi-setup.sh:$LINENO."
+  unset SERPAPI_SEED MAPTILER_SEED
+fi
 
 # --- Optional history import ---------------------------------------------
 
