@@ -7,6 +7,7 @@
   import LoadingScreen from './lib/components/LoadingScreen.svelte';
   import PageDots from './lib/components/PageDots.svelte';
   import CategoryLegend from './lib/components/CategoryLegend.svelte';
+  import HeadlineQrModal from './lib/components/HeadlineQrModal.svelte';
   import SearchPulse from './lib/components/SearchPulse.svelte';
   import SettingsModal from './lib/components/SettingsModal.svelte';
   import WeatherDashboard from './lib/components/WeatherDashboard.svelte';
@@ -179,7 +180,9 @@
    * cannot resume underneath it and nothing closes the user's dialog for them.
    */
   $effect(() => {
-    attract.suspend(menuOpen || legendOpen || trends.dayTrend !== null);
+    attract.suspend(
+      menuOpen || legendOpen || trends.dayTrend !== null || trends.qrHeadline !== null,
+    );
   });
 </script>
 
@@ -253,6 +256,7 @@
             onclosecard={() => trends.closeCard()}
             onmenu={() => (menuOpen = true)}
             onhold={() => attract.start()}
+            onqr={(headline) => trends.openQr(headline)}
           />
         </section>
 
@@ -290,8 +294,21 @@
         Rendered from the store's own state, which means a poll landing while
         it is open refreshes it instead of leaving it stale.
       -->
-      {#if trends.dayTrend !== null}
-        <DayTrendModal detail={trends.dayTrend} onclose={() => trends.closeDayTrend()} />
+      <!--
+        Replaces the day-trend dialog rather than stacking on it, the same way
+        the legend replaces the settings panel. Two dialogs on a 720px panel
+        leave the lower one as a rim of frame around the upper, which reads as a
+        rendering fault rather than as depth. Closing this brings the day trend
+        straight back, because its own state was never cleared.
+      -->
+      {#if trends.qrHeadline !== null}
+        <HeadlineQrModal headline={trends.qrHeadline} onclose={() => trends.closeQr()} />
+      {:else if trends.dayTrend !== null}
+        <DayTrendModal
+          detail={trends.dayTrend}
+          onclose={() => trends.closeDayTrend()}
+          onqr={(headline) => trends.openQr(headline)}
+        />
       {/if}
 
       {#if menuOpen}

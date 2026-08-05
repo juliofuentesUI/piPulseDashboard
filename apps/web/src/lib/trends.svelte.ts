@@ -22,6 +22,7 @@ import type {
   DashboardFailure,
   DashboardPhase,
   TrendDay,
+  TrendHeadlineView,
   TrendHistory,
   TrendsSnapshot,
 } from './types';
@@ -156,6 +157,28 @@ export class Trends {
 
   closeCard(): void {
     this.cardOpen = false;
+  }
+
+  /**
+   * The headline whose QR code is showing, or null.
+   *
+   * Held here rather than in a component for the same reason `cardOpen` is:
+   * attract mode has to be able to close it, and it can be opened from two
+   * different places — the trend card on the Search Pulse page, and the day
+   * trend's own dialog.
+   *
+   * A `TrendHeadlineView` and not a key: headlines have no stable identity
+   * across fetches, and holding an index would start describing a different
+   * article the moment Google reordered them.
+   */
+  qrHeadline = $state<TrendHeadlineView | null>(null);
+
+  openQr(headline: TrendHeadlineView): void {
+    this.qrHeadline = headline;
+  }
+
+  closeQr(): void {
+    this.qrHeadline = null;
   }
 
   #day = $state<TrendDay | null>(null);

@@ -6,9 +6,11 @@
     card: TrendCardView;
     history: TrendHistoryView | null;
     onback: () => void;
+    /** Opens the QR code for a headline. Only called when it has a URL. */
+    onqr: (headline: TrendHeadlineView) => void;
   }
 
-  let { card, history, onback }: Props = $props();
+  let { card, history, onback, onqr }: Props = $props();
 
   /**
    * The image is loaded straight from Google's CDN, so it can fail on its own
@@ -39,10 +41,32 @@
   named, and never summarised, interpreted or passed off as a related search.
 -->
 {#snippet quote(headline: TrendHeadlineView)}
-  <figure class="quote">
+  <figure class="quote" class:tappable={headline.url !== ''}>
     <blockquote class="text">{headline.text}</blockquote>
     {#if headline.source !== '' || headline.host !== ''}
-      <figcaption class="attrib">{headline.source}{#if headline.source !== '' && headline.host !== ''}<span class="sep">·</span>{/if}{headline.host}</figcaption>
+      <figcaption class="attrib">{headline.source}{#if headline.source !== '' && headline.host !== ''}<span class="sep">·</span>{/if}{headline.host}{#if headline.url !== ''}<span class="scan" aria-hidden="true"></span>{/if}</figcaption>
+    {/if}
+    {#if headline.url !== ''}
+      <!--
+        A real button, stretched over the quote, rather than a role on the
+        figure.
+
+        The figure/blockquote/figcaption markup is load-bearing — it is what
+        says the headline is quoted verbatim with its source named — and a
+        button may only contain phrasing content, so the quote cannot go
+        inside one. Putting a bare button over it keeps the semantics intact,
+        gets keyboard and screen-reader behaviour for free, and needs no
+        role or tabindex of its own.
+
+        The label carries the headline, because "button" alone would be
+        three identical announcements on a card with three headlines.
+      -->
+      <button
+        class="tap"
+        type="button"
+        aria-label="Show QR code for: {headline.text}"
+        onclick={() => onqr(headline)}
+      ></button>
     {/if}
   </figure>
 {/snippet}
@@ -349,6 +373,40 @@
     gap: 6px;
     margin: 0;
     min-width: 0;
+  }
+
+  /*
+   * `relative` so the stretched button has something to anchor to. Safe against
+   * `millennium`, which gives `.quote` only a plaque fill and shadow and sets
+   * no position of its own.
+   */
+  .quote.tappable {
+    position: relative;
+    cursor: pointer;
+  }
+
+  .tap {
+    position: absolute;
+    inset: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+
+  /*
+   * A code-shaped mark: outlined square with a filled core, the same flat
+   * grammar as the page dots and the map pins. It says "a camera can follow
+   * this" without spending a word, and it is drawn permanently because a wall
+   * panel has no hover to reveal it on.
+   */
+  .scan {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-left: 8px;
+    vertical-align: middle;
+    background: var(--c-blue);
+    box-shadow: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-blue);
   }
 
   /*

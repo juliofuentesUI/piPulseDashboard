@@ -178,6 +178,7 @@ export function toTrendCard(trend: TrendingSearch, now: Date): TrendCardView {
       text: item.title,
       source: (item.source ?? '').toUpperCase(),
       host: hostOf(item.url),
+      url: item.url ?? '',
     })),
   };
 }
@@ -536,6 +537,7 @@ export function toDayDetail(
       text: item.title,
       source: (item.source ?? '').toUpperCase(),
       host: hostOf(item.url),
+      url: item.url ?? '',
     })),
     // All-time and ours, so it explains why the log can reach back past the
     // day the summary above it describes.

@@ -1,13 +1,15 @@
 <script lang="ts">
-  import type { TrendDayDetailView } from '../types';
+  import type { TrendDayDetailView, TrendHeadlineView } from '../types';
   import Sparkline from './Sparkline.svelte';
 
   interface Props {
     detail: TrendDayDetailView;
     onclose: () => void;
+    /** Opens the QR code for a headline. Only called when it has a URL. */
+    onqr: (headline: TrendHeadlineView) => void;
   }
 
-  let { detail, onclose }: Props = $props();
+  let { detail, onclose, onqr }: Props = $props();
 
   let dialog: HTMLDivElement | undefined = $state();
 
@@ -174,10 +176,31 @@
           <ul class="headlines">
             {#each detail.headlines as headline (headline.key)}
               <li>
-                <figure class="quote">
+                <!--
+                  Interactive on the figure, not wrapped in a button: a button
+                  may only hold phrasing content, and the figure/blockquote/
+                  figcaption markup is load-bearing here — it is what says the
+                  headline is quoted verbatim with its source named.
+                -->
+                <figure class="quote" class:tappable={headline.url !== ''}>
                   <blockquote class="text">{headline.text}</blockquote>
                   {#if headline.source !== '' || headline.host !== ''}
-                    <figcaption class="attrib">{headline.source}{#if headline.source !== '' && headline.host !== ''}<span class="sep">·</span>{/if}{headline.host}</figcaption>
+                    <figcaption class="attrib">{headline.source}{#if headline.source !== '' && headline.host !== ''}<span class="sep">·</span>{/if}{headline.host}{#if headline.url !== ''}<span class="scan" aria-hidden="true"></span>{/if}</figcaption>
+                  {/if}
+                  {#if headline.url !== ''}
+                    <!--
+                      A real button stretched over the quote, not a role on the
+                      figure. Same reasoning as the trend card: a button may
+                      only hold phrasing content, and the figure/blockquote/
+                      figcaption markup is what says the headline is quoted
+                      verbatim with its source named.
+                    -->
+                    <button
+                      class="tap"
+                      type="button"
+                      aria-label="Show QR code for: {headline.text}"
+                      onclick={() => onqr(headline)}
+                    ></button>
                   {/if}
                 </figure>
               </li>
@@ -418,6 +441,34 @@
     gap: 6px;
     margin: 0;
     min-width: 0;
+  }
+
+  /*
+   * `relative` anchors the stretched button. Safe against `millennium`, which
+   * gives `.quote` only a plaque fill and shadow and no position of its own.
+   */
+  .quote.tappable {
+    position: relative;
+    cursor: pointer;
+  }
+
+  .tap {
+    position: absolute;
+    inset: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+
+  /* Same code-shaped mark the trend card uses, for the same reason. */
+  .scan {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-left: 8px;
+    vertical-align: middle;
+    background: var(--c-blue);
+    box-shadow: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-blue);
   }
 
   /*

@@ -9,6 +9,7 @@
   import type { PulseStatus } from '../trends.svelte';
   import type {
     DashboardPhase,
+    TrendHeadlineView,
     TrendCardView,
     TrendDayView,
     TrendDetailView,
@@ -54,6 +55,8 @@
     onclosecard: () => void;
     onmenu: () => void;
     onhold?: () => void;
+    /** Opens the QR code for one of the trend card's headlines. */
+    onqr: (headline: TrendHeadlineView) => void;
   }
 
   let {
@@ -82,6 +85,7 @@
     onclosecard,
     onmenu,
     onhold,
+    onqr,
   }: Props = $props();
 
   /** Movement is only worth a badge when the record actually shows one. */
@@ -104,7 +108,7 @@
 </script>
 
 {#if cardOpen && card !== null}
-  <TrendCard {card} {history} onback={onclosecard} />
+  <TrendCard {card} {history} onback={onclosecard} {onqr} />
 {:else}
 <div class="pulse" class:today={view === 'today'}>
   <TitleBar title="SEARCH PULSE" size={56} dotRows={3} {onmenu} {onhold} />

@@ -277,6 +277,16 @@ export interface TrendHeadlineView {
   readonly source: string;
   /** The article's domain, e.g. "wkrc.com". Empty when the feed named none. */
   readonly host: string;
+  /**
+   * The article itself. Empty when the feed named none — measured at 30/30
+   * present on the live export, but the field is optional upstream so this
+   * cannot be assumed.
+   *
+   * Carried through to the view rather than only reduced to `host`, because a
+   * QR code needs the whole address. Nothing renders it as a link: a kiosk
+   * panel has no browser to follow one, which is the reason the QR exists.
+   */
+  readonly url: string;
 }
 
 /**
