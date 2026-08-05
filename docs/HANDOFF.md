@@ -8,8 +8,14 @@ what happens next. Delete or rewrite it when it stops being true.
 ## Start here — the next session is planning, not building
 
 **The next session designs a new screen: a map of nearby events, as pins, on the
-carousel.** The user's description: a cheap maps API or library, pins from Eventbrite,
-tapping a pin shows that event's details, and it has to be performant on a Pi.
+carousel.** Tapping a pin shows that event's details, and it has to be performant on a Pi.
+The stack is already chosen — **SerpApi, MapTiler and Leaflet** — and the user will paste a
+detailed implementation write-up at the start of the session.
+
+**The API keys will be in that pasted text.** Move them into `.env` as the first action,
+tell the user plainly that a pasted key is in a stored transcript and should be rotated
+once, and then get on with the work — see the note at the end of this document. Do not
+labour the point; it has already been made once and accepted.
 
 **Nothing is to be built until a plan exists and the user has agreed to it.** They asked
 explicitly for back-and-forth until there is shared agreement on what the feature is. That
@@ -18,43 +24,74 @@ is the job — not code.
 **Search Pulse is paused, deliberately, and it is in a good state.** Everything below about
 it is context, not a queue. Do not pick up its open items unless asked.
 
-### Four things to know before planning the map
+### The stack is chosen
 
-These are not objections. They are the costs, and the user has been clear that costs get
-discussed rather than discovered.
+**SerpApi for events, MapTiler for tiles, Leaflet for the map.** The user decided this on
+2026-08-05, and they have a detailed implementation write-up from ChatGPT that they will
+paste in at the start of the session. **Read that before proposing anything**, and treat it
+as their intent rather than as a specification to follow literally — parts of it will be
+right, and the job is to find the parts that meet this codebase badly.
 
-**1. Eventbrite has no public event search, and has not since February 2020.** Verified
-2026-08-05. The `GET /v3/events/search/` endpoint was removed and there is no replacement
-for searching events across the platform — only *retrieve by ID*, *list by venue*, and
-*list by organization*. Broad discovery requires their distribution partner programme,
-which is an application. **This may be the single fact that reshapes the feature**, and it
-should be settled before anything is designed around it. Ticketmaster's Discovery API is
-the usual substitute and does support latitude/longitude search on a free tier; SeatGeek is
-another. None of this has been decided.
+Eventbrite is out. Its public event search was removed in February 2020 and never replaced,
+which is what pushed the source to SerpApi — whose Google Events engine does what
+Eventbrite's search used to.
 
-**2. It is a third page, and everything assumes two.** `PAGES` in `App.svelte`, the page
-indicator, the swipe gesture and attract mode's four-stop tour were all written for two
-pages. `CLAUDE.md` no longer forbids a third — it says to cost it out first, and that is
-this plan's job. The cost is real but bounded; it is mostly `PageDots`, `ATTRACT_TOUR` and
-the carousel's scroll arithmetic.
+The choice is a good one and it answers most of what was worrying about this feature.
+Leaflet is small and renders **raster** tiles with no WebGL, which is the right shape for a
+Pi. MapTiler supports **custom styles**, which is a real answer to the aesthetic problem
+below rather than a workaround.
 
-**3. A map is the first real dependency this project would take.** The stack is Svelte,
-Vite and Fastify, and nothing else on the front end — the sprites, the RSS parser and the
-payload validation are all hand-written on purpose. Leaflet or MapLibre would be a genuine
-departure. `CLAUDE.md` permits it explicitly ("there is no banned-technology list at all
-any more") but requires it to be worth what it costs. Raster tiles on a Pi 5 are probably
-fine; WebGL is the open question.
+### Five things to raise before designing
 
-**4. Photographic map tiles will fight this dashboard's entire look.** Every pixel of this
-panel is flat, aliased, six-colour pixel art authored at 720 × 720. A standard OSM tile
-dropped into it will look like a screenshot pasted into a painting. There are answers —
-a hand-styled tile set, a vector map drawn to the palette, or an abstract non-geographic
-layout — and picking one is a design decision, not an implementation detail. **This is
-likely the hardest part of the feature and it is worth raising early.**
+These are not objections. They are the costs, and this user has been consistently clear
+that costs get discussed rather than discovered.
 
-Two smaller things worth clarifying with the user: what "low GPS data" means (the phrase is
-ambiguous — coarse coordinates? small payloads?), and where "near me" comes from, since the
-dashboard has no GPS and its location is a fixed San Jose in `config.ts`.
+**1. SerpApi does not return coordinates, and the feature is pins on a map.** Verified
+against SerpApi's Google Events documentation on 2026-08-05: each event carries `title`,
+`date`, `address` (text), `link`, `description`, `ticket_info`, `venue`, `thumbnail` and an
+`event_location_map` — **no latitude or longitude**. A text address cannot be placed on a
+Leaflet map. Something has to geocode it, which is a second lookup with its own quota;
+MapTiler offers geocoding. **This is the biggest gap between the chosen stack and the
+described feature and it should be settled first.**
+
+The good news is that the fix has a pattern already in this codebase: a venue's coordinates
+never change, so geocode once, store in SQLite keyed by address, and never look it up
+again. That is exactly what `trend_categories` does for categories, down to the reasoning —
+see `docs/trend-category-plan.md` for why "decide once and store" is worth more than the
+money it saves.
+
+**2. SerpApi is the real cost of this feature, and it is not small.** The free tier is
+**250 searches a month** — about eight a day — and paid starts at **$25/month for 1,000**.
+For comparison, trend categorisation costs $2.62 a *year*.
+
+That makes polling cadence a design decision rather than a detail. The trends feed is
+fetched every ten minutes, which would be 4,320 SerpApi searches a month and past the
+paid tier. Events do not change every ten minutes: one fetch every three hours is 240 a
+month and fits inside the free tier; hourly is 720 and needs the $25 plan. **Pick the
+cadence from the quota, and put the arithmetic in the plan the way the category plan does.**
+
+**3. It is a third page, and everything assumes two.** `PAGES` in `App.svelte`, the page
+indicator, the swipe gesture and attract mode's four-stop tour were all written for two.
+`CLAUDE.md` no longer forbids a third — it asks for the cost to be counted first, and that
+is this plan's job. Bounded: mostly `PageDots`, `ATTRACT_TOUR` and the carousel arithmetic.
+
+**4. Leaflet would be this project's first real front-end dependency.** The stack is Svelte,
+Vite and Fastify and nothing else — the sprites, the RSS parser and the payload validation
+are hand-written on purpose. `CLAUDE.md` permits new dependencies explicitly but requires
+them to be worth what they cost. Leaflet is about 40 KB and needs no WebGL, so this is
+probably the easiest of the five to justify; it still deserves a sentence in the plan.
+
+**5. Default map tiles will fight this dashboard's entire look.** Every pixel of this panel
+is flat, aliased, six-colour pixel art authored at 720 × 720. A standard tile set dropped
+into it will look like a photograph pasted into a painting. MapTiler's custom styles are the
+lever here — a style drawn from the same palette, with labels and detail stripped back — and
+the panel has **six themes**, so the question of whether the map restyles per theme is real
+and probably wants answering early. **This is the part most likely to look wrong and is
+worth a render before much is built.**
+
+Two smaller things to clarify with the user: what "low GPS data" meant (coarse coordinates?
+small payloads? it was never pinned down), and where "near me" comes from, since the Pi has
+no GPS and the dashboard's location is a fixed San Jose in `config.ts`.
 
 ## What landed this session
 
