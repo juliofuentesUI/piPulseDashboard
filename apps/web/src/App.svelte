@@ -3,6 +3,7 @@
 
   import DayTrendModal from './lib/components/DayTrendModal.svelte';
   import ErrorScreen from './lib/components/ErrorScreen.svelte';
+  import EventsMap from './lib/components/EventsMap.svelte';
   import LoadingScreen from './lib/components/LoadingScreen.svelte';
   import PageDots from './lib/components/PageDots.svelte';
   import CategoryLegend from './lib/components/CategoryLegend.svelte';
@@ -13,6 +14,7 @@
   import { Attract } from './lib/attract.svelte';
   import { BadgeStore, type BadgeStyle } from './lib/badge.svelte';
   import { Dashboard } from './lib/dashboard.svelte';
+  import { Events } from './lib/events.svelte';
   import { ScreenStore, SCREENS, type Screen } from './lib/screen.svelte';
   import { ThemeStore, type Theme } from './lib/theme.svelte';
   import { Trends } from './lib/trends.svelte';
@@ -25,10 +27,11 @@
    * holds whichever of the two weather layouts settings has chosen, so the
    * screen picker keeps meaning what it always did.
    */
-  const PAGES = ['WEATHER', 'SEARCH PULSE'] as const;
+  const PAGES = ['WEATHER', 'SEARCH PULSE', 'EVENTS'] as const;
 
   const dashboard = new Dashboard();
   const trends = new Trends();
+  const events = new Events();
   const themes = new ThemeStore();
   const badges = new BadgeStore();
   const screens = new ScreenStore();
@@ -156,6 +159,7 @@
 
     dashboard.start();
     trends.start();
+    events.start();
     attract.begin();
 
     return () => {
@@ -165,6 +169,7 @@
       }
       dashboard.stop();
       trends.stop();
+      events.stop();
       attract.dispose();
     };
   });
@@ -246,6 +251,25 @@
             cardOpen={trends.cardOpen}
             onopencard={() => trends.openCard()}
             onclosecard={() => trends.closeCard()}
+            onmenu={() => (menuOpen = true)}
+            onhold={() => attract.start()}
+          />
+        </section>
+
+        <section class="page" aria-label="Events">
+          <EventsMap
+            phase={events.phase}
+            snapshot={events.snapshot}
+            failure={events.failure}
+            events={events.visible}
+            pins={events.pins}
+            unpinned={events.unpinned}
+            isMock={events.isMock}
+            filter={events.filter}
+            selected={events.selected}
+            onfilter={(filter) => events.setFilter(filter)}
+            onselect={(id) => events.select(id)}
+            onclose={() => events.close()}
             onmenu={() => (menuOpen = true)}
             onhold={() => attract.start()}
           />

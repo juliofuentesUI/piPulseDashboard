@@ -334,6 +334,24 @@ html[data-theme='millennium'] section[aria-label='Search Pulse'] .row:has(> .men
  */
 
 /*
+ * The events map's attribution is the fifth place a corner lands on text, and
+ * the only one where being covered is a licence problem rather than a cosmetic
+ * one — MapTiler and OpenStreetMap both require it to stay visible.
+ *
+ * Measured: the strip is 201px and ends flush at the band's right edge, so the
+ * bottom-right ornament's 40px sat squarely over "OpenStreetMap". Nudging it
+ * inboard by 44 clears the solid part of the ornament, matching the figure the
+ * 7-day footer already uses for the same corner.
+ *
+ * `.leaflet-control-attribution` is Leaflet's class, not ours. That is the same
+ * arrangement this file already has with every other component it reaches into,
+ * and it carries the same caveat: renaming it upstream breaks this silently.
+ */
+html[data-theme='millennium'] section[aria-label='Events'] .leaflet-control-attribution {
+  margin-right: 44px;
+}
+
+/*
  * A winged-eye rail, straddling the rule under every band heading.
  *
  * Stretched to the full 704 rather than drawn at its own aspect. Held to its

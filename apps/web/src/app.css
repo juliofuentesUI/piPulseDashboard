@@ -48,6 +48,55 @@
    * `millennium` points this at Cinzel.
    */
   --font-display: var(--font-pixel);
+
+  /*
+   * How the map's tile imagery is recoloured for this theme.
+   *
+   * The basemap is one greyscale style (MapTiler `toner-v2`) filtered per
+   * theme, rather than six hand-authored styles. That choice is worth its own
+   * note: six styles would be six things to maintain, and switching theme would
+   * swap the tile layer and re-request every tile — visible as a flash, and
+   * billed. A filter is a compositor operation on tiles already in memory.
+   *
+   * The default suits a light theme: dial the stark black-and-white back to a
+   * mid grey so the pins and the panel's own rules stay the loudest marks on
+   * screen. A map that out-contrasts the interface drawn over it is a map
+   * nobody can read the interface on.
+   */
+  --map-filter: invert(12%) sepia(28%) saturate(340%) hue-rotate(178deg)
+    brightness(104%) contrast(88%) opacity(72%);
+}
+
+/*
+ * The dark themes need the tiles inverted before anything else: `toner-v2` is
+ * black ink on white paper, which on a dark panel is a white rectangle with the
+ * map cut out of it. `midnight` is the one that breaks first — its `ink` is
+ * near-white where every other theme's is dark — so it is the one to check
+ * after touching any of this.
+ */
+:root[data-theme='midnight'] {
+  --map-filter: invert(88%) sepia(18%) saturate(520%) hue-rotate(178deg)
+    brightness(78%) contrast(92%) opacity(80%);
+}
+
+:root[data-theme='dmg-green'] {
+  --map-filter: invert(22%) sepia(64%) saturate(420%) hue-rotate(58deg)
+    brightness(96%) contrast(86%) opacity(62%);
+}
+
+:root[data-theme='brutalist-mono'] {
+  --map-filter: invert(82%) sepia(72%) saturate(1100%) hue-rotate(48deg)
+    brightness(62%) contrast(120%) opacity(72%);
+}
+
+:root[data-theme='amber'] {
+  --map-filter: invert(74%) sepia(58%) saturate(760%) hue-rotate(348deg)
+    brightness(74%) contrast(94%) opacity(76%);
+}
+
+:root[data-theme='millennium'] {
+  --map-filter: invert(72%) sepia(46%) saturate(520%) hue-rotate(2deg)
+    brightness(76%) contrast(88%) opacity(74%);
 }
 
 /*

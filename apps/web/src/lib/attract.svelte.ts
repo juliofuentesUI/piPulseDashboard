@@ -63,7 +63,7 @@ export interface AttractStop {
 }
 
 /**
- * The tour, in order. Four stops, twenty seconds a loop.
+ * The tour, in order. Five stops, twenty-five seconds a loop.
  *
  * Deliberately all four *full-screen* views and nothing else. No dialog, no
  * modal, and for now no trend card: a card is a fine thing to look at from
@@ -78,6 +78,16 @@ export const ATTRACT_TOUR: readonly AttractStop[] = [
   { page: 0, screen: 'week' },
   { page: 1, pulse: 'now' },
   { page: 1, pulse: 'today' },
+  /*
+   * The map, plain. No event selected and no sheet: a sheet opening on its own
+   * looks broken for the same reason the tour never opens the settings dialog,
+   * and the map is worth looking at from across a room without one.
+   *
+   * It costs no tile requests. The Leaflet instance is created once and reused,
+   * so arriving here every twenty-five seconds redraws cached tiles rather than
+   * fetching any.
+   */
+  { page: 2 },
 ];
 
 /**

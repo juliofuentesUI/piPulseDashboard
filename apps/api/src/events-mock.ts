@@ -115,8 +115,10 @@ const SEEDS: readonly MockSeed[] = [
     queries: [Q_MUSIC],
   },
   {
-    proves: 'provider-supplied coordinates — must skip geocoding entirely',
-    inDays: 1,
+    proves:
+      'provider-supplied coordinates — must skip geocoding entirely. Also the ' +
+      'one seed dated today, so the TODAY filter has something to show.',
+    inDays: 0,
     startHour: 17,
     endHour: 21,
     title: 'Music in the Park: Summer Series',
