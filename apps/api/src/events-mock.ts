@@ -66,6 +66,10 @@ const SEEDS: readonly MockSeed[] = [
     address: '87 N San Pedro St, San Jose, CA 95110',
     description:
       'Weekly market with local produce, prepared food and live acoustic music along San Pedro Street.',
+    // Deliberately unreachable, so the broken-image fallback is exercised as
+    // well as the missing-image one. They are different paths: this fires
+    // `onerror` after a failed request, where an absent field never requests.
+    thumbnailUrl: 'https://example.invalid/img/missing.jpg',
     url: 'https://example.org/sj-farmers-market',
     queries: [Q_MARKETS],
   },
@@ -99,7 +103,7 @@ const SEEDS: readonly MockSeed[] = [
     title: 'San Jose Sharks vs Los Angeles Kings',
     venue: 'SAP Center',
     description: 'Regular season home game.',
-    thumbnailUrl: 'https://example.org/img/sharks.jpg',
+    thumbnailUrl: poster(210),
     url: 'https://example.org/sharks-kings',
     links: [{ label: 'Ticketmaster', url: 'https://example.org/tickets/sharks' }],
     queries: [Q_GENERAL],
@@ -216,7 +220,7 @@ const SEEDS: readonly MockSeed[] = [
     venue: 'SoFA District',
     address: '333 S 1st St, San Jose, CA 95113',
     description: 'Galleries, studios and street vendors across the SoFA district.',
-    thumbnailUrl: 'https://example.org/img/sofa.jpg',
+    thumbnailUrl: poster(30),
     queries: [Q_ART, Q_FREE],
   },
   {
@@ -228,7 +232,7 @@ const SEEDS: readonly MockSeed[] = [
     venue: 'Guadalupe River Park',
     address: '438 Coleman Ave, San Jose, CA 95110',
     description: 'Forty food trucks, live music and a beer garden along the river.',
-    thumbnailUrl: 'https://example.org/img/streetfood.jpg',
+    thumbnailUrl: poster(140),
     url: 'https://example.org/street-food',
     links: [
       { label: 'Eventbrite', url: 'https://example.org/eb/street-food' },
@@ -237,6 +241,28 @@ const SEEDS: readonly MockSeed[] = [
     queries: [Q_FOOD, Q_GENERAL],
   },
 ];
+
+/**
+ * A small synthetic poster, as a self-contained data URI.
+ *
+ * The fixtures need *some* thumbnails that actually load, or the list view can
+ * only ever be seen in its fallback state and the image path goes unverified.
+ * Inline SVG keeps that self-contained: no files added to the repo, no external
+ * request, and nothing that could be mistaken for a real event's artwork.
+ *
+ * Real events carry `thumbnail` or `image` from SerpApi, which are Google-hosted
+ * URLs. Those are ordinary remote images and need no help from here.
+ */
+function poster(hue: number): string {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144">` +
+    `<rect width="144" height="144" fill="hsl(${hue} 45% 82%)"/>` +
+    `<rect y="96" width="144" height="48" fill="hsl(${hue} 50% 62%)"/>` +
+    `<circle cx="46" cy="52" r="24" fill="hsl(${hue} 65% 46%)"/>` +
+    `<rect x="84" y="30" width="38" height="38" fill="hsl(${hue} 60% 54%)"/>` +
+    `</svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
 
 export class MockEventProvider implements EventProvider {
   readonly source = 'mock' as const;

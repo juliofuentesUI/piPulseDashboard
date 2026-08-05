@@ -3,8 +3,15 @@
   import L from 'leaflet';
   import 'leaflet/dist/leaflet.css';
 
-  import { EVENT_FILTERS, type EventFilter } from '../events.svelte';
+  import {
+    EVENT_FILTERS,
+    EVENT_VIEWS,
+    type EventFilter,
+    type EventSort,
+    type EventView,
+  } from '../events.svelte';
   import type { DashboardFailure, DashboardPhase, EventsSnapshot, LocalEvent } from '../types';
+  import EventList from './EventList.svelte';
   import EventSheet from './EventSheet.svelte';
   import TitleBar from './TitleBar.svelte';
 
@@ -17,8 +24,15 @@
     unpinned: number;
     isMock: boolean;
     filter: EventFilter;
+    view: EventView;
+    sort: EventSort;
+    /** Every visible event in the list's order, pinned or not. */
+    ordered: readonly LocalEvent[];
     selected: LocalEvent | null;
     onfilter: (filter: EventFilter) => void;
+    onview: (view: EventView) => void;
+    onsort: (sort: EventSort) => void;
+    onshowunplaced: () => void;
     onselect: (id: string) => void;
     onclose: () => void;
     onmenu: () => void;
@@ -34,8 +48,14 @@
     unpinned,
     isMock,
     filter,
+    view,
+    sort,
+    ordered,
     selected,
     onfilter,
+    onview,
+    onsort,
+    onshowunplaced,
     onselect,
     onclose,
     onmenu,
@@ -186,6 +206,18 @@
    */
   let framedFor = '';
 
+  /*
+   * Coming back from the list, the map's container was `visibility: hidden` and
+   * may have been resized underneath it. `invalidateSize` is cheap and idempotent,
+   * and skipping it leaves Leaflet drawing against a stale viewport — the same
+   * grey-rectangle failure the IntersectionObserver exists to prevent, reached by
+   * a different route.
+   */
+  $effect(() => {
+    if (view !== 'map') return;
+    requestAnimationFrame(() => map?.invalidateSize());
+  });
+
   /** Redraws markers whenever the visible set or the selection changes. */
   $effect(() => {
     const signature = pins.map((event) => event.id).join('|');
@@ -286,25 +318,65 @@
       <span class="warn">CACHED</span>
     {/if}
 
-    <span class="status">{statusLine}</span>
+    <!--
+      The unplaced count is a control, not a readout. An event with no position
+      cannot be a pin, so without a way through to the list this number is the
+      whole of what a person can ever learn about it — which is most of the way
+      to having dropped it.
+    -->
+    {#if unpinned > 0 && phase === 'ready'}
+      <span class="status">
+        <span class="shown">{pins.length} ON MAP</span>
+        <button class="unplaced" type="button" onclick={onshowunplaced}>
+          {unpinned} NOT PLACED
+        </button>
+      </span>
+    {:else}
+      <span class="status">{statusLine}</span>
+    {/if}
   </div>
 
-  <nav class="filters" aria-label="Event range">
-    {#each EVENT_FILTERS as option (option.id)}
-      <button
-        class="filter"
-        class:active={option.id === filter}
-        type="button"
-        aria-pressed={option.id === filter}
-        onclick={() => onfilter(option.id)}
-      >
-        {option.name}
-      </button>
-    {/each}
-  </nav>
+  <!--
+    Two nav groups in one 44px band, which is the arrangement Search Pulse
+    already uses for its view and ordering controls. On a wall display there is
+    no hover and no menu, so a control you cannot see is one nobody knows about.
+  -->
+  <div class="bands">
+    <nav class="filters" aria-label="Event range">
+      {#each EVENT_FILTERS as option (option.id)}
+        <button
+          class="filter"
+          class:active={option.id === filter}
+          type="button"
+          aria-pressed={option.id === filter}
+          onclick={() => onfilter(option.id)}
+        >
+          {option.name}
+        </button>
+      {/each}
+    </nav>
+
+    <nav class="filters view-switch" aria-label="Event view">
+      {#each EVENT_VIEWS as option (option.id)}
+        <button
+          class="filter"
+          class:active={option.id === view}
+          type="button"
+          aria-pressed={option.id === view}
+          onclick={() => onview(option.id)}
+        >
+          {option.name}
+        </button>
+      {/each}
+    </nav>
+  </div>
 
   <div class="band">
-    {#if !hasKey}
+    {#if view === 'list'}
+      <EventList events={ordered} {sort} selectedId={selected?.id ?? null} {onsort} {onselect} />
+    {/if}
+
+    {#if view === 'map' && !hasKey}
       <!--
         No key is a configuration state, not a fault, and it says which one.
         The events themselves are unaffected — only the basemap is missing.
@@ -313,14 +385,26 @@
         <p class="lead">NO MAP KEY SET</p>
         <p class="hint">VITE_MAPTILER_KEY IS EMPTY</p>
       </div>
-    {:else if tilesFailed}
+    {:else if view === 'map' && tilesFailed}
       <div class="fallback">
         <p class="lead">MAP TILES UNAVAILABLE</p>
-        <p class="hint">EVENTS BELOW ARE STILL CURRENT</p>
+        <p class="hint">SWITCH TO LIST TO SEE EVENTS</p>
       </div>
     {/if}
 
-    <div class="map" class:hidden={!hasKey || tilesFailed} bind:this={host}></div>
+    <!--
+      Hidden rather than unmounted when the list is showing.
+
+      Destroying the map to show a list would mean rebuilding it — and
+      re-requesting every tile — each time someone flips between the two. That
+      is the same reasoning that keeps the map alive across carousel pages, and
+      switching views is a far more frequent action than switching pages.
+    -->
+    <div
+      class="map"
+      class:hidden={!hasKey || tilesFailed || view === 'list'}
+      bind:this={host}
+    ></div>
 
     {#if selected !== null}
       <EventSheet event={selected} {onclose} />
@@ -375,15 +459,60 @@
   }
 
   .status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-left: auto;
     font-family: var(--font-pixel);
     font-size: 13px;
     color: var(--c-blue);
   }
 
+  .shown {
+    color: var(--c-blue);
+  }
+
+  /*
+   * Underlined rather than merely coloured. Six themes make colour alone an
+   * unreliable way to say "this is tappable" — in `dmg-green` the warning and
+   * accent tokens are the same hex — and this is the only control on the page
+   * that does not look like a button already.
+   */
+  .unplaced {
+    padding: 0;
+    font-family: var(--font-pixel);
+    font-size: 13px;
+    color: var(--c-hot);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+
+  .bands {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    border-bottom: var(--divider) solid var(--line);
+  }
+
   .filters {
     display: flex;
-    border-bottom: var(--divider) solid var(--line);
+  }
+
+  /*
+   * `.view-switch`, not `.views`. `millennium.css` gives `.views` an inset
+   * stone channel and 14px of padding, which is right for Search Pulse's
+   * full-width view band and wrong for a two-button nav sitting inside another
+   * band. Same class-name contract as `.foot` above.
+   */
+  .view-switch {
+    border-left: var(--divider) solid var(--line);
+  }
+
+  .view-switch .filter {
+    flex: 0 0 auto;
+    padding: 0 18px;
   }
 
   .filter {

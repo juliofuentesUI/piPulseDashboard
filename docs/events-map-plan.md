@@ -668,11 +668,37 @@ which the handoff correctly identified as the part most likely to look wrong.
 normalisation, deduplication, the three tables, the budget guards, `/api/events`. Built and
 tested entirely against the Phase 0 fixture. **No live calls in tests, ever.**
 
-### Phase 2 — the page
+### Phase 2 — the page — **BUILT 2026-08-05**
 
-Third carousel entry, Leaflet map created once, clustered markers, the bottom sheet, the
-Today / This Week filter, every state in the failure table including the no-basemap
-fallback.
+Third carousel entry, Leaflet map created once, the bottom sheet, the Today / This Week
+filter, and the no-basemap fallback. Marker clustering is **not** built — eleven pins do not
+need it, and it wants a render against real density before a hand-rolled implementation is
+worth writing.
+
+**A list view was added beyond the original plan**, at the user's request: the same events as
+two columns of cards with thumbnails, ordered by distance or by time, switched by a MAP /
+LIST pair beside the range filter.
+
+It closed a real gap rather than only adding a view. The map showed a count of events it
+could not place — "1 NOT PLACED" — and nothing else about them, which meant an event with no
+usable address existed on screen only as a digit. The plan's ruling was *listed* but not
+pinned; what was built was *counted* but not listed, which is most of the way to having
+dropped it. The count is now a control that opens the list on the event itself.
+
+Two collisions with `millennium.css`'s class-name contract were found by rendering, and both
+were invisible in the other five themes:
+
+- **`.foot`** is the 7-day footer's class and carries 44px of padding each side to clear the
+  corner ornaments. A card's meta row inheriting 88px of padding lost its venue name. Renamed
+  to `.meta`.
+- **`.views`** is Search Pulse's full-width view band and carries an inset stone channel plus
+  14px of padding, which is wrong on a two-button nav nested inside another band. Renamed to
+  `.view-switch`.
+
+Three other collisions were checked and deliberately kept: `millennium` qualifies `.title` by
+element (`h1.title`), only targets `.card .head` rather than `.head`, and `.date` adds a
+text-shadow that suits the sheet. **`.where` is kept on purpose** — it inherits the gold
+plaque, which is what Search Pulse's region strip already looks like.
 
 ### Phase 3 — theming and the Pi
 

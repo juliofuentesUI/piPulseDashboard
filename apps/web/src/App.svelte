@@ -266,8 +266,14 @@
             unpinned={events.unpinned}
             isMock={events.isMock}
             filter={events.filter}
+            view={events.view}
+            sort={events.sort}
+            ordered={events.ordered}
             selected={events.selected}
             onfilter={(filter) => events.setFilter(filter)}
+            onview={(view) => events.setView(view)}
+            onsort={(sort) => events.setSort(sort)}
+            onshowunplaced={() => events.showUnplaced()}
             onselect={(id) => events.select(id)}
             onclose={() => events.close()}
             onmenu={() => (menuOpen = true)}

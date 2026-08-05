@@ -20,6 +20,27 @@ export const EVENT_FILTERS: readonly { id: EventFilter; name: string }[] = [
   { id: 'week', name: 'THIS WEEK' },
 ];
 
+/** Map or list. Two ways to read the same events, not two sets of them. */
+export type EventView = 'map' | 'list';
+
+export const EVENT_VIEWS: readonly { id: EventView; name: string }[] = [
+  { id: 'map', name: 'MAP' },
+  { id: 'list', name: 'LIST' },
+];
+
+/**
+ * How the list is ordered. Map view has no ordering — a map shows position.
+ *
+ * `distance` is the one the list exists for: "what is on near me, nearest
+ * first" is a question the map can only answer by eye.
+ */
+export type EventSort = 'distance' | 'time';
+
+export const EVENT_SORTS: readonly { id: EventSort; name: string }[] = [
+  { id: 'distance', name: 'NEAREST' },
+  { id: 'time', name: 'SOONEST' },
+];
+
 /**
  * How often the page asks again.
  *
@@ -35,6 +56,8 @@ export class Events {
   failure = $state<DashboardFailure | null>(null);
 
   filter = $state<EventFilter>('week');
+  view = $state<EventView>('map');
+  sort = $state<EventSort>('distance');
 
   /** The event whose sheet is open, or null. Never an index — the list reorders. */
   selectedId = $state<string | null>(null);
@@ -77,6 +100,26 @@ export class Events {
   /** True when the events on screen are fabricated. The page must say so. */
   readonly isMock = $derived(this.snapshot?.source === 'mock');
 
+  /**
+   * The visible events in the list's chosen order.
+   *
+   * Events with no position sort last under either ordering, and that is the
+   * point of showing them at all: they are the ones the map cannot represent,
+   * so the list is the only place they exist. Dropping them here would recreate
+   * exactly the gap this view was built to close.
+   */
+  readonly ordered = $derived<readonly LocalEvent[]>(
+    [...this.visible].sort((a, b) => {
+      if (this.sort === 'distance') {
+        const near = compareOptionalNumber(a.distanceMiles, b.distanceMiles);
+        if (near !== 0) return near;
+      }
+      const soon = compareOptionalString(a.startsAt, b.startsAt);
+      if (soon !== 0) return soon;
+      return a.title.localeCompare(b.title);
+    }),
+  );
+
   readonly selected = $derived<LocalEvent | null>(
     this.selectedId === null
       ? null
@@ -96,6 +139,39 @@ export class Events {
     this.filter = filter;
     // A sheet left open would be showing an event the new filter excludes.
     this.close();
+  }
+
+  setView(view: EventView): void {
+    if (this.view === view) return;
+    this.view = view;
+    // The sheet is anchored to the bottom of whichever view is showing, and
+    // carrying it across reads as a panel that failed to close.
+    this.close();
+  }
+
+  setSort(sort: EventSort): void {
+    this.sort = sort;
+  }
+
+  /**
+   * Opens the list *on* the events that could not be placed.
+   *
+   * Reached from the "N NOT PLACED" count on the map, which is otherwise the
+   * only trace of them — the map cannot draw an event with no position, so
+   * without this the count is the whole of what a person can learn about it.
+   *
+   * Selecting the first one is what makes this a destination rather than a
+   * gesture. Unplaced events sort last under either ordering, so merely
+   * switching to the list leaves them below the fold on a twelve-card grid —
+   * the same dead end, one tap further along. The list scrolls the selection
+   * into view, and the sheet opens on it.
+   */
+  showUnplaced(): void {
+    this.view = 'list';
+    this.sort = 'distance';
+
+    const first = this.ordered.find((event) => event.coordinates === undefined);
+    this.selectedId = first?.id ?? null;
   }
 
   start(): void {
@@ -145,6 +221,21 @@ export class Events {
  * is a development-only difference and the honest behaviour for a page whose
  * whole subject is "near here, now".
  */
+/** Undefined sorts last, which is what "no distance known" should do. */
+function compareOptionalNumber(a: number | undefined, b: number | undefined): number {
+  if (a === b) return 0;
+  if (a === undefined) return 1;
+  if (b === undefined) return -1;
+  return a - b;
+}
+
+function compareOptionalString(a: string | undefined, b: string | undefined): number {
+  if (a === b) return 0;
+  if (a === undefined) return 1;
+  if (b === undefined) return -1;
+  return a < b ? -1 : 1;
+}
+
 function isToday(event: LocalEvent): boolean {
   if (event.startsAt === undefined) return false;
 
