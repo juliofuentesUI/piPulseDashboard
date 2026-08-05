@@ -5,7 +5,13 @@ import { TtlCache } from './cache.js';
 import { CategoriserUnavailableError, TrendCategoriser } from './categorise.js';
 import { SchemaMigrationError, startOfLocalDay, TrendHistoryStore } from './history.js';
 import { GoogleTrendingRssProvider, type TrendProvider } from './trends.js';
-import type { ApiErrorBody, TrendingSearch, TrendsSnapshot, WeatherSnapshot } from './types.js';
+import type {
+  ApiErrorBody,
+  TrendingSearch,
+  TrendsRefreshResult,
+  TrendsSnapshot,
+  WeatherSnapshot,
+} from './types.js';
 import { fetchWeather } from './weather.js';
 
 const app = Fastify({
@@ -324,17 +330,18 @@ app.get('/api/trends/now', async (request, reply) => {
      * make a working button look broken.
      */
     const forced = (request.query as { refresh?: string }).refresh === '1';
+    let refreshResult: TrendsRefreshResult | undefined;
     if (forced) {
       const now = Date.now();
-      if (now - lastForcedFetchMs >= FORCED_FETCH_FLOOR_MS) {
+      const since = now - lastForcedFetchMs;
+      if (since >= FORCED_FETCH_FLOOR_MS) {
         lastForcedFetchMs = now;
         trendsCache.invalidate();
+        refreshResult = { honoured: true, retryAfterMs: FORCED_FETCH_FLOOR_MS };
         request.log.info('Manual refresh; dropping the trends cache');
       } else {
-        request.log.info(
-          { withinMs: now - lastForcedFetchMs },
-          'Manual refresh refused; inside the upstream floor',
-        );
+        refreshResult = { honoured: false, retryAfterMs: FORCED_FETCH_FLOOR_MS - since };
+        request.log.info({ withinMs: since }, 'Manual refresh refused; inside the floor');
       }
     }
 
@@ -373,6 +380,7 @@ app.get('/api/trends/now', async (request, reply) => {
         state: categoriser === null ? 'off' : categoriesHalted ? 'halted' : 'ready',
         pending: withCategories.filter((trend) => trend.category === undefined).length,
       },
+      ...(refreshResult === undefined ? {} : { refresh: refreshResult }),
     };
     return snapshot;
   } catch (error) {

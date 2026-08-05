@@ -40,6 +40,8 @@
     categoryWarning: string;
     /** True while a manual refresh is in flight. */
     refreshing: boolean;
+    /** Short-lived message about what the last refresh press did. */
+    flash: string;
     onrefresh: () => void;
     onview: (view: PulseView) => void;
     onmode: (mode: PulseMode) => void;
@@ -69,6 +71,7 @@
     badge,
     categoryWarning,
     refreshing,
+    flash,
     onrefresh,
     onview,
     onmode,
@@ -124,7 +127,18 @@
       <span class="warn">{categoryWarning}</span>
     {/if}
 
-    {#if view === 'today'}
+    <!--
+      While a refresh message is up it takes the freshness readout's place
+      rather than floating over the panel. A real toast would need a z-index,
+      a position and a decision about what it covers on a screen where every
+      band is budgeted to the pixel; this needs none of those, and it puts the
+      answer exactly where the eye already goes to ask "how current is this".
+    -->
+    {#if flash !== ''}
+      <span class="status">
+        <span class="flash">{flash}</span>
+      </span>
+    {:else if view === 'today'}
       <span class="status-text">{day?.window ?? ''}</span>
       <span class="status">
         <span class="status-text">{day?.scope ?? ''}</span>
@@ -461,6 +475,21 @@
     padding: 0 24px;
     overflow: hidden;
     border-bottom: var(--divider) solid var(--line);
+  }
+
+  /*
+   * Inverted rather than merely coloured. It is transient, so it has one
+   * moment to be noticed, and on a wall display a colour change alone is easy
+   * to miss at four feet.
+   */
+  .flash {
+    padding: 3px 10px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    white-space: nowrap;
+    color: var(--c-bg);
+    background: var(--c-ink);
   }
 
   /*

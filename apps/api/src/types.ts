@@ -261,6 +261,20 @@ export interface TrendCategoriesStatus {
   readonly pending: number;
 }
 
+/**
+ * What a `?refresh=1` press actually did, so the panel can say so.
+ *
+ * Present only on a forced request. Without it an honoured press and a refused
+ * one are indistinguishable from the client — which is the same silent-failure
+ * shape that made the badges look broken, and not a mistake worth making twice.
+ */
+export interface TrendsRefreshResult {
+  /** False when the press landed inside the upstream floor and was ignored. */
+  readonly honoured: boolean;
+  /** Milliseconds until another forced fetch is allowed. Zero when one is. */
+  readonly retryAfterMs: number;
+}
+
 export interface TrendsSnapshot {
   /** Google region code the list was fetched for, e.g. "US". */
   readonly region: string;
@@ -275,6 +289,8 @@ export interface TrendsSnapshot {
   readonly updatedAt: string;
   /** Why there are or are not badges. Never absent; see the type. */
   readonly categories: TrendCategoriesStatus;
+  /** Only on a forced request; absent on the ordinary poll. */
+  readonly refresh?: TrendsRefreshResult;
 }
 
 /** One stored observation: where a trend sat at one moment. */

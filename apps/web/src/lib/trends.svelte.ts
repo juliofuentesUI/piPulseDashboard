@@ -53,6 +53,14 @@ const CATEGORY_CATCH_UP_MS = 8 * 1000;
 const MAX_CATEGORY_CATCH_UPS = 2;
 
 /**
+ * How long a refresh message stays up.
+ *
+ * Long enough to read a short line from a few feet away, short enough that the
+ * freshness readout it borrows the space from is not gone when you next look.
+ */
+const FLASH_MS = 4000;
+
+/**
  * Past this, the list is no longer keeping up with the backend's ten-minute
  * refresh and stops calling itself live. The slack over ten minutes covers one
  * missed upstream fetch without crying wolf.
@@ -87,6 +95,16 @@ export class Trends {
   online = $state(true);
   /** True while a manual refresh is in flight, so the control can say so. */
   refreshing = $state(false);
+
+  /**
+   * A short-lived message about what a refresh press just did.
+   *
+   * A press that Google answered and a press the floor swallowed look
+   * identical otherwise — the list simply sits there, which reads as a dead
+   * button. This is the smallest honest thing that distinguishes them.
+   */
+  flash = $state('');
+  #flashTimer: ReturnType<typeof setTimeout> | undefined;
 
   #snapshot = $state<TrendsSnapshot | null>(null);
   #now = $state(new Date());
@@ -372,6 +390,7 @@ export class Trends {
     window.removeEventListener('offline', this.#handleOffline);
     clearInterval(this.#timer);
     clearTimeout(this.#categoryTimer);
+    clearTimeout(this.#flashTimer);
     this.#controller?.abort();
     this.#historyController?.abort();
     this.#dayController?.abort();
@@ -390,11 +409,45 @@ export class Trends {
   async refreshNow(): Promise<void> {
     if (this.refreshing) return;
     this.refreshing = true;
+
+    // Captured before the request so "what is new" is measured against what
+    // was actually on screen when the button was pressed.
+    const before = new Set((this.#snapshot?.trends ?? []).map((trend) => trend.id));
+    const stampBefore = this.#snapshot?.updatedAt;
+
     try {
       await this.refresh({ force: true });
+      this.#flashResult(before, stampBefore);
     } finally {
       this.refreshing = false;
     }
+  }
+
+  /** Turns the outcome into the shortest true sentence about it. */
+  #flashResult(before: ReadonlySet<string>, stampBefore: string | undefined): void {
+    const snapshot = this.#snapshot;
+    if (snapshot === null) return this.#showFlash('COULD NOT REFRESH');
+
+    const result = snapshot.refresh;
+    if (result !== undefined && !result.honoured) {
+      // Rounded up: "WAIT 0S" on 400ms remaining would be a lie the user can
+      // catch by pressing again and being refused.
+      const seconds = Math.max(1, Math.ceil(result.retryAfterMs / 1000));
+      return this.#showFlash(`TOO SOON · WAIT ${seconds}S`);
+    }
+
+    if (snapshot.updatedAt === stampBefore) return this.#showFlash('NO NEW FETCH');
+
+    const fresh = snapshot.trends.filter((trend) => !before.has(trend.id)).length;
+    this.#showFlash(fresh === 0 ? 'REFRESHED · NOTHING NEW' : `REFRESHED · ${fresh} NEW`);
+  }
+
+  #showFlash(text: string): void {
+    this.flash = text;
+    clearTimeout(this.#flashTimer);
+    this.#flashTimer = setTimeout(() => {
+      this.flash = '';
+    }, FLASH_MS);
   }
 
   async refresh(options?: { readonly force?: boolean }): Promise<void> {

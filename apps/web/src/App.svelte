@@ -236,6 +236,7 @@
             badge={badges.current}
             categoryWarning={trends.categoryWarning}
             refreshing={trends.refreshing}
+            flash={trends.flash}
             onrefresh={() => void trends.refreshNow()}
             view={trends.view}
             onview={(view) => trends.setView(view)}

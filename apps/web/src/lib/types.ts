@@ -215,12 +215,19 @@ export interface TrendCategoriesStatus {
   readonly pending: number;
 }
 
+/** What a forced refresh did. Mirrors the API; absent on an ordinary poll. */
+export interface TrendsRefreshResult {
+  readonly honoured: boolean;
+  readonly retryAfterMs: number;
+}
+
 export interface TrendsSnapshot {
   readonly region: string;
   readonly trends: readonly TrendingSearch[];
   /** When the list was retrieved from Google, not when we last polled the API. */
   readonly updatedAt: string;
   readonly categories?: TrendCategoriesStatus;
+  readonly refresh?: TrendsRefreshResult;
 }
 
 /** One rendered row of the trend list. */
